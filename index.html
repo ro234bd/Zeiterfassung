@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teamordination Dr. Stütz & Dr. Haselgruber | Zeiterfassung v3.61</title>
+    <title>Teamordination Dr. Stütz & Dr. Haselgruber | Zeiterfassung v3.63</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -40,7 +40,7 @@
 
 <div id="loginOverlay" class="fixed inset-0 bg-slate-900 z-[9999] flex items-center justify-center p-4">
     <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-blue-600">
-        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800">Login <span class="text-blue-600">v3.61</span></h2>
+        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800">Login <span class="text-blue-600">v3.63</span></h2>
         <p class="text-[10px] font-bold text-slate-400 uppercase mb-6 tracking-widest">Teamordination Stütz & Haselgruber</p>
         
         <div class="space-y-4">
@@ -55,6 +55,56 @@
             <button onclick="performLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-black uppercase shadow-lg transition-all active:scale-95">Anmelden</button>
             <p id="loginErrorMsg" class="text-red-500 text-[10px] font-bold uppercase text-center hidden">Falsches Passwort!</p>
         </div>
+    </div>
+</div>
+
+<div id="teamStatsOverlay" class="hidden fixed inset-0 bg-black/50 z-[9000] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-lg border-t-8 border-emerald-500">
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+            <h2 class="text-xl font-black italic uppercase text-slate-700">Team Saldo-Liste</h2>
+            <button onclick="document.getElementById('teamStatsOverlay').classList.add('hidden')" class="text-2xl font-bold text-slate-400 hover:text-red-500">×</button>
+        </div>
+        <p class="text-[10px] text-slate-400 uppercase font-bold mb-4">Aktueller Stand aller Mitarbeiter</p>
+        <div class="overflow-y-auto max-h-[60vh]">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-100 text-[10px] uppercase text-slate-500 font-bold sticky top-0">
+                    <tr>
+                        <th class="p-2 text-left">Name</th>
+                        <th class="p-2 text-right">Saldo</th>
+                        <th class="p-2 text-right">Resturlaub</th>
+                    </tr>
+                </thead>
+                <tbody id="teamStatsBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+        </div>
+        <button onclick="document.getElementById('teamStatsOverlay').classList.add('hidden')" class="w-full mt-6 bg-slate-800 text-white py-3 rounded-xl font-bold uppercase text-xs">Schließen</button>
+    </div>
+</div>
+
+<div id="teamScheduleOverlay" class="hidden fixed inset-0 bg-black/50 z-[9000] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-4xl border-t-8 border-blue-500">
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+            <h2 class="text-xl font-black italic uppercase text-slate-700">Wochenarbeitszeiten Team</h2>
+            <button onclick="document.getElementById('teamScheduleOverlay').classList.add('hidden')" class="text-2xl font-bold text-slate-400 hover:text-red-500">×</button>
+        </div>
+        <p class="text-[10px] text-slate-400 uppercase font-bold mb-4">Übersicht der Soll-Arbeitszeiten</p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left border-collapse">
+                <thead class="bg-slate-100 text-slate-500 font-bold uppercase">
+                    <tr>
+                        <th class="p-2 border-b">Name</th>
+                        <th class="p-2 border-b w-24">Mo</th>
+                        <th class="p-2 border-b w-24">Di</th>
+                        <th class="p-2 border-b w-24">Mi</th>
+                        <th class="p-2 border-b w-24">Do</th>
+                        <th class="p-2 border-b w-24">Fr</th>
+                    </tr>
+                </thead>
+                <tbody id="teamScheduleBody" class="divide-y divide-slate-100">
+                    </tbody>
+            </table>
+        </div>
+        <button onclick="document.getElementById('teamScheduleOverlay').classList.add('hidden')" class="w-full mt-6 bg-slate-800 text-white py-3 rounded-xl font-bold uppercase text-xs">Schließen</button>
     </div>
 </div>
 
@@ -97,7 +147,6 @@
             <div class="bg-white p-6 rounded-2xl shadow border flex flex-col justify-center">
                  <h3 class="text-xs font-bold uppercase text-slate-400 mb-4 text-center border-b pb-2">Status</h3>
                  <div id="punchStatus" class="text-center italic text-slate-500 font-bold mb-6">Bereit...</div>
-                 
                  <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
                     <h4 class="text-[9px] font-black uppercase text-slate-400 mb-2">Einstellungen</h4>
                     <button onclick="changeUserPassword()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-600 py-2 rounded font-bold text-[10px] uppercase">Mein Passwort ändern</button>
@@ -140,7 +189,11 @@
                 <div class="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border">
                     <input type="checkbox" id="toggleSchoolHolidays" checked onchange="renderCalendar()" class="w-4 h-4 cursor-pointer">
                     <label for="toggleSchoolHolidays" class="text-[10px] font-bold uppercase text-slate-500 cursor-pointer">Ferien</label>
+                    
                     <button onclick="toggleTeamView()" id="btnTeamView" class="ml-4 bg-white border border-emerald-600 text-emerald-600 px-3 py-1 rounded text-[10px] font-black uppercase hover:bg-emerald-50 transition-colors">Team Übersicht</button>
+                    
+                    <button onclick="renderTeamSchedule()" class="ml-2 bg-blue-50 border border-blue-600 text-blue-600 px-3 py-1 rounded text-[10px] font-black uppercase hover:bg-blue-100 transition-colors">📅 Wer arbeitet wann?</button>
+                    
                     <button onclick="fetchSchoolHolidays(true)" title="Daten neu laden" class="ml-2 hover:rotate-180 transition-transform">🔄</button>
                 </div>
                 <div class="flex items-center gap-4">
@@ -160,7 +213,7 @@
             <div class="p-6 border-b">
                 <div class="flex justify-between items-start mb-4">
                     <div>
-                        <h2 class="text-xl font-black uppercase italic">Zeitnachweis v3.61</h2>
+                        <h2 class="text-xl font-black uppercase italic">Zeitnachweis v3.63</h2>
                         <p class="text-xs text-blue-600 font-bold uppercase tracking-tight">Teamordination Dr. Stütz & Dr. Haselgruber</p>
                     </div>
                     <div class="text-right">
@@ -186,6 +239,7 @@
                     <select id="viewYear" onchange="renderLogs()" class="bg-slate-700 p-1 rounded text-xs"></select>
                 </div>
                 <div class="flex gap-2">
+                    <button onclick="renderTeamStats()" class="bg-indigo-600 text-white px-4 py-1 rounded font-bold text-[10px] uppercase hover:bg-indigo-500">👥 Team Status</button>
                     <button onclick="exportExcel()" class="bg-emerald-600 px-4 py-1 rounded font-bold text-[10px] uppercase">Excel</button>
                     <button onclick="exportPDF()" class="bg-blue-600 px-4 py-1 rounded font-bold text-[10px] uppercase">PDF Export</button>
                 </div>
@@ -233,11 +287,9 @@ const DEFAULT_NAMES = ["Michaela Pfoser", "Alexandra Reiter", "Sandra Kehrer", "
 const WEEKDAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
-// NEU: passwords in DB
-let db = JSON.parse(localStorage.getItem('ze_profi_cloud_v3.61')) || { users: DEFAULT_NAMES, logs: {}, config: {}, admin: {}, passwords: {} };
+let db = JSON.parse(localStorage.getItem('ze_profi_cloud_v3.63')) || { users: DEFAULT_NAMES, logs: {}, config: {}, admin: {}, passwords: {} };
 let currentUser = db.users[0];
-let loggedInUser = null; // Wer ist tatsächlich eingeloggt?
-
+let loggedInUser = null; 
 let currentCalDate = new Date();
 let calView = 'month';
 let timeWarpOffset = 0;
@@ -261,33 +313,67 @@ function toLocalISO(date) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); 
 }
 
-// ---------------------- NEUE LOGIN LOGIK ------------------------
+// ---------------------- NEUE FUNKTIONEN ------------------------
+function renderTeamStats() {
+    const tbody = document.getElementById('teamStatsBody');
+    tbody.innerHTML = "";
+    db.users.forEach(u => {
+        if(u === "Admin") return;
+        const bal = calculateBalances(u, getNow().getFullYear(), getNow().getMonth(), false); // Bis Jahresende für Resturlaub
+        const saldoNow = calculateBalances(u, getNow().getFullYear(), getNow().getMonth(), true).totalSaldo; // Nur bis heute für Saldo
+        
+        tbody.innerHTML += `
+        <tr>
+            <td class="p-2 font-black text-slate-700">${u}</td>
+            <td class="p-2 text-right font-bold ${saldoNow < 0 ? 'text-red-500' : 'text-blue-600'}">${saldoNow.toFixed(2)}h</td>
+            <td class="p-2 text-right font-bold text-green-600">${bal.restVacation} T</td>
+        </tr>`;
+    });
+    document.getElementById('teamStatsOverlay').classList.remove('hidden');
+}
+
+function renderTeamSchedule() {
+    const tbody = document.getElementById('teamScheduleBody');
+    tbody.innerHTML = "";
+    const days = [1, 2, 3, 4, 5]; // Mo-Fr
+    db.users.forEach(u => {
+        if(u === "Admin") return;
+        let rowHtml = `<td class="p-2 font-black text-blue-800 border-b">${u}</td>`;
+        days.forEach(d => {
+            const cfg = (db.config[u] && db.config[u][d]) ? db.config[u][d] : {start: "08:00", target: 0};
+            if(cfg.target > 0) {
+                rowHtml += `<td class="p-2 border-b bg-blue-50/50"><div class="font-bold text-xs">${cfg.start}</div><div class="text-[9px] text-slate-400 font-bold">${cfg.target}h</div></td>`;
+            } else {
+                rowHtml += `<td class="p-2 border-b text-slate-200 text-xs">-</td>`;
+            }
+        });
+        const tr = document.createElement('tr');
+        tr.innerHTML = rowHtml;
+        tbody.appendChild(tr);
+    });
+    document.getElementById('teamScheduleOverlay').classList.remove('hidden');
+}
+
 function performLogin() {
     const user = document.getElementById('loginUserSelect').value;
     const pass = document.getElementById('loginPassInput').value;
-    
-    // Passwort Check
     const storedPass = (db.passwords && db.passwords[user]) ? db.passwords[user] : (user==="Admin"?"Va19tti!":"1234");
-    
     if(pass === storedPass) {
         loggedInUser = user;
         document.getElementById('loginOverlay').classList.add('hidden');
         document.getElementById('appContainer').classList.remove('hidden');
         document.getElementById('loginErrorMsg').classList.add('hidden');
-        
-        // ADMIN vs USER
         if(loggedInUser === "Admin") {
             testModeActive = true;
             document.getElementById('userSelect').classList.remove('hidden');
             document.getElementById('btn-einstellungen').classList.remove('hidden');
-            currentUser = db.users[0]; // Admin startet beim ersten User
+            currentUser = db.users[0];
         } else {
             testModeActive = false;
             document.getElementById('userSelect').classList.add('hidden');
             document.getElementById('btn-einstellungen').classList.add('hidden');
-            currentUser = loggedInUser; // Normaler User sieht nur sich
+            currentUser = loggedInUser;
         }
-        
         renderUserSelect();
         document.getElementById('userSelect').value = currentUser;
         renderAll();
@@ -312,7 +398,6 @@ function changeUserPassword() {
         alert("Passwort geändert!");
     }
 }
-// ---------------------------------------------------------------
 
 function getExtendedOutTime(dStr, inStr, outStr) {
     if(!inStr || !outStr) return outStr;
@@ -342,33 +427,22 @@ function getBreakTimeRange(dStr, inStr, outStr, uName) {
 
 async function init() {
     await syncFromCloud();
-    
-    // Sicherstellen, dass "Admin" existiert
     if(!db.users.includes("Admin")) db.users.push("Admin");
-    
-    // Init Passwörter falls leer
     if(!db.passwords) db.passwords = {};
     db.users.forEach(u => {
         if (!db.config[u]) { db.config[u] = {}; for(let i=0; i<7; i++) db.config[u][i] = { start: "08:00", target: (i==0 || i==6 ? 0 : 8) }; }
         if (!db.admin[u]) db.admin[u] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
-        // Default Passwörter setzen (falls noch nicht vorhanden)
-        if(!db.passwords[u]) {
-            db.passwords[u] = (u === "Admin") ? "Va19tti!" : "1234";
-        }
+        if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "Va19tti!" : "1234"; }
     });
-
     schoolHolidays = [...fallbackHolidays];
     await fetchHolidays();
     await fetchSchoolHolidays();
     populateSelectors();
-    
-    // Login Select füllen
     const ls = document.getElementById('loginUserSelect');
     ls.innerHTML = "";
     db.users.forEach(u => {
         let o = document.createElement('option'); o.value = u; o.innerText = u; ls.appendChild(o);
     });
-
     renderUserSelect();
     updateClock();
     setInterval(updateClock, 1000);
@@ -386,10 +460,10 @@ async function syncFromCloud() {
             const cloudDb = await r.json();
             if(cloudDb && cloudDb.users) {
                 db = cloudDb;
-                localStorage.setItem('ze_profi_cloud_v3.61', JSON.stringify(db));
+                localStorage.setItem('ze_profi_cloud_v3.63', JSON.stringify(db));
                 statusDiv.innerText = "● Daten geladen";
                 statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
-                if(loggedInUser) renderAll(); // Refresh wenn eingeloggt
+                if(loggedInUser) renderAll();
             }
         }
     } catch(e) { 
@@ -492,8 +566,11 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
         }
         else if (log.type === 'ZA') { ist = 0; }
         else if (log.in && log.out) {
-            ist = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${log.in}`)) / 3600000;
-            if (ist > 6.0) ist -= 0.5;
+            if (isWE || isH) { ist = 0; }
+            else {
+                ist = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${log.in}`)) / 3600000;
+                if (ist > 6.0) ist -= 0.5;
+            }
         }
         totalSaldo += (ist - target);
         iter.setDate(iter.getDate() + 1);
@@ -517,20 +594,14 @@ function renderLogs() {
             if (rawIst > 6.0) { 
                 pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
                 dispOut = getExtendedOutTime(dStr, log.in, log.out); 
-                ist = rawIst - 0.5; 
+                ist = (isH || isWE) ? 0 : rawIst - 0.5; 
             } else { 
-                ist = rawIst; 
+                ist = (isH || isWE) ? 0 : rawIst; 
             }
         }
         mIst += ist; mSoll += target;
-        let rowClasses = [];
-        if(isH) rowClasses.push('row-holiday');
-        if(d.getDay() === 6) rowClasses.push('row-weekend');
-        if(d.getDay() === 0) rowClasses.push('row-sunday');
-        if(log.type==='Urlaub') rowClasses.push('row-vacation');
-        if(log.type==='ZA') rowClasses.push('row-za');
-        
-        tbody.innerHTML += `<tr class="border-b ${rowClasses.join(' ')}">
+        let rowClass = isH?'row-holiday':''; if(d.getDay() === 6) rowClass = 'row-weekend'; if(d.getDay() === 0) rowClass = 'row-sunday'; if(log.type==='Urlaub') rowClass = 'row-vacation'; if(log.type==='ZA') rowClass = 'row-za';
+        tbody.innerHTML += `<tr class="border-b ${rowClass}">
             <td class="p-2 font-bold whitespace-nowrap">${i}.${m+1}. <span class="text-[9px] opacity-40 uppercase">${WEEKDAYS_SHORT[d.getDay()]}</span></td>
             <td class="p-2 text-right font-medium text-slate-600">${log.in||'-'}</td>
             <td class="p-2 text-right font-medium text-slate-600">${dispOut}</td>
@@ -554,7 +625,7 @@ function renderLogs() {
 }
 
 async function save() {
-    localStorage.setItem('ze_profi_cloud_v3.61', JSON.stringify(db));
+    localStorage.setItem('ze_profi_cloud_v3.63', JSON.stringify(db));
     const statusDiv = document.getElementById('syncStatus');
     try {
         await fetch(CLOUD_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(db) });
@@ -688,7 +759,6 @@ function editEntry(d) {
     if(ni!==null) { if(!db.logs[currentUser]) db.logs[currentUser] = {}; db.logs[currentUser][d] = {in:ni, out:no, note:nn}; save(); renderAll(); }
 }
 function unlockTest() { 
-    // Legacy für Notfälle
     const pass = document.getElementById('testPass').value;
     if(pass === 'hkb154132l' || pass === 'Va19tt!') { 
         testModeActive = true; document.getElementById('testHeaderUI').classList.remove('hidden'); document.getElementById('testLock').classList.add('hidden'); document.getElementById('testActiveMsg').classList.remove('hidden'); renderAdminConfigs(); 
@@ -698,7 +768,6 @@ function setHeaderWarp() { const val = document.getElementById('headerWarpTime')
 function resetWarp() { timeWarpOffset = 0; testModeActive = false; document.getElementById('testHeaderUI').classList.add('hidden'); document.getElementById('testLock').classList.remove('hidden'); document.getElementById('testActiveMsg').classList.add('hidden'); renderAll(); }
 
 function renderAdminConfigs() {
-    // Falls nicht Admin, gar nicht erst rendern
     if(loggedInUser !== "Admin") {
         document.getElementById('adminUserConfig').innerHTML = "<p>Zugriff verweigert.</p>";
         return;
@@ -761,8 +830,8 @@ function exportExcel() {
         let ist = 0, pStr = "-"; let dispOut = log.out || log.type || "";
         if(log.in && log.out) { 
             let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+log.in))/3600000); 
-            if(rawIst > 6.0) { pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); ist = rawIst - 0.5; dispOut = getExtendedOutTime(ds, log.in, log.out); } 
-            else { ist = rawIst; } 
+            if(rawIst > 6.0) { pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); ist = (isH || isWE) ? 0 : rawIst - 0.5; dispOut = getExtendedOutTime(ds, log.in, log.out); } 
+            else { ist = (isH || isWE) ? 0 : rawIst; } 
         }
         rows.push([i+"."+(m+1)+".", log.in||"", dispOut, pStr, ist.toFixed(2), target.toFixed(2), (ist-target).toFixed(2), log.note || ""]);
     }
