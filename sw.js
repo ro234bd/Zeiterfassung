@@ -1,7 +1,7 @@
 const CACHE_NAME = 'zeiterfassung-v1';
 const ASSETS = [
   './',
-  './Zeiterfassung3.50.html',
+  './index.html',
   './manifest.json'
 ];
 
@@ -11,4 +11,5 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('fetch', (e) => {
   e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+
 });
