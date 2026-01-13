@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teamordination Dr. Stütz & Dr. Haselgruber | Zeiterfassung v3.86</title>
+    <title>Teamordination Dr. Stütz & Dr. Haselgruber | Zeiterfassung v3.89</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -12,7 +12,6 @@
     
     <script>
       if ('serviceWorker' in navigator) {
-        // Falls wir lokal sind (file://) oder kein sw.js da ist, fangen wir den Fehler ab
         try { navigator.serviceWorker.register('./sw.js').catch(console.log); } catch(e) {}
       }
     </script>
@@ -23,19 +22,47 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .tab-active { border-bottom: 4px solid #2563eb; color: #2563eb; font-weight: 800; }
+        
+        /* Zeilen-Styles für Tabelle und Kalender */
         .row-holiday { background-color: #fef2f2 !important; color: #991b1b !important; }
         .row-vacation { background-color: #ecfdf5 !important; color: #064e3b !important; }
+        .row-schulung { background-color: #f3e8ff !important; color: #6b21a8 !important; } /* VIOLETT */
+        .row-custom { background-color: #fffbeb !important; color: #92400e !important; } /* GELB/ORANGE */
         .row-za { background-color: #fff7ed !important; color: #c2410c !important; border-left: 4px solid #f97316 !important; }
         .row-weekend { background-color: #f8fafc !important; color: #64748b !important; }
         .row-sunday { background-color: #fff7ed !important; color: #c2410c !important; border-left: 4px solid #ea580c !important; font-weight: bold !important; }
         .row-school-holiday { background-color: #f0f9ff !important; border-left: 4px solid #0ea5e9 !important; border-bottom: 1px solid #bae6fd !important; }
         
+        /* Kalender Grid Anpassungen */
         .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background-color: #e2e8f0; border: 1px solid #e2e8f0; }
-        .cal-day { background: white; min-height: 85px; padding: 4px; font-size: 0.75rem; position: relative; }
+        .cal-day { background: white; min-height: 85px; padding: 4px; font-size: 0.75rem; position: relative; display: flex; flex-direction: column; gap: 2px; }
         .cal-header { background: #f8fafc; font-weight: bold; padding: 8px; text-align: center; font-size: 0.7rem; text-transform: uppercase; }
+        
+        /* Kalender Einträge: Standard */
+        .cal-entry {
+            white-space: normal;      
+            word-wrap: break-word;    
+            line-height: 1.1;         
+            font-size: 0.65rem;       
+            padding: 2px 3px;
+            border-radius: 3px;
+            border: 1px solid transparent;
+            font-weight: 600;         
+        }
+
+        /* SPEZIAL: Jahresansicht noch kleiner */
+        .year-grid .cal-entry {
+            font-size: 0.5rem !important;
+            line-height: 1.0 !important;
+            padding: 1px 2px !important;
+        }
+        .year-grid .cal-day {
+            min-height: 60px !important; /* Etwas kompakter in der Höhe */
+        }
+
         .year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
         #mainTable { table-layout: fixed; width: 100%; }
-        * { font-style: italic; } 
+        * { font-style: normal; } 
 
         .sig-box { margin-top: 20px; padding: 20px; border: 2px dashed #cbd5e1; border-radius: 12px; text-align: center; background: #f8fafc; }
         .sig-badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-weight: bold; font-size: 0.75rem; text-transform: uppercase; }
@@ -46,7 +73,7 @@
 
 <div id="loginOverlay" class="fixed inset-0 bg-slate-900 z-[9999] flex items-center justify-center p-4">
     <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-blue-600">
-        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800">Login <span class="text-blue-600">v3.86</span></h2>
+        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800">Login <span class="text-blue-600">v3.89</span></h2>
         <p class="text-[10px] font-bold text-slate-400 uppercase mb-4 tracking-widest">Teamordination Dr. Stütz & Dr. Haselgruber</p>
         
         <div id="loginSyncStatus" class="text-[10px] font-bold text-slate-400 uppercase text-center mb-6">● Bereit zum Start</div>
@@ -182,10 +209,12 @@
                     <select id="planType" class="p-2 border rounded text-xs font-bold">
                         <option value="Urlaub">🌴 Urlaub</option>
                         <option value="Betriebsurlaub">🏢 Betriebsurlaub (Alle)</option>
+                        <option value="Schulung">🎓 Schulung (Info)</option>
                         <option value="ZA">⏳ Zeitausgleich (ZA)</option>
                         <option value="Krank">🤒 Krank</option>
-                        <option value="DELETE">🗑️ Eintrag löschen</option>
-                        <option value="DELETE_BU" class="text-red-600 font-black">🗑️ Betriebsurlaub löschen (ALLE)</option>
+                        <option value="Sonstiges">✏️ Freitext / Zeit</option>
+                        <option value="DELETE">🗑️ Eintrag löschen (Einzel)</option>
+                        <option value="DELETE_ALL" class="text-red-600 font-black">🗑️ Alle Termine löschen (Zeitraum)</option>
                     </select>
                     <button onclick="addPlanningRange()" class="bg-blue-600 text-white px-4 py-2 rounded font-bold uppercase text-xs">Übernehmen</button>
                 </div>
@@ -224,7 +253,7 @@
             <div class="p-6 border-b">
                 <div class="flex justify-between items-start mb-4">
                     <div>
-                        <h2 class="text-xl font-black uppercase italic">Zeitnachweis v3.86</h2>
+                        <h2 class="text-xl font-black uppercase italic">Zeitnachweis v3.89</h2>
                         <p class="text-xs text-blue-600 font-bold uppercase tracking-tight">Teamordination Dr. Stütz & Dr. Haselgruber</p>
                     </div>
                     <div class="text-right">
@@ -328,7 +357,6 @@ try {
 
 if (!db || !db.users || !Array.isArray(db.users) || db.users.length === 0) {
     db = { users: DEFAULT_NAMES, logs: {}, config: {}, admin: {}, passwords: {} };
-    // Notfall-Speicherung, damit immer was da ist
     localStorage.setItem(DB_KEY, JSON.stringify(db));
 }
 
@@ -471,7 +499,6 @@ function getBreakTimeRange(dStr, inStr, outStr, uName) {
 
 async function init() {
     try {
-        // --- 1. LOKALE DATEN SICHERSTELLEN ---
         if(!db.users.includes("Admin")) db.users.push("Admin");
         if(!db.passwords) db.passwords = {};
         if(!db.config.system) db.config.system = { reserve1: false, reserve2: false };
@@ -489,8 +516,6 @@ async function init() {
             if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "Va19tti!" : "1234"; }
         });
 
-        // --- 2. UI SOFORT RENDERN (DAS IST NEU!) ---
-        // Wir warten NICHT auf die Cloud, sondern zeigen sofort das Login mit den lokalen Daten
         schoolHolidays = [...fallbackHolidays];
         populateSelectors();
         
@@ -510,11 +535,8 @@ async function init() {
         updateClock();
         setInterval(updateClock, 1000);
 
-        // --- 3. CLOUD SYNC PARALLEL STARTEN ---
         fetchHolidays();
         fetchSchoolHolidays();
-        
-        // Asynchron Daten holen - blockiert die UI nicht mehr!
         syncFromCloud();
         
     } catch (err) {
@@ -527,24 +549,17 @@ async function syncFromCloud() {
     const loginSync = document.getElementById('loginSyncStatus');
     try {
         const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 5000); 
-        
-        // TRICK: Wir hängen "?noCache=" + Zeitstempel an die URL
-        // Damit zwingen wir den Browser, die echten Daten neu zu laden!
         const cleanUrl = CLOUD_URL + "?noCache=" + new Date().getTime();
-        
         const r = await fetch(cleanUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
         
         if(r.ok) {
             const cloudDb = await r.json();
-            
             if(cloudDb && cloudDb.users && Array.isArray(cloudDb.users)) {
                 db = cloudDb;
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
                 statusDiv.innerText = "● Daten geladen"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
                 if(loginSync) { loginSync.innerText = "● Online (Daten da!)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
-                
-                // Falls schon eingeloggt oder Dropdown offen -> Refresh
                 renderUserSelect();
                 if(loggedInUser) renderAll();
             } 
@@ -600,6 +615,7 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
                 if (iter.getMonth() === targetMonth) usedVacMonth++; 
             } 
         } else if (log.type === 'ZA') { ist = 0; }
+        else if (log.type === 'Sonstiges') { ist = log.value !== undefined ? parseFloat(log.value) : target; }
         else if (log.in && log.out) {
             if (isWE || isH) { ist = 0; }
             else { 
@@ -643,7 +659,22 @@ function renderLogs() {
             }
         }
         else if (log.type === 'ZA') { ist = 0; dispOut = "ZA"; }
-        else if (log.in && log.out) {
+        else if (log.type === 'Sonstiges') { 
+            ist = log.value !== undefined ? parseFloat(log.value) : target;
+            dispOut = log.title || "Sonstiges";
+        }
+        else if (log.type === 'Schulung') {
+            // Schulung hat 0h Ist, außer man stempelt.
+            if(log.in && log.out) {
+                 // Fallthrough zu unten (Berechnung durch Stempelung)
+            } else {
+                 ist = 0; 
+                 dispOut = "Schulung"; // Wird in Notiz angezeigt, hier Platzhalter
+            }
+        }
+
+        // Berechnung überschreiben, falls gestempelt wurde (auch bei Schulung!)
+        if (log.in && log.out) {
             let calcIn = log.in;
             const cfg = db.config[currentUser][d.getDay()] || {start: "00:00"};
             if(!isH && !isWE) calcIn = getKulanzStart(log.in, cfg.start);
@@ -662,10 +693,18 @@ function renderLogs() {
         let rowClass = ''; 
         if (log.type==='Urlaub' || log.type==='Betriebsurlaub') rowClass = 'row-vacation';
         else if (log.type==='ZA') rowClass = 'row-za';
+        else if (log.type==='Schulung') rowClass = 'row-schulung';
+        else if (log.type==='Sonstiges') rowClass = 'row-custom';
 
         if (d.getDay() === 6) rowClass = 'row-weekend';
         if (d.getDay() === 0) rowClass = 'row-sunday';
         if (isH) rowClass = 'row-holiday';
+        
+        // Notiz zusammenbauen
+        let note = log.note || "";
+        if(isH) note = '(' + isH + ') ' + note;
+        if(log.type === 'Schulung' && log.range) note = "Schulung: " + log.range + " " + note;
+        if(log.type === 'Sonstiges' && log.range) note = log.range + " " + note;
         
         const dateHtml = `<div class="flex items-center"><span class="w-8 text-right font-bold inline-block">${i}.${m+1}.</span><span class="w-10"></span><span class="text-[9px] opacity-60 uppercase tracking-wider">${WEEKDAYS_SHORT[d.getDay()]}</span></div>`;
 
@@ -676,7 +715,7 @@ function renderLogs() {
             <td class="p-2 text-center text-slate-600 font-medium">${pauseDisplay}</td>
             <td class="p-2 text-right font-bold">${ist.toFixed(2)}</td><td class="p-2 text-right text-slate-300">${target.toFixed(2)}</td>
             <td class="p-2 text-right font-bold ${(ist-target)<0?'text-red-500':'text-blue-600'}">${(ist-target).toFixed(2)}</td>
-            <td class="p-2 text-[10px] text-slate-500 italic truncate">${log.note || (isH?'('+isH+')':'')}</td>
+            <td class="p-2 text-[10px] text-slate-500 italic truncate">${note}</td>
             <td class="p-2 no-print text-center"><button onclick="editEntry('${dStr}')">✏️</button></td></tr>`;
     }
     
@@ -717,7 +756,6 @@ function renderLogs() {
     }
 }
 
-// ============== DER FIX WAR HIER: async function =================
 async function save() {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
     const statusDiv = document.getElementById('syncStatus');
@@ -761,21 +799,59 @@ function generateMonthNode(y, m, mini = false) {
                     if (u === "Admin") return;
                     const uLog = (db.logs[u]||{})[dStr] || {};
                     if(uLog.type) {
+                        // --- Urlaub nur anzeigen, wenn Arbeitstag ---
+                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
+                        if (typesToHide.includes(uLog.type)) {
+                            const dayOfWeek = d.getDay();
+                            const target = (db.config[u] && db.config[u][dayOfWeek]) ? db.config[u][dayOfWeek].target : 0;
+                            if (dayOfWeek === 0 || dayOfWeek === 6 || isH || target === 0) return;
+                        }
+                        // ---------------------------------------------------------
                         let cl = "bg-blue-50 text-blue-700 border-blue-200"; 
                         if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') cl="bg-emerald-50 text-emerald-700 border-emerald-200"; 
-                        if(uLog.type==='ZA') cl="bg-orange-50 text-orange-700 border-orange-200";
-                        cell.innerHTML += `<div class='text-[7px] font-black leading-none ${cl} border mt-0.5 px-0.5 rounded truncate'>${(uLog.type==='Urlaub'||uLog.type==='Betriebsurlaub')?u.split(' ')[0]:u.split(' ')[0]+': '+uLog.type}</div>`;
+                        if(uLog.type==='Schulung') cl="bg-purple-100 text-purple-700 border-purple-200";
+                        if(uLog.type==='Sonstiges') cl="bg-yellow-50 text-yellow-700 border-yellow-200";
+
+                        let label = u.split(' ')[0];
+                        if(uLog.type==='Schulung' && uLog.range) label += ` (${uLog.range})`;
+                        else if(uLog.type==='Sonstiges' && uLog.title) {
+                            label += ` (${uLog.title}`;
+                            if(uLog.range) label += `, ${uLog.range}`;
+                            label += `)`;
+                        }
+                        else if(uLog.type!=='Urlaub'&&uLog.type!=='Betriebsurlaub') label += `: ${uLog.type}`;
+                        
+                        // Hier wird die "cal-entry" Klasse verwendet, die wir im nächsten Schritt CSS-seitig verbessern
+                        cell.innerHTML += `<div class='cal-entry ${cl}'>${label}</div>`;
                     }
                 });
             } else {
                 const log = (db.logs[currentUser]||{})[dStr] || {};
                 if(log && log.type) { 
-                    if(!isH && d.getDay() !== 6 && d.getDay() !== 0) {
-                        if(log.type==='Urlaub' || log.type==='Betriebsurlaub') cell.classList.add('row-vacation'); 
-                        else if(log.type==='ZA') cell.classList.add('row-za'); 
-                        else cell.classList.add('bg-amber-50'); 
+                    // --- Urlaub nur anzeigen, wenn Arbeitstag ---
+                    let showLog = true;
+                    const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
+                    if (typesToHide.includes(log.type)) {
+                         const dayOfWeek = d.getDay();
+                         const target = (db.config[currentUser] && db.config[currentUser][dayOfWeek]) ? db.config[currentUser][dayOfWeek].target : 0;
+                         if (dayOfWeek === 0 || dayOfWeek === 6 || isH || target === 0) showLog = false;
                     }
-                    cell.innerHTML += `<div class='font-bold uppercase text-[8px]'>${log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type}</div>`; 
+                    // ---------------------------------------------------------
+
+                    if(showLog) {
+                        if(!isH && d.getDay() !== 6 && d.getDay() !== 0) {
+                            if(log.type==='Urlaub' || log.type==='Betriebsurlaub') cell.classList.add('row-vacation'); 
+                            else if(log.type==='ZA') cell.classList.add('row-za'); 
+                            else if(log.type==='Schulung') cell.classList.add('row-schulung');
+                            else if(log.type==='Sonstiges') cell.classList.add('row-custom');
+                            else cell.classList.add('bg-amber-50'); 
+                        }
+                        let txt = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
+                        if(log.type === 'Sonstiges' && log.title) txt = log.title;
+                        if(log.type === 'Schulung' && log.range) txt = "Schulung (" + log.range + ")";
+                        
+                        cell.innerHTML += `<div class='cal-entry'>${txt}</div>`; 
+                    }
                 }
             }
         } else cell.classList.add('bg-slate-50');
@@ -816,15 +892,48 @@ function renderCalendar() {
                     if (u === "Admin") return;
                     const uLog = (db.logs[u]||{})[dStr] || {};
                     if(uLog.type) { 
+                        // --- NEUE LOGIK: Urlaub nur anzeigen, wenn Arbeitstag ---
+                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
+                        if (typesToHide.includes(uLog.type)) {
+                            const dayOfWeek = d.getDay();
+                            const target = (db.config[u] && db.config[u][dayOfWeek]) ? db.config[u][dayOfWeek].target : 0;
+                            if (dayOfWeek === 0 || dayOfWeek === 6 || isH || target === 0) return;
+                        }
+                        // ---------------------------------------------------------
                         let col = "text-blue-700 bg-blue-50"; 
                         if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') col="text-emerald-700 bg-emerald-50"; 
-                        content += `<div class='text-[8px] font-bold ${col} p-1 rounded mt-1 border truncate'>${(uLog.type==='Urlaub'||uLog.type==='Betriebsurlaub')?u.split(' ')[0]:u.split(' ')[0]+': '+uLog.type}</div>`; 
+                        if(uLog.type==='Schulung') col="text-purple-700 bg-purple-50";
+                        if(uLog.type==='Sonstiges') col="text-yellow-700 bg-yellow-50";
+                        
+                        let txt = u.split(' ')[0];
+                        if(uLog.type==='Schulung' && uLog.range) txt += ` (${uLog.range})`;
+                        else if(uLog.type==='Sonstiges' && uLog.title) {
+                            txt += ` (${uLog.title}`;
+                            if(uLog.range) txt += `, ${uLog.range}`;
+                            txt += `)`;
+                        }
+                        else if(uLog.type!=='Urlaub'&&uLog.type!=='Betriebsurlaub') txt += `: ${uLog.type}`;
+                        
+                        content += `<div class='text-[8px] font-bold ${col} p-1 rounded mt-1 border truncate'>${txt}</div>`; 
                     }
                 });
             } else {
                 const log = (db.logs[currentUser]||{})[dStr] || {};
                 let dt = (log.in ? log.in + ' - ' + (getExtendedOutTime(dStr, log.in, log.out) || '') : '');
+                
+                // --- NEUE LOGIK ---
                 let typeDisplay = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
+                if(log.type === 'Sonstiges' && log.title) typeDisplay = log.title;
+                if(log.type === 'Schulung' && log.range) typeDisplay = "Schulung (" + log.range + ")";
+
+                const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
+                if (typesToHide.includes(log.type)) {
+                     const dayOfWeek = d.getDay();
+                     const target = (db.config[currentUser] && db.config[currentUser][dayOfWeek]) ? db.config[currentUser][dayOfWeek].target : 0;
+                     if (dayOfWeek === 0 || dayOfWeek === 6 || isH || target === 0) typeDisplay = "";
+                }
+                // ---------------------------------------------------------
+                
                 content += `<p class="text-[10px] mt-2 font-bold text-blue-600 truncate">${isH || typeDisplay || dt}</p>`;
             }
             grid.innerHTML += `<div class="p-4 bg-white border rounded-xl shadow-sm ${isH?'row-holiday':''}">${content}</div>`;
@@ -892,12 +1001,30 @@ function addPlanningRange() {
     if(start) {
         let current = new Date(start), finish = end ? new Date(end) : new Date(start);
         
+        let customTitle = null, customValue = null, customRange = null, schulungRange = null;
+        let forAll = false;
+
+        if(type === 'Sonstiges') {
+            customTitle = prompt("Titel für den Eintrag (z.B. Teamsitzung):");
+            if(!customTitle) return;
+            customRange = prompt("Zeitraum (z.B. 12:00 - 14:00) - Optional:", "");
+            customValue = prompt("Stundenanzahl (Optional - leer lassen für Tagessoll):", "");
+            if(confirm("Soll dieser Eintrag für ALLE Mitarbeiter gelten?\nOK = Ja, für alle\nAbbrechen = Nein, nur für " + currentUser)) {
+                forAll = true;
+            }
+        }
+        if(type === 'Schulung') {
+            schulungRange = prompt("Zeitraum (z.B. 09:00 - 12:00):");
+            if(!schulungRange) return;
+            if(confirm("Soll diese Schulung für ALLE Mitarbeiter gelten?\nOK = Ja, für alle\nAbbrechen = Nein, nur für " + currentUser)) {
+                forAll = true;
+            }
+        }
+
         let targets = [currentUser];
-        if(type === 'Betriebsurlaub') {
+        if(type === 'Betriebsurlaub' || type === 'DELETE_BU' || type === 'DELETE_ALL' || forAll) {
             targets = getVisibleUsers().filter(u => u !== 'Admin');
-        } else if (type === 'DELETE_BU') {
-            targets = getVisibleUsers().filter(u => u !== 'Admin');
-        } else if (currentUser === 'Admin') {
+        } else if (currentUser === 'Admin' && !forAll) {
             alert("Admin hat keine Urlaubsfunktion."); return;
         }
 
@@ -907,20 +1034,33 @@ function addPlanningRange() {
                 if(!db.logs[u]) db.logs[u] = {}; 
                 
                 if(type === 'DELETE_BU') {
-                    if(db.logs[u][dIso]?.type === 'Betriebsurlaub') {
-                        delete db.logs[u][dIso];
-                    }
+                    if(db.logs[u][dIso]?.type === 'Betriebsurlaub') delete db.logs[u][dIso];
                 } else if(type === "DELETE") {
                     delete db.logs[u][dIso]; 
+                } else if(type === "DELETE_ALL") {
+                    // Löscht jeglichen Eintrag an diesem Tag
+                     if(db.logs[u][dIso]) delete db.logs[u][dIso];
                 } else {
-                    db.logs[u][dIso] = {type: type}; 
+                    let entry = db.logs[u][dIso] || {};
+                    entry.type = type;
+                    
+                    if(type === 'Sonstiges') {
+                        entry.title = customTitle;
+                        if(customValue !== "") entry.value = customValue;
+                        if(customRange !== "") entry.range = customRange;
+                    }
+                    if(type === 'Schulung') {
+                        entry.range = schulungRange;
+                    }
+                    db.logs[u][dIso] = entry; 
                 }
             });
             current.setDate(current.getDate() + 1); 
         }
         save(); renderAll();
         if(type === 'Betriebsurlaub') alert("Betriebsurlaub für alle Mitarbeiter eingetragen!");
-        if(type === 'DELETE_BU') alert("Betriebsurlaub für alle gelöscht!");
+        if(type === 'DELETE_ALL') alert("Alle Termine im Zeitraum gelöscht.");
+        if(forAll) alert("Eintrag '" + (customTitle || "Schulung") + "' wurde für ALLE Mitarbeiter erstellt.");
     }
 }
 
