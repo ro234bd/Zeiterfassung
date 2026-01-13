@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teamordination Dr. Stütz & Dr. Haselgruber | Zeiterfassung v3.89</title>
+    <title>Teamordination Dr. Stütz & Dr. Haselgruber | Zeiterfassung v3.91</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -73,7 +73,7 @@
 
 <div id="loginOverlay" class="fixed inset-0 bg-slate-900 z-[9999] flex items-center justify-center p-4">
     <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-blue-600">
-        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800">Login <span class="text-blue-600">v3.89</span></h2>
+        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800">Login <span class="text-blue-600">v3.91</span></h2>
         <p class="text-[10px] font-bold text-slate-400 uppercase mb-4 tracking-widest">Teamordination Dr. Stütz & Dr. Haselgruber</p>
         
         <div id="loginSyncStatus" class="text-[10px] font-bold text-slate-400 uppercase text-center mb-6">● Bereit zum Start</div>
@@ -253,7 +253,7 @@
             <div class="p-6 border-b">
                 <div class="flex justify-between items-start mb-4">
                     <div>
-                        <h2 class="text-xl font-black uppercase italic">Zeitnachweis v3.89</h2>
+                        <h2 class="text-xl font-black uppercase italic">Zeitnachweis v3.91</h2>
                         <p class="text-xs text-blue-600 font-bold uppercase tracking-tight">Teamordination Dr. Stütz & Dr. Haselgruber</p>
                     </div>
                     <div class="text-right">
@@ -315,6 +315,10 @@
                     <input type="checkbox" id="checkReserve2" onchange="toggleReserve('Reserve 2')" class="w-4 h-4">
                     <span class="text-xs font-bold uppercase">Reserve 2 anzeigen</span>
                 </label>
+                <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded border">
+                    <input type="checkbox" id="checkReserve3" onchange="toggleReserve('Reserve 3')" class="w-4 h-4">
+                    <span class="text-xs font-bold uppercase">Reserve 3 anzeigen</span>
+                </label>
             </div>
         </div>
 
@@ -337,7 +341,8 @@
 
 <script>
 const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwg3vKEz3JHYX4baAFsL5gyutGFGswoNsXzD8YEZFYVwwMuKP7uc0rbGMyfWua1dfgA/exec";
-const DEFAULT_NAMES = ["Michaela Pfoser", "Alexandra Reiter", "Sandra Kehrer", "Annemarie Bruckmüller", "Gerlinde Stadler", "Reserve 1", "Reserve 2"];
+// Update v3.91: Added 2 Employees and Reserve 3
+const DEFAULT_NAMES = ["Michaela Pfoser", "Alexandra Reiter", "Sandra Kehrer", "Annemarie Bruckmüller", "Gerlinde Stadler", "Mitarbeiter 6", "Mitarbeiter 7", "Reserve 1", "Reserve 2", "Reserve 3"];
 const WEEKDAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 const DB_KEY = 'ze_profi_cloud_v3.86_FINAL'; 
@@ -347,7 +352,11 @@ const INITIAL_CONFIG = {
     "Alexandra Reiter": { 1:{start:"00:00",target:0}, 2:{start:"07:30",target:6.5}, 3:{start:"07:30",target:6.5}, 4:{start:"13:00",target:7}, 5:{start:"00:00",target:0} },
     "Sandra Kehrer": { 1:{start:"07:30",target:8.5}, 2:{start:"14:00",target:5}, 3:{start:"07:30",target:5.5}, 4:{start:"00:00",target:0}, 5:{start:"07:30",target:7} },
     "Annemarie Bruckmüller": { 1:{start:"07:30",target:7}, 2:{start:"07:00",target:7}, 3:{start:"00:00",target:0}, 4:{start:"13:00",target:3.5}, 5:{start:"07:30",target:5.5} },
-    "Gerlinde Stadler": { 1:{start:"07:00",target:7}, 2:{start:"14:00",target:5}, 3:{start:"00:00",target:0}, 4:{start:"00:00",target:0}, 5:{start:"00:00",target:0} }
+    "Gerlinde Stadler": { 1:{start:"07:00",target:7}, 2:{start:"14:00",target:5}, 3:{start:"00:00",target:0}, 4:{start:"00:00",target:0}, 5:{start:"00:00",target:0} },
+    // Defaults for new slots to prevent errors
+    "Mitarbeiter 6": { 1:{start:"08:00",target:8}, 2:{start:"08:00",target:8}, 3:{start:"08:00",target:8}, 4:{start:"08:00",target:8}, 5:{start:"08:00",target:8} },
+    "Mitarbeiter 7": { 1:{start:"08:00",target:8}, 2:{start:"08:00",target:8}, 3:{start:"08:00",target:8}, 4:{start:"08:00",target:8}, 5:{start:"08:00",target:8} },
+    "Reserve 3":     { 1:{start:"08:00",target:8}, 2:{start:"08:00",target:8}, 3:{start:"08:00",target:8}, 4:{start:"08:00",target:8}, 5:{start:"08:00",target:8} }
 };
 
 let db;
@@ -396,10 +405,11 @@ function getKulanzStart(tatsZeit, sollBeginn) {
 }
 
 function getVisibleUsers() {
-    const activeReserves = db.config.system || { reserve1: false, reserve2: false };
+    const activeReserves = db.config.system || { reserve1: false, reserve2: false, reserve3: false };
     return db.users.filter(u => {
         if(u === "Reserve 1" && !activeReserves.reserve1) return false;
         if(u === "Reserve 2" && !activeReserves.reserve2) return false;
+        if(u === "Reserve 3" && !activeReserves.reserve3) return false;
         return true;
     });
 }
@@ -441,9 +451,10 @@ function performLogin() {
             document.getElementById('testHeaderUI').classList.remove('hidden');
             
             currentUser = db.users[0]; 
-            const sys = db.config.system || {reserve1: false, reserve2: false};
+            const sys = db.config.system || {reserve1: false, reserve2: false, reserve3: false};
             document.getElementById('checkReserve1').checked = sys.reserve1;
             document.getElementById('checkReserve2').checked = sys.reserve2;
+            document.getElementById('checkReserve3').checked = sys.reserve3;
 
         } else {
             testModeActive = false;
@@ -501,20 +512,41 @@ async function init() {
     try {
         if(!db.users.includes("Admin")) db.users.push("Admin");
         if(!db.passwords) db.passwords = {};
-        if(!db.config.system) db.config.system = { reserve1: false, reserve2: false };
+        if(!db.config.system) db.config.system = { reserve1: false, reserve2: false, reserve3: false };
         
+        // --- AUTO-MIGRATION FIX v3.91: Add missing users if existing DB has old list ---
+        DEFAULT_NAMES.forEach(defName => {
+            if(!db.users.includes(defName)) {
+                db.users.push(defName);
+                console.log("Auto-Added missing user: " + defName);
+            }
+        });
+
+        // Ensure Config exists for everyone (especially the new ones)
         db.users.forEach(u => {
             if (!db.config[u]) db.config[u] = {}; 
-            if (INITIAL_CONFIG[u]) {
-                for(let d=1; d<=5; d++) db.config[u][d] = INITIAL_CONFIG[u][d];
-                db.config[u][0] = { start: "00:00", target: 0 };
-                db.config[u][6] = { start: "00:00", target: 0 };
-            } else {
-                for(let d=1; d<=5; d++) if(!db.config[u][d]) db.config[u][d] = { start: "08:00", target: 8 };
+            
+            // Check if user has settings for days, if not apply defaults (important for new users!)
+            for(let d=1; d<=5; d++) {
+                if(!db.config[u][d]) {
+                     // Check if we have a hardcoded default in INITIAL_CONFIG
+                     if(INITIAL_CONFIG[u] && INITIAL_CONFIG[u][d]) {
+                         db.config[u][d] = INITIAL_CONFIG[u][d];
+                     } else {
+                         // Generic default
+                         db.config[u][d] = { start: "08:00", target: 8 };
+                     }
+                }
             }
+            if(!db.config[u][0]) db.config[u][0] = { start: "00:00", target: 0 };
+            if(!db.config[u][6]) db.config[u][6] = { start: "00:00", target: 0 };
+
             if (!db.admin[u]) db.admin[u] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
             if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "Va19tti!" : "1234"; }
         });
+        
+        // Ensure System Config has all reserves (migrating from older versions)
+        if(typeof db.config.system.reserve3 === 'undefined') db.config.system.reserve3 = false;
 
         schoolHolidays = [...fallbackHolidays];
         populateSelectors();
@@ -1038,7 +1070,6 @@ function addPlanningRange() {
                 } else if(type === "DELETE") {
                     delete db.logs[u][dIso]; 
                 } else if(type === "DELETE_ALL") {
-                    // Löscht jeglichen Eintrag an diesem Tag
                      if(db.logs[u][dIso]) delete db.logs[u][dIso];
                 } else {
                     let entry = db.logs[u][dIso] || {};
@@ -1114,9 +1145,9 @@ function sendDevMessage() {
 
 function toggleReserve(rName) {
     if(loggedInUser !== "Admin") return;
-    const key = rName === "Reserve 1" ? "reserve1" : "reserve2";
-    if(!db.config.system) db.config.system = {reserve1: false, reserve2: false};
-    db.config.system[key] = document.getElementById(rName === "Reserve 1" ? "checkReserve1" : "checkReserve2").checked;
+    const key = rName === "Reserve 1" ? "reserve1" : (rName === "Reserve 2" ? "reserve2" : "reserve3");
+    if(!db.config.system) db.config.system = {reserve1: false, reserve2: false, reserve3: false};
+    db.config.system[key] = document.getElementById(rName === "Reserve 1" ? "checkReserve1" : (rName === "Reserve 2" ? "checkReserve2" : "checkReserve3")).checked;
     save();
     
     const ls = document.getElementById('loginUserSelect'); ls.innerHTML = "";
