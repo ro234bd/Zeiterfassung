@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teamordination Dr. Stütz & Dr. Haselgruber | Zeiterfassung v3.91</title>
+    <title>Teamordination Dr. Stütz & Dr. Haselgruber | Zeiterfassung v3.96</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,43 +23,28 @@
     <style>
         .tab-active { border-bottom: 4px solid #2563eb; color: #2563eb; font-weight: 800; }
         
-        /* Zeilen-Styles für Tabelle und Kalender */
+        /* Zeilen-Styles */
         .row-holiday { background-color: #fef2f2 !important; color: #991b1b !important; }
         .row-vacation { background-color: #ecfdf5 !important; color: #064e3b !important; }
-        .row-schulung { background-color: #f3e8ff !important; color: #6b21a8 !important; } /* VIOLETT */
-        .row-custom { background-color: #fffbeb !important; color: #92400e !important; } /* GELB/ORANGE */
-        .row-za { background-color: #fff7ed !important; color: #c2410c !important; border-left: 4px solid #f97316 !important; }
-        .row-weekend { background-color: #f8fafc !important; color: #64748b !important; }
+        .row-schulung { background-color: #f3e8ff !important; color: #6b21a8 !important; } 
+        .row-custom { background-color: #fffbeb !important; color: #92400e !important; } 
+        .row-za { background-color: #ecfeff !important; color: #0e7490 !important; border-left: 4px solid #06b6d4 !important; }
+        
+        .row-weekend { background-color: #f8fafc !important; color: #94a3b8 !important; }
+        .row-free { background-color: #f1f5f9 !important; color: #64748b !important; font-style: italic; }
         .row-sunday { background-color: #fff7ed !important; color: #c2410c !important; border-left: 4px solid #ea580c !important; font-weight: bold !important; }
         .row-school-holiday { background-color: #f0f9ff !important; border-left: 4px solid #0ea5e9 !important; border-bottom: 1px solid #bae6fd !important; }
         
-        /* Kalender Grid Anpassungen */
+        /* Kalender Grid */
         .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background-color: #e2e8f0; border: 1px solid #e2e8f0; }
         .cal-day { background: white; min-height: 85px; padding: 4px; font-size: 0.75rem; position: relative; display: flex; flex-direction: column; gap: 2px; }
         .cal-header { background: #f8fafc; font-weight: bold; padding: 8px; text-align: center; font-size: 0.7rem; text-transform: uppercase; }
         
-        /* Kalender Einträge: Standard */
         .cal-entry {
-            white-space: normal;      
-            word-wrap: break-word;    
-            line-height: 1.1;         
-            font-size: 0.65rem;       
-            padding: 2px 3px;
-            border-radius: 3px;
-            border: 1px solid transparent;
-            font-weight: 600;         
+            white-space: normal; word-wrap: break-word; line-height: 1.1; font-size: 0.65rem; padding: 2px 3px; border-radius: 3px; border: 1px solid transparent; font-weight: 600;         
         }
-
-        /* SPEZIAL: Jahresansicht noch kleiner */
-        .year-grid .cal-entry {
-            font-size: 0.5rem !important;
-            line-height: 1.0 !important;
-            padding: 1px 2px !important;
-        }
-        .year-grid .cal-day {
-            min-height: 60px !important; /* Etwas kompakter in der Höhe */
-        }
-
+        .year-grid .cal-entry { font-size: 0.5rem !important; line-height: 1.0 !important; padding: 1px 2px !important; }
+        .year-grid .cal-day { min-height: 60px !important; }
         .year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
         #mainTable { table-layout: fixed; width: 100%; }
         * { font-style: normal; } 
@@ -71,26 +56,44 @@
 </head>
 <body class="bg-gray-100 min-h-screen text-slate-800">
 
+<div id="dayEditorOverlay" class="hidden fixed inset-0 bg-black/60 z-[9100] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm border-t-8 border-blue-500">
+        <h3 class="text-lg font-black italic uppercase text-slate-700 mb-4 border-b pb-2">Eintrag bearbeiten</h3>
+        <p id="editorDateDisplay" class="text-xs font-bold text-blue-600 uppercase mb-4"></p>
+        
+        <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="text-[9px] font-bold uppercase text-slate-400">Kommen</label><input type="time" id="editIn" class="w-full p-2 border rounded font-bold bg-slate-50"></div>
+                <div><label class="text-[9px] font-bold uppercase text-slate-400">Gehen</label><input type="time" id="editOut" class="w-full p-2 border rounded font-bold bg-slate-50"></div>
+            </div>
+            <div>
+                <label class="text-[9px] font-bold uppercase text-slate-400">Typ / Status</label>
+                <select id="editType" class="w-full p-2 border rounded font-bold text-xs bg-slate-50">
+                    <option value="">(Standard: Arbeitszeit)</option><option value="Urlaub">🌴 Urlaub</option><option value="ZA">⏳ Zeitausgleich (ZA)</option><option value="Krank">🤒 Krank</option><option value="Schulung">🎓 Schulung</option><option value="Sonstiges">✏️ Sonstiges</option><option value="Betriebsurlaub">🏢 Betriebsurlaub</option>
+                </select>
+            </div>
+            <div><label class="text-[9px] font-bold uppercase text-slate-400">Notiz</label><textarea id="editNote" rows="3" class="w-full p-2 border rounded text-xs" placeholder="Notiz hier eingeben..."></textarea></div>
+            
+            <div class="flex gap-2 pt-2">
+                <button onclick="saveDayEditor()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold uppercase text-xs shadow hover:bg-blue-700">Speichern</button>
+                <button onclick="closeDayEditor()" class="flex-1 bg-slate-200 text-slate-600 py-2 rounded-lg font-bold uppercase text-xs hover:bg-slate-300">Abbrechen</button>
+            </div>
+             <button onclick="deleteDayEntry()" class="w-full mt-2 text-red-400 text-[10px] font-bold uppercase hover:text-red-600 hover:underline">Eintrag komplett löschen</button>
+        </div>
+    </div>
+</div>
+
 <div id="loginOverlay" class="fixed inset-0 bg-slate-900 z-[9999] flex items-center justify-center p-4">
     <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-blue-600">
-        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800">Login <span class="text-blue-600">v3.91</span></h2>
+        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800">Login <span class="text-blue-600">v3.96</span></h2>
         <p class="text-[10px] font-bold text-slate-400 uppercase mb-4 tracking-widest">Teamordination Dr. Stütz & Dr. Haselgruber</p>
-        
         <div id="loginSyncStatus" class="text-[10px] font-bold text-slate-400 uppercase text-center mb-6">● Bereit zum Start</div>
-
         <div class="space-y-4">
-            <div>
-                <label class="text-[10px] font-black uppercase text-slate-500">Benutzer</label>
-                <select id="loginUserSelect" class="w-full p-3 bg-slate-100 border-2 border-transparent focus:border-blue-500 rounded-xl font-bold outline-none"></select>
-            </div>
-            <div>
-                <label class="text-[10px] font-black uppercase text-slate-500">PIN / Passwort</label>
-                <input type="password" id="loginPassInput" placeholder="****" class="w-full p-3 bg-slate-100 border-2 border-transparent focus:border-blue-500 rounded-xl font-bold outline-none text-center text-xl tracking-widest">
-            </div>
+            <div><label class="text-[10px] font-black uppercase text-slate-500">Benutzer</label><select id="loginUserSelect" class="w-full p-3 bg-slate-100 border-2 border-transparent focus:border-blue-500 rounded-xl font-bold outline-none"></select></div>
+            <div><label class="text-[10px] font-black uppercase text-slate-500">PIN / Passwort</label><input type="password" id="loginPassInput" placeholder="****" class="w-full p-3 bg-slate-100 border-2 border-transparent focus:border-blue-500 rounded-xl font-bold outline-none text-center text-xl tracking-widest"></div>
             <button onclick="performLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-black uppercase shadow-lg transition-all active:scale-95">Anmelden</button>
             <p id="loginErrorMsg" class="text-red-500 text-[10px] font-bold uppercase text-center hidden">Falsches Passwort!</p>
         </div>
-        
         <div id="debugLog" class="mt-4 text-[9px] text-slate-300 font-mono text-center"></div>
     </div>
 </div>
@@ -101,23 +104,7 @@
             <h2 class="text-xl font-black italic uppercase text-slate-700">Wochenarbeitszeiten Team</h2>
             <button onclick="document.getElementById('teamScheduleOverlay').classList.add('hidden')" class="text-2xl font-bold text-slate-400 hover:text-red-500">×</button>
         </div>
-        <p class="text-[10px] text-slate-400 uppercase font-bold mb-4">Übersicht der Soll-Arbeitszeiten</p>
-        <div class="overflow-x-auto">
-            <table class="w-full text-xs text-left border-collapse">
-                <thead class="bg-slate-100 text-slate-500 font-bold uppercase">
-                    <tr>
-                        <th class="p-2 border-b">Name</th>
-                        <th class="p-2 border-b w-24">Mo</th>
-                        <th class="p-2 border-b w-24">Di</th>
-                        <th class="p-2 border-b w-24">Mi</th>
-                        <th class="p-2 border-b w-24">Do</th>
-                        <th class="p-2 border-b w-24">Fr</th>
-                    </tr>
-                </thead>
-                <tbody id="teamScheduleBody" class="divide-y divide-slate-100">
-                    </tbody>
-            </table>
-        </div>
+        <div class="overflow-x-auto"><table class="w-full text-xs text-left border-collapse"><thead class="bg-slate-100 text-slate-500 font-bold uppercase"><tr><th class="p-2 border-b">Name</th><th class="p-2 border-b w-24">Mo</th><th class="p-2 border-b w-24">Di</th><th class="p-2 border-b w-24">Mi</th><th class="p-2 border-b w-24">Do</th><th class="p-2 border-b w-24">Fr</th></tr></thead><tbody id="teamScheduleBody" class="divide-y divide-slate-100"></tbody></table></div>
         <button onclick="document.getElementById('teamScheduleOverlay').classList.add('hidden')" class="w-full mt-6 bg-slate-800 text-white py-3 rounded-xl font-bold uppercase text-xs">Schließen</button>
     </div>
 </div>
@@ -130,14 +117,10 @@
         </div>
         <div class="flex items-center gap-4">
             <div id="testHeaderUI" class="hidden flex items-center gap-2 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                <input type="datetime-local" id="headerWarpTime" class="text-[10px] p-1 border rounded">
-                <button onclick="setHeaderWarp()" class="bg-amber-600 text-white text-[9px] px-2 py-1 rounded font-bold uppercase">Warp</button>
-                <button onclick="resetWarp()" class="bg-white text-slate-400 text-[9px] px-2 py-1 rounded font-bold uppercase border">Reset</button>
+                <input type="datetime-local" id="headerWarpTime" class="text-[10px] p-1 border rounded"><button onclick="setHeaderWarp()" class="bg-amber-600 text-white text-[9px] px-2 py-1 rounded font-bold uppercase">Warp</button><button onclick="resetWarp()" class="bg-white text-slate-400 text-[9px] px-2 py-1 rounded font-bold uppercase border">Reset</button>
             </div>
             <div id="liveClock" class="text-2xl font-mono font-bold">00:00:00</div>
-            
             <select id="userSelect" onchange="switchUser()" class="bg-slate-100 p-2 rounded font-bold outline-none border-2 border-transparent focus:border-blue-400 hidden"></select>
-            
             <button onclick="doLogout()" class="text-xs text-red-500 font-bold uppercase underline ml-2">Abmelden</button>
         </div>
     </header>
@@ -154,7 +137,6 @@
             <div class="bg-white p-8 rounded-2xl shadow-lg text-center border">
                 <h2 id="displayUserName" class="text-2xl font-black text-slate-700 mb-1">--</h2>
                 <p class="text-sm text-slate-400 mb-6" id="displayTodayDate"></p>
-                
                 <div id="punchButtonsArea">
                     <div class="flex justify-center gap-6 mb-8">
                         <button onclick="punch('in')" class="w-32 h-32 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase">Kommen</button>
@@ -162,17 +144,13 @@
                     </div>
                     <div id="todayDetails" class="space-y-2 max-w-xs mx-auto"></div>
                 </div>
-                
                 <div id="adminPunchPlaceholder" class="hidden text-slate-400 font-bold italic border-2 border-dashed border-slate-200 p-8 rounded-xl bg-slate-50">
-                    <p>Admin Modus aktiv</p>
-                    <p class="text-xs font-normal mt-2">Mitarbeiter oben rechts auswählen.</p>
+                    <p>Admin Modus aktiv</p><p class="text-xs font-normal mt-2">Mitarbeiter oben rechts auswählen.</p>
                 </div>
-
             </div>
             <div class="bg-white p-6 rounded-2xl shadow border flex flex-col">
                  <h3 class="text-xs font-bold uppercase text-slate-400 mb-4 text-center border-b pb-2">Status & Einstellungen</h3>
                  <div id="punchStatus" class="text-center italic text-slate-500 font-bold mb-4">Bereit...</div>
-                 
                  <div class="space-y-4 mt-auto">
                      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
                         <h4 class="text-[9px] font-black uppercase text-slate-400 mb-2">Passwort ändern</h4>
@@ -180,7 +158,6 @@
                         <input type="password" id="newPwConfirm" placeholder="Wiederholung" class="w-full p-2 border rounded mb-2 text-center text-xs font-bold">
                         <button onclick="changePassword()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-600 py-2 rounded font-bold text-[10px] uppercase transition">Speichern</button>
                      </div>
-
                      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
                         <h4 class="text-[9px] font-black uppercase text-slate-400 mb-2">Nachricht an Entwickler</h4>
                         <textarea id="devMsgText" placeholder="Bug gefunden? Wünsche?" class="w-full p-2 border rounded text-xs h-16 mb-2"></textarea>
@@ -194,57 +171,29 @@
     <section id="tab-planung" class="tab-content hidden">
         <div class="bg-white p-4 rounded-xl shadow border mb-4">
             <div id="planStatsBox" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div class="bg-blue-600 text-white p-4 rounded-xl shadow-md">
-                    <p class="text-[10px] uppercase font-bold opacity-80">Aktueller Stundensaldo (heute)</p>
-                    <p id="planSaldoDisplay" class="text-3xl font-black italic">0.00h</p>
-                </div>
-                <div class="bg-emerald-600 text-white p-4 rounded-xl shadow-md">
-                    <p class="text-[10px] uppercase font-bold opacity-80">Resturlaub (Tage)</p>
-                    <p id="planVacDisplay" class="text-3xl font-black italic">0 Tage</p>
-                </div>
+                <div class="bg-blue-600 text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Aktueller Stundensaldo (heute)</p><p id="planSaldoDisplay" class="text-3xl font-black italic">0.00h</p></div>
+                <div class="bg-emerald-600 text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Resturlaub (Tage)</p><p id="planVacDisplay" class="text-3xl font-black italic">0 Tage</p></div>
                 <div class="lg:col-span-2 flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-dashed border-slate-300">
-                    <input type="date" id="planStart" class="p-2 border rounded text-xs font-bold">
-                    <span class="text-[10px] font-bold uppercase">bis</span>
-                    <input type="date" id="planEnd" class="p-2 border rounded text-xs font-bold">
+                    <input type="date" id="planStart" class="p-2 border rounded text-xs font-bold"><span class="text-[10px] font-bold uppercase">bis</span><input type="date" id="planEnd" class="p-2 border rounded text-xs font-bold">
                     <select id="planType" class="p-2 border rounded text-xs font-bold">
-                        <option value="Urlaub">🌴 Urlaub</option>
-                        <option value="Betriebsurlaub">🏢 Betriebsurlaub (Alle)</option>
-                        <option value="Schulung">🎓 Schulung (Info)</option>
-                        <option value="ZA">⏳ Zeitausgleich (ZA)</option>
-                        <option value="Krank">🤒 Krank</option>
-                        <option value="Sonstiges">✏️ Freitext / Zeit</option>
-                        <option value="DELETE">🗑️ Eintrag löschen (Einzel)</option>
-                        <option value="DELETE_ALL" class="text-red-600 font-black">🗑️ Alle Termine löschen (Zeitraum)</option>
+                        <option value="Urlaub">🌴 Urlaub</option><option value="Betriebsurlaub">🏢 Betriebsurlaub (Alle)</option><option value="Schulung">🎓 Schulung (Info)</option><option value="ZA">⏳ Zeitausgleich (ZA)</option><option value="Krank">🤒 Krank</option><option value="Sonstiges">✏️ Freitext / Zeit</option><option value="DELETE">🗑️ Eintrag löschen (Einzel)</option><option value="DELETE_ALL" class="text-red-600 font-black">🗑️ Alle Termine löschen (Zeitraum)</option>
                     </select>
                     <button onclick="addPlanningRange()" class="bg-blue-600 text-white px-4 py-2 rounded font-bold uppercase text-xs">Übernehmen</button>
                 </div>
             </div>
-
             <div class="flex flex-wrap justify-between items-center gap-4 pt-4 border-t">
                 <div class="flex bg-slate-100 p-1 rounded-lg">
-                    <button onclick="setCalView('week')" id="v-week" class="px-3 py-1 text-[10px] font-bold uppercase rounded">Woche</button>
-                    <button onclick="setCalView('month')" id="v-month" class="px-3 py-1 text-[10px] font-bold uppercase rounded bg-white shadow-sm">Monat</button>
-                    <button onclick="setCalView('2month')" id="v-2month" class="px-3 py-1 text-[10px] font-bold uppercase rounded">2-M</button>
-                    <button onclick="setCalView('year')" id="v-year" class="px-3 py-1 text-[10px] font-bold uppercase rounded">Jahr</button>
+                    <button onclick="setCalView('week')" id="v-week" class="px-3 py-1 text-[10px] font-bold uppercase rounded">Woche</button><button onclick="setCalView('month')" id="v-month" class="px-3 py-1 text-[10px] font-bold uppercase rounded bg-white shadow-sm">Monat</button><button onclick="setCalView('2month')" id="v-2month" class="px-3 py-1 text-[10px] font-bold uppercase rounded">2-M</button><button onclick="setCalView('year')" id="v-year" class="px-3 py-1 text-[10px] font-bold uppercase rounded">Jahr</button>
                 </div>
                 <div class="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border">
-                    <input type="checkbox" id="toggleSchoolHolidays" checked onchange="renderCalendar()" class="w-4 h-4 cursor-pointer">
-                    <label for="toggleSchoolHolidays" class="text-[10px] font-bold uppercase text-slate-500 cursor-pointer">Ferien</label>
-                    
+                    <input type="checkbox" id="toggleSchoolHolidays" checked onchange="renderCalendar()" class="w-4 h-4 cursor-pointer"><label for="toggleSchoolHolidays" class="text-[10px] font-bold uppercase text-slate-500 cursor-pointer">Ferien</label>
                     <button onclick="toggleTeamView()" id="btnTeamView" class="ml-4 bg-white border border-emerald-600 text-emerald-600 px-3 py-1 rounded text-[10px] font-black uppercase hover:bg-emerald-50 transition-colors">Team Übersicht</button>
-                    
                     <button onclick="renderTeamSchedule()" class="ml-2 bg-blue-50 border border-blue-600 text-blue-600 px-3 py-1 rounded text-[10px] font-black uppercase hover:bg-blue-100 transition-colors">📅 Wer arbeitet wann?</button>
-                    
                     <button onclick="fetchSchoolHolidays(true)" title="Daten neu laden" class="ml-2 hover:rotate-180 transition-transform">🔄</button>
                 </div>
-                <div class="flex items-center gap-4">
-                    <button onclick="changeCalDate(-1)" class="font-bold text-xl">◀</button>
-                    <span id="calCurrentLabel" class="font-black uppercase text-blue-600 min-w-[200px] text-center"></span>
-                    <button onclick="changeCalDate(1)" class="font-bold text-xl">▶</button>
-                </div>
+                <div class="flex items-center gap-4"><button onclick="changeCalDate(-1)" class="font-bold text-xl">◀</button><span id="calCurrentLabel" class="font-black uppercase text-blue-600 min-w-[200px] text-center"></span><button onclick="changeCalDate(1)" class="font-bold text-xl">▶</button></div>
             </div>
         </div>
-
         <div id="calendarRoot"></div>
     </section>
 
@@ -252,16 +201,8 @@
         <div class="bg-white shadow rounded-xl border overflow-hidden">
             <div class="p-6 border-b">
                 <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <h2 class="text-xl font-black uppercase italic">Zeitnachweis v3.91</h2>
-                        <p class="text-xs text-blue-600 font-bold uppercase tracking-tight">Teamordination Dr. Stütz & Dr. Haselgruber</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-[9px] font-bold text-slate-300 uppercase">Mitarbeiter:</p>
-                        <p id="billUser" class="text-lg font-black uppercase italic leading-none mb-1">--</p>
-                        <p class="text-[9px] font-bold text-slate-300 uppercase">Zeitraum:</p>
-                        <p id="billPeriod" class="text-xs font-bold text-slate-400 uppercase leading-none">--</p>
-                    </div>
+                    <div><h2 class="text-xl font-black uppercase italic">Zeitnachweis v3.96</h2><p class="text-xs text-blue-600 font-bold uppercase tracking-tight">Teamordination Dr. Stütz & Dr. Haselgruber</p></div>
+                    <div class="text-right"><p class="text-[9px] font-bold text-slate-300 uppercase">Mitarbeiter:</p><p id="billUser" class="text-lg font-black uppercase italic leading-none mb-1">--</p><p class="text-[9px] font-bold text-slate-300 uppercase">Zeitraum:</p><p id="billPeriod" class="text-xs font-bold text-slate-400 uppercase leading-none">--</p></div>
                 </div>
                 <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Soll/M</label><div id="sumMonthSoll" class="font-black">0</div></div>
@@ -274,28 +215,12 @@
                 </div>
             </div>
             <div class="p-3 bg-slate-800 text-white flex justify-between items-center no-print">
-                <div class="flex gap-2">
-                    <select id="viewMonth" onchange="renderLogs()" class="bg-slate-700 p-1 rounded text-xs"></select>
-                    <select id="viewYear" onchange="renderLogs()" class="bg-slate-700 p-1 rounded text-xs"></select>
-                </div>
-                <div class="flex gap-2">
-                    <button onclick="exportExcel()" class="bg-emerald-600 px-4 py-1 rounded font-bold text-[10px] uppercase">Excel</button>
-                    <button onclick="exportPDF()" class="bg-blue-600 px-4 py-1 rounded font-bold text-[10px] uppercase">PDF Export</button>
-                </div>
+                <div class="flex gap-2"><select id="viewMonth" onchange="renderLogs()" class="bg-slate-700 p-1 rounded text-xs"></select><select id="viewYear" onchange="renderLogs()" class="bg-slate-700 p-1 rounded text-xs"></select></div>
+                <div class="flex gap-2"><button onclick="exportExcel()" class="bg-emerald-600 px-4 py-1 rounded font-bold text-[10px] uppercase">Excel</button><button onclick="exportPDF()" class="bg-blue-600 px-4 py-1 rounded font-bold text-[10px] uppercase">PDF Export</button></div>
             </div>
             <table class="w-full text-[11px] text-left" id="mainTable">
                 <thead class="bg-slate-50 font-bold uppercase text-slate-500 border-b">
-                    <tr>
-                        <th class="p-2 w-24">Datum</th>
-                        <th class="p-2 w-16 text-right">Kommen</th>
-                        <th class="p-2 w-16 text-right">Gehen</th>
-                        <th class="p-2 w-24 text-center">Pause</th>
-                        <th class="p-2 w-12 text-right">Ist</th>
-                        <th class="p-2 w-12 text-right">Soll</th>
-                        <th class="p-2 w-14 text-right">Saldo</th>
-                        <th class="p-2">Notiz</th>
-                        <th class="p-2 no-print text-center w-8"></th>
-                    </tr>
+                    <tr><th class="p-2 w-24">Datum</th><th class="p-2 w-16 text-right">Kommen</th><th class="p-2 w-16 text-right">Gehen</th><th class="p-2 w-24 text-center">Pause</th><th class="p-2 w-12 text-right">Ist</th><th class="p-2 w-12 text-right">Soll</th><th class="p-2 w-14 text-right">Saldo</th><th class="p-2">Notiz</th><th class="p-2 no-print text-center w-8"></th></tr>
                 </thead>
                 <tbody id="logTableBody"></tbody>
             </table>
@@ -307,32 +232,44 @@
         <div class="bg-white p-6 rounded-xl shadow border mb-6">
             <h2 class="font-black text-purple-600 mb-4 uppercase italic border-b pb-2">System Einstellungen</h2>
             <div class="flex flex-wrap gap-6">
-                <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded border">
-                    <input type="checkbox" id="checkReserve1" onchange="toggleReserve('Reserve 1')" class="w-4 h-4">
-                    <span class="text-xs font-bold uppercase">Reserve 1 anzeigen</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded border">
-                    <input type="checkbox" id="checkReserve2" onchange="toggleReserve('Reserve 2')" class="w-4 h-4">
-                    <span class="text-xs font-bold uppercase">Reserve 2 anzeigen</span>
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded border">
-                    <input type="checkbox" id="checkReserve3" onchange="toggleReserve('Reserve 3')" class="w-4 h-4">
-                    <span class="text-xs font-bold uppercase">Reserve 3 anzeigen</span>
-                </label>
+                <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded border"><input type="checkbox" id="checkReserve1" onchange="toggleReserve('Reserve 1')" class="w-4 h-4"><span class="text-xs font-bold uppercase">Reserve 1 anzeigen</span></label>
+                <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded border"><input type="checkbox" id="checkReserve2" onchange="toggleReserve('Reserve 2')" class="w-4 h-4"><span class="text-xs font-bold uppercase">Reserve 2 anzeigen</span></label>
+                <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded border"><input type="checkbox" id="checkReserve3" onchange="toggleReserve('Reserve 3')" class="w-4 h-4"><span class="text-xs font-bold uppercase">Reserve 3 anzeigen</span></label>
             </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-white p-6 rounded-xl shadow border">
-                <h2 class="font-black text-blue-600 mb-4 uppercase italic border-b pb-2">Mitarbeiter Stammdaten</h2>
-                <div id="adminUserConfig" class="space-y-4"></div>
-                <button onclick="saveAdminConfigs()" class="mt-6 bg-blue-600 text-white w-full py-3 rounded-xl font-bold uppercase shadow-lg">Daten speichern</button>
+            <div class="space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow border">
+                    <h2 class="font-black text-blue-600 mb-4 uppercase italic border-b pb-2">Mitarbeiter Stammdaten</h2>
+                    <div id="adminUserConfig" class="space-y-4"></div>
+                    <button onclick="saveAdminConfigs()" class="mt-6 bg-blue-600 text-white w-full py-3 rounded-xl font-bold uppercase shadow-lg">Daten speichern</button>
+                </div>
+                 <div class="bg-purple-50 p-6 rounded-xl shadow border border-purple-200">
+                    <h2 class="font-black text-purple-600 mb-4 uppercase italic border-b border-purple-200 pb-2">📬 Posteingang / Nachrichten</h2>
+                    <div id="adminInbox" class="space-y-2 max-h-60 overflow-y-auto"></div>
+                </div>
             </div>
+
             <div class="space-y-6">
                 <div class="bg-white p-6 rounded-xl shadow border">
                     <h2 class="font-black mb-4 uppercase italic border-b pb-2">Soll-Stunden: <span id="targetName" class="text-blue-600"></span></h2>
                     <div id="weeklyEditor" class="space-y-2"></div>
                     <button onclick="saveWeekly()" class="mt-4 bg-slate-800 text-white w-full py-3 rounded-xl font-bold uppercase shadow-lg">Plan speichern</button>
+                </div>
+
+                <div class="bg-red-50 p-6 rounded-xl shadow border border-red-200">
+                    <h2 class="font-black text-red-600 mb-4 uppercase italic border-b border-red-200 pb-2">☠️ Daten bereinigen (Admin)</h2>
+                    <p class="text-xs text-red-800 mb-4">Achtung: Löscht alle Einträge im gewählten Zeitraum unwiderruflich!</p>
+                    <div class="space-y-2">
+                        <select id="cleanUserSelect" class="w-full p-2 border rounded text-xs font-bold"></select>
+                        <div class="flex items-center gap-2">
+                            <input type="date" id="cleanStart" class="w-full p-2 border rounded text-xs">
+                            <span class="text-xs font-bold">bis</span>
+                            <input type="date" id="cleanEnd" class="w-full p-2 border rounded text-xs">
+                        </div>
+                        <button onclick="adminClearData()" class="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded font-bold uppercase text-xs shadow">Daten unwiderruflich löschen</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -341,7 +278,7 @@
 
 <script>
 const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwg3vKEz3JHYX4baAFsL5gyutGFGswoNsXzD8YEZFYVwwMuKP7uc0rbGMyfWua1dfgA/exec";
-// Update v3.91: Added 2 Employees and Reserve 3
+// Update v3.96: Name Fix + Privacy Fix + Admin Inbox
 const DEFAULT_NAMES = ["Michaela Pfoser", "Alexandra Reiter", "Sandra Kehrer", "Annemarie Bruckmüller", "Gerlinde Stadler", "Mitarbeiter 6", "Mitarbeiter 7", "Reserve 1", "Reserve 2", "Reserve 3"];
 const WEEKDAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
@@ -353,7 +290,6 @@ const INITIAL_CONFIG = {
     "Sandra Kehrer": { 1:{start:"07:30",target:8.5}, 2:{start:"14:00",target:5}, 3:{start:"07:30",target:5.5}, 4:{start:"00:00",target:0}, 5:{start:"07:30",target:7} },
     "Annemarie Bruckmüller": { 1:{start:"07:30",target:7}, 2:{start:"07:00",target:7}, 3:{start:"00:00",target:0}, 4:{start:"13:00",target:3.5}, 5:{start:"07:30",target:5.5} },
     "Gerlinde Stadler": { 1:{start:"07:00",target:7}, 2:{start:"14:00",target:5}, 3:{start:"00:00",target:0}, 4:{start:"00:00",target:0}, 5:{start:"00:00",target:0} },
-    // Defaults for new slots to prevent errors
     "Mitarbeiter 6": { 1:{start:"08:00",target:8}, 2:{start:"08:00",target:8}, 3:{start:"08:00",target:8}, 4:{start:"08:00",target:8}, 5:{start:"08:00",target:8} },
     "Mitarbeiter 7": { 1:{start:"08:00",target:8}, 2:{start:"08:00",target:8}, 3:{start:"08:00",target:8}, 4:{start:"08:00",target:8}, 5:{start:"08:00",target:8} },
     "Reserve 3":     { 1:{start:"08:00",target:8}, 2:{start:"08:00",target:8}, 3:{start:"08:00",target:8}, 4:{start:"08:00",target:8}, 5:{start:"08:00",target:8} }
@@ -378,6 +314,7 @@ let holidaysDB = {};
 let schoolHolidays = [];
 let testModeActive = false;
 let showTeamView = false; 
+let editingDateStr = null;
 
 const fallbackHolidays = [
     {s: "2026-02-02", e: "2026-02-07", n: "Semesterferien (OÖ)"},
@@ -456,6 +393,10 @@ function performLogin() {
             document.getElementById('checkReserve2').checked = sys.reserve2;
             document.getElementById('checkReserve3').checked = sys.reserve3;
 
+            // Populate Clean User Select
+            const cl = document.getElementById('cleanUserSelect'); cl.innerHTML = "<option value='ALL'>ALLE MITARBEITER</option>";
+            getVisibleUsers().forEach(u => { if(u!=='Admin') { let o = document.createElement('option'); o.value = u; o.innerText = u; cl.appendChild(o); } });
+
         } else {
             testModeActive = false;
             document.getElementById('userSelect').classList.add('hidden');
@@ -513,27 +454,21 @@ async function init() {
         if(!db.users.includes("Admin")) db.users.push("Admin");
         if(!db.passwords) db.passwords = {};
         if(!db.config.system) db.config.system = { reserve1: false, reserve2: false, reserve3: false };
+        if(!db.messages) db.messages = []; 
         
-        // --- AUTO-MIGRATION FIX v3.91: Add missing users if existing DB has old list ---
         DEFAULT_NAMES.forEach(defName => {
             if(!db.users.includes(defName)) {
                 db.users.push(defName);
-                console.log("Auto-Added missing user: " + defName);
             }
         });
 
-        // Ensure Config exists for everyone (especially the new ones)
         db.users.forEach(u => {
             if (!db.config[u]) db.config[u] = {}; 
-            
-            // Check if user has settings for days, if not apply defaults (important for new users!)
             for(let d=1; d<=5; d++) {
                 if(!db.config[u][d]) {
-                     // Check if we have a hardcoded default in INITIAL_CONFIG
                      if(INITIAL_CONFIG[u] && INITIAL_CONFIG[u][d]) {
                          db.config[u][d] = INITIAL_CONFIG[u][d];
                      } else {
-                         // Generic default
                          db.config[u][d] = { start: "08:00", target: 8 };
                      }
                 }
@@ -545,7 +480,6 @@ async function init() {
             if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "Va19tti!" : "1234"; }
         });
         
-        // Ensure System Config has all reserves (migrating from older versions)
         if(typeof db.config.system.reserve3 === 'undefined') db.config.system.reserve3 = false;
 
         schoolHolidays = [...fallbackHolidays];
@@ -654,8 +588,10 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
                 let calcIn = log.in;
                 const cfg = db.config[userName][iter.getDay()] || {start: "00:00"};
                 calcIn = getKulanzStart(log.in, cfg.start);
-                ist = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000; 
-                if (ist > 6.0) ist -= 0.5; 
+                
+                // Calculate raw difference
+                let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
+                ist = rawDiff; 
             }
         }
         totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
@@ -681,7 +617,15 @@ function renderLogs() {
         const d = new Date(y, m, i), dStr = toLocalISO(d), log = (db.logs[currentUser]||{})[dStr] || {};
         const isH = holidaysDB[dStr], isWE = d.getDay()%6==0, target = (isH || isWE) ? 0 : db.config[currentUser][d.getDay()].target;
         let ist = 0, pauseDisplay = "-", dispOut = log.out || "-";
+        let rowClass = ''; 
         
+        let isFree = false;
+        if (!isH && !isWE && target === 0 && !log.type && !log.in && !log.note) {
+            dispOut = "Frei";
+            rowClass = 'row-free';
+            isFree = true;
+        }
+
         if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
             ist = target; 
             if(isH || isWE) {
@@ -696,33 +640,26 @@ function renderLogs() {
             dispOut = log.title || "Sonstiges";
         }
         else if (log.type === 'Schulung') {
-            // Schulung hat 0h Ist, außer man stempelt.
-            if(log.in && log.out) {
-                 // Fallthrough zu unten (Berechnung durch Stempelung)
-            } else {
-                 ist = 0; 
-                 dispOut = "Schulung"; // Wird in Notiz angezeigt, hier Platzhalter
-            }
+            if(log.in && log.out) { } else { ist = 0; dispOut = "Schulung"; }
         }
 
-        // Berechnung überschreiben, falls gestempelt wurde (auch bei Schulung!)
         if (log.in && log.out) {
             let calcIn = log.in;
             const cfg = db.config[currentUser][d.getDay()] || {start: "00:00"};
             if(!isH && !isWE) calcIn = getKulanzStart(log.in, cfg.start);
 
             const rawIst = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
+            
             if (rawIst > 6.0) { 
                 pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
                 dispOut = getExtendedOutTime(dStr, log.in, log.out); 
-                ist = (isH || isWE) ? 0 : rawIst - 0.5; 
+                ist = (isH || isWE) ? 0 : rawIst; 
             } else { 
                 ist = (isH || isWE) ? 0 : rawIst; 
             }
         }
         mIst += ist; mSoll += target;
         
-        let rowClass = ''; 
         if (log.type==='Urlaub' || log.type==='Betriebsurlaub') rowClass = 'row-vacation';
         else if (log.type==='ZA') rowClass = 'row-za';
         else if (log.type==='Schulung') rowClass = 'row-schulung';
@@ -732,7 +669,6 @@ function renderLogs() {
         if (d.getDay() === 0) rowClass = 'row-sunday';
         if (isH) rowClass = 'row-holiday';
         
-        // Notiz zusammenbauen
         let note = log.note || "";
         if(isH) note = '(' + isH + ') ' + note;
         if(log.type === 'Schulung' && log.range) note = "Schulung: " + log.range + " " + note;
@@ -830,20 +766,21 @@ function generateMonthNode(y, m, mini = false) {
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
                     const uLog = (db.logs[u]||{})[dStr] || {};
+                    const uConfig = db.config[u][d.getDay()] || {target:0};
+
                     if(uLog.type) {
-                        // --- Urlaub nur anzeigen, wenn Arbeitstag ---
-                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
+                        if (uLog.type === 'Krank') return;
+                        
+                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'ZA'];
                         if (typesToHide.includes(uLog.type)) {
-                            const dayOfWeek = d.getDay();
-                            const target = (db.config[u] && db.config[u][dayOfWeek]) ? db.config[u][dayOfWeek].target : 0;
-                            if (dayOfWeek === 0 || dayOfWeek === 6 || isH || target === 0) return;
+                            if (d.getDay() === 0 || d.getDay() === 6 || isH || uConfig.target === 0) return;
                         }
-                        // ---------------------------------------------------------
                         let cl = "bg-blue-50 text-blue-700 border-blue-200"; 
                         if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') cl="bg-emerald-50 text-emerald-700 border-emerald-200"; 
                         if(uLog.type==='Schulung') cl="bg-purple-100 text-purple-700 border-purple-200";
                         if(uLog.type==='Sonstiges') cl="bg-yellow-50 text-yellow-700 border-yellow-200";
-
+                        if(uLog.type==='ZA') cl="bg-cyan-50 text-cyan-700 border-cyan-200";
+                        
                         let label = u.split(' ')[0];
                         if(uLog.type==='Schulung' && uLog.range) label += ` (${uLog.range})`;
                         else if(uLog.type==='Sonstiges' && uLog.title) {
@@ -853,27 +790,24 @@ function generateMonthNode(y, m, mini = false) {
                         }
                         else if(uLog.type!=='Urlaub'&&uLog.type!=='Betriebsurlaub') label += `: ${uLog.type}`;
                         
-                        // Hier wird die "cal-entry" Klasse verwendet, die wir im nächsten Schritt CSS-seitig verbessern
                         cell.innerHTML += `<div class='cal-entry ${cl}'>${label}</div>`;
                     }
                 });
             } else {
                 const log = (db.logs[currentUser]||{})[dStr] || {};
+                const uConfig = db.config[currentUser][d.getDay()] || {target:0};
+
                 if(log && log.type) { 
-                    // --- Urlaub nur anzeigen, wenn Arbeitstag ---
                     let showLog = true;
                     const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
                     if (typesToHide.includes(log.type)) {
-                         const dayOfWeek = d.getDay();
-                         const target = (db.config[currentUser] && db.config[currentUser][dayOfWeek]) ? db.config[currentUser][dayOfWeek].target : 0;
-                         if (dayOfWeek === 0 || dayOfWeek === 6 || isH || target === 0) showLog = false;
+                         if (d.getDay() === 0 || d.getDay() === 6 || isH || uConfig.target === 0) showLog = false;
                     }
-                    // ---------------------------------------------------------
 
                     if(showLog) {
                         if(!isH && d.getDay() !== 6 && d.getDay() !== 0) {
                             if(log.type==='Urlaub' || log.type==='Betriebsurlaub') cell.classList.add('row-vacation'); 
-                            else if(log.type==='ZA') cell.classList.add('row-za'); 
+                            else if(log.type==='ZA') { /* row-za style ist nur für Tabelle definiert, wir nutzen hier custom style */ }
                             else if(log.type==='Schulung') cell.classList.add('row-schulung');
                             else if(log.type==='Sonstiges') cell.classList.add('row-custom');
                             else cell.classList.add('bg-amber-50'); 
@@ -882,8 +816,12 @@ function generateMonthNode(y, m, mini = false) {
                         if(log.type === 'Sonstiges' && log.title) txt = log.title;
                         if(log.type === 'Schulung' && log.range) txt = "Schulung (" + log.range + ")";
                         
-                        cell.innerHTML += `<div class='cal-entry'>${txt}</div>`; 
+                        let extraClass = log.type === 'ZA' ? 'bg-cyan-50 text-cyan-800 border border-cyan-200' : '';
+                        cell.innerHTML += `<div class='cal-entry ${extraClass}'>${txt}</div>`; 
                     }
+                } 
+                else if (!isH && d.getDay() !== 6 && d.getDay() !== 0 && uConfig.target === 0 && !log.in && !log.note) {
+                    cell.innerHTML += `<div class='cal-entry text-slate-400 italic bg-slate-50'>Frei</div>`;
                 }
             }
         } else cell.classList.add('bg-slate-50');
@@ -923,19 +861,20 @@ function renderCalendar() {
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
                     const uLog = (db.logs[u]||{})[dStr] || {};
+                    const uConfig = db.config[u][d.getDay()] || {target:0};
+
                     if(uLog.type) { 
-                        // --- NEUE LOGIK: Urlaub nur anzeigen, wenn Arbeitstag ---
-                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
+                        if (uLog.type === 'Krank') return;
+                        
+                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'ZA'];
                         if (typesToHide.includes(uLog.type)) {
-                            const dayOfWeek = d.getDay();
-                            const target = (db.config[u] && db.config[u][dayOfWeek]) ? db.config[u][dayOfWeek].target : 0;
-                            if (dayOfWeek === 0 || dayOfWeek === 6 || isH || target === 0) return;
+                            if (d.getDay() === 0 || d.getDay() === 6 || isH || uConfig.target === 0) return;
                         }
-                        // ---------------------------------------------------------
                         let col = "text-blue-700 bg-blue-50"; 
                         if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') col="text-emerald-700 bg-emerald-50"; 
                         if(uLog.type==='Schulung') col="text-purple-700 bg-purple-50";
                         if(uLog.type==='Sonstiges') col="text-yellow-700 bg-yellow-50";
+                        if(uLog.type==='ZA') col="text-cyan-700 bg-cyan-50 border border-cyan-200"; 
                         
                         let txt = u.split(' ')[0];
                         if(uLog.type==='Schulung' && uLog.range) txt += ` (${uLog.range})`;
@@ -952,21 +891,26 @@ function renderCalendar() {
             } else {
                 const log = (db.logs[currentUser]||{})[dStr] || {};
                 let dt = (log.in ? log.in + ' - ' + (getExtendedOutTime(dStr, log.in, log.out) || '') : '');
+                const uConfig = db.config[currentUser][d.getDay()] || {target:0};
                 
-                // --- NEUE LOGIK ---
                 let typeDisplay = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
                 if(log.type === 'Sonstiges' && log.title) typeDisplay = log.title;
                 if(log.type === 'Schulung' && log.range) typeDisplay = "Schulung (" + log.range + ")";
 
                 const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
                 if (typesToHide.includes(log.type)) {
-                     const dayOfWeek = d.getDay();
-                     const target = (db.config[currentUser] && db.config[currentUser][dayOfWeek]) ? db.config[currentUser][dayOfWeek].target : 0;
-                     if (dayOfWeek === 0 || dayOfWeek === 6 || isH || target === 0) typeDisplay = "";
+                     if (d.getDay() === 0 || d.getDay() === 6 || isH || uConfig.target === 0) typeDisplay = "";
                 }
-                // ---------------------------------------------------------
                 
-                content += `<p class="text-[10px] mt-2 font-bold text-blue-600 truncate">${isH || typeDisplay || dt}</p>`;
+                if (!typeDisplay && !isH && d.getDay() !== 0 && d.getDay() !== 6 && uConfig.target === 0 && !log.in && !log.note) {
+                     typeDisplay = "Frei";
+                }
+                
+                let textColor = "text-blue-600";
+                if(typeDisplay === "Frei") textColor = "text-slate-400 italic";
+                if(log.type === 'ZA') textColor = "text-cyan-600 font-black"; 
+
+                content += `<p class="text-[10px] mt-2 font-bold ${textColor} truncate">${isH || typeDisplay || dt}</p>`;
             }
             grid.innerHTML += `<div class="p-4 bg-white border rounded-xl shadow-sm ${isH?'row-holiday':''}">${content}</div>`;
         }
@@ -980,7 +924,6 @@ function punch(t) {
     const n = getNow(), ds = toLocalISO(n);
     let ts = n.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
 
-    // DIREKTE KULANZ-KORREKTUR VOR DEM SPEICHERN
     const isWE = n.getDay() === 0 || n.getDay() === 6;
     const isH = holidaysDB[ds];
     if (t === 'in' && !isWE && !isH) {
@@ -996,6 +939,9 @@ function switchUser() {
     document.getElementById('displayUserName').innerText = currentUser; document.getElementById('targetName').innerText = currentUser; renderAll(); 
 }
 function renderAll() { 
+    // BUGFIX v3.96: Name im Stempelfeld wird nun immer korrekt aktualisiert
+    document.getElementById('displayUserName').innerText = currentUser;
+
     if(currentUser === 'Admin') {
         document.getElementById('punchButtonsArea').classList.add('hidden');
         document.getElementById('adminPunchPlaceholder').classList.remove('hidden');
@@ -1101,13 +1047,95 @@ function renderTodayInfo() {
     let dispOut = log.out ? getExtendedOutTime(ds, log.in, log.out) : '--:--';
     document.getElementById('todayDetails').innerHTML = `<div class="flex justify-between p-2 bg-green-50 rounded border text-xs italic"><span>KOMMEN:</span><span class="font-black">${log.in || '--:--'}</span></div><div class="flex justify-between p-2 bg-red-50 rounded border text-xs italic"><span>GEHEN:</span><span class="font-black">${dispOut}</span></div>`; 
 }
+
 function editEntry(d) {
-    if(currentUser === "Admin") return alert("Admin kann nicht stempeln.");
-    const log = (db.logs[currentUser]||{})[d] || {in:'', out:'', note:''};
-    const ni = prompt("Kommen (HH:MM) - Leer lassen zum Löschen:", log.in);
-    if(ni === "") { if(confirm("Eintrag für " + d + " wirklich löschen?")) { delete db.logs[currentUser][d]; save(); renderAll(); return; } }
-    const no = prompt("Gehen (HH:MM):", log.out); const nn = prompt("Notiz:", log.note || "");
-    if(ni!==null) { if(!db.logs[currentUser]) db.logs[currentUser] = {}; db.logs[currentUser][d] = {in:ni, out:no, note:nn}; save(); renderAll(); }
+    if(currentUser === "Admin") return alert("Admin kann nicht stempeln/bearbeiten.");
+    editingDateStr = d;
+    const log = (db.logs[currentUser]||{})[d] || {in:'', out:'', note:'', type:''};
+    
+    document.getElementById('editorDateDisplay').innerText = new Date(d).toLocaleDateString('de-DE', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+    document.getElementById('editIn').value = log.in || '';
+    document.getElementById('editOut').value = log.out || '';
+    document.getElementById('editNote').value = log.note || '';
+    document.getElementById('editType').value = log.type || '';
+    
+    document.getElementById('dayEditorOverlay').classList.remove('hidden');
+}
+
+function closeDayEditor() {
+    document.getElementById('dayEditorOverlay').classList.add('hidden');
+    editingDateStr = null;
+}
+
+function saveDayEditor() {
+    if(!editingDateStr) return;
+    const i = document.getElementById('editIn').value;
+    const o = document.getElementById('editOut').value;
+    const n = document.getElementById('editNote').value.trim();
+    const t = document.getElementById('editType').value;
+
+    if(!db.logs[currentUser]) db.logs[currentUser] = {};
+
+    if(!i && !o && !n && !t) {
+        delete db.logs[currentUser][editingDateStr];
+    } else {
+        let entry = db.logs[currentUser][editingDateStr] || {};
+        entry.in = i;
+        entry.out = o;
+        entry.note = n;
+        entry.type = t;
+        
+        if(!entry.in) delete entry.in;
+        if(!entry.out) delete entry.out;
+        if(!entry.note) delete entry.note;
+        if(!entry.type) delete entry.type;
+        
+        db.logs[currentUser][editingDateStr] = entry;
+    }
+    
+    save(); renderAll(); closeDayEditor();
+}
+
+function deleteDayEntry() {
+    if(!editingDateStr) return;
+    if(confirm("Eintrag für diesen Tag wirklich komplett löschen?")) {
+        if(db.logs[currentUser] && db.logs[currentUser][editingDateStr]) {
+            delete db.logs[currentUser][editingDateStr];
+            save(); renderAll();
+        }
+        closeDayEditor();
+    }
+}
+
+function adminClearData() {
+    if(loggedInUser !== "Admin") return;
+    const targetUser = document.getElementById('cleanUserSelect').value;
+    const sStr = document.getElementById('cleanStart').value;
+    const eStr = document.getElementById('cleanEnd').value;
+    
+    if(!sStr || !eStr) return alert("Bitte Start- und Enddatum wählen.");
+    if(!confirm(`ACHTUNG: Wirklich alle Daten für ${targetUser === 'ALL' ? 'ALLE Mitarbeiter' : targetUser} im Zeitraum ${sStr} bis ${eStr} unwiderruflich löschen?`)) return;
+    
+    let start = new Date(sStr);
+    let end = new Date(eStr);
+    let count = 0;
+    const usersToClean = targetUser === 'ALL' ? db.users : [targetUser];
+    
+    usersToClean.forEach(u => {
+        if(db.logs[u]) {
+            let loop = new Date(start);
+            while(loop <= end) {
+                const dIso = toLocalISO(loop);
+                if(db.logs[u][dIso]) {
+                    delete db.logs[u][dIso];
+                    count++;
+                }
+                loop.setDate(loop.getDate() + 1);
+            }
+        }
+    });
+    
+    save(); renderAll(); alert(`${count} Einträge gelöscht.`);
 }
 
 function setHeaderWarp() { const val = document.getElementById('headerWarpTime').value; if(val) { timeWarpOffset = new Date(val).getTime() - Date.now(); renderAll(); alert("Warp aktiv!"); } }
@@ -1138,9 +1166,21 @@ function changePassword() {
     document.getElementById('newPwInput').value = "";
     document.getElementById('newPwConfirm').value = "";
 }
+
 function sendDevMessage() {
     const txt = document.getElementById('devMsgText').value; if(!txt) return;
-    if(!db.messages) db.messages = []; db.messages.push({from: currentUser, date: new Date().toISOString(), text: txt}); save(); alert("Gesendet!");
+    if(!db.messages) db.messages = []; 
+    db.messages.push({from: currentUser, date: new Date().toISOString(), text: txt}); 
+    save(); 
+    document.getElementById('devMsgText').value = ""; 
+    alert("Nachricht gesendet!");
+}
+
+function deleteMessage(index) {
+    if(!confirm("Nachricht löschen?")) return;
+    db.messages.splice(index, 1);
+    save();
+    renderAdminConfigs();
 }
 
 function toggleReserve(rName) {
@@ -1185,6 +1225,24 @@ function renderAdminConfigs() {
             <button onclick="db.passwords['${selectedEditUser}']='1234';save();alert('PIN für ${selectedEditUser} auf 1234 gesetzt.');" class="bg-red-100 text-red-500 hover:bg-red-200 px-3 py-2 rounded text-[9px] mt-1 font-bold w-full">PIN auf 1234 zurücksetzen</button>
         </div>
     </div>`;
+
+    // Render Inbox
+    const inbox = document.getElementById('adminInbox');
+    inbox.innerHTML = "";
+    if(db.messages && db.messages.length > 0) {
+        db.messages.forEach((msg, idx) => {
+            inbox.innerHTML += `<div class="bg-white p-3 rounded-lg border border-purple-100 shadow-sm flex flex-col gap-1">
+                <div class="flex justify-between items-start">
+                    <span class="font-bold text-[10px] uppercase text-purple-600">${msg.from}</span>
+                    <span class="text-[9px] text-slate-400">${new Date(msg.date).toLocaleString()}</span>
+                </div>
+                <p class="text-xs text-slate-700 italic">"${msg.text}"</p>
+                <button onclick="deleteMessage(${idx})" class="self-end text-[9px] text-red-400 hover:text-red-600 font-bold uppercase mt-1">Erledigt / Löschen</button>
+            </div>`;
+        });
+    } else {
+        inbox.innerHTML = `<p class="text-xs text-slate-400 text-center italic">Keine neuen Nachrichten.</p>`;
+    }
 }
 
 function saveAdminConfigs() {
@@ -1227,7 +1285,7 @@ async function exportPDF() {
                     else if (new Date(y, m, row).getDay() === 0) { data.cell.styles.fillColor = [255, 247, 237]; }
                     if (text.includes("Urlaub") || text.includes("Betriebsurlaub")) { data.cell.styles.fillColor = [209, 250, 229]; data.cell.styles.textColor = [6, 78, 59]; } 
                     else if (text.includes("Krank")) { data.cell.styles.fillColor = [254, 243, 199]; } 
-                    else if (text.includes("ZA")) { data.cell.styles.fillColor = [255, 237, 213]; data.cell.styles.textColor = [154, 52, 18]; } 
+                    else if (text.includes("ZA")) { data.cell.styles.fillColor = [236, 254, 255]; data.cell.styles.textColor = [14, 116, 144]; } 
                 } 
             }
         }); 
@@ -1253,8 +1311,14 @@ function exportExcel() {
             if(!isH && !isWE) calcIn = getKulanzStart(log.in, cfg.start);
             
             let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+calcIn))/3600000); 
-            if(rawIst > 6.0) { pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); ist = (isH || isWE) ? 0 : rawIst - 0.5; dispOut = getExtendedOutTime(ds, log.in, log.out); } 
-            else { ist = (isH || isWE) ? 0 : rawIst; } 
+            
+            if(rawIst > 6.0) { 
+                pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); 
+                dispOut = getExtendedOutTime(ds, log.in, log.out);
+                ist = (isH || isWE) ? 0 : rawIst; 
+            } else { 
+                ist = (isH || isWE) ? 0 : rawIst; 
+            } 
         }
         rows.push([i+"."+(m+1)+".", log.in||"", dispOut, pStr, ist.toFixed(2), target.toFixed(2), (ist-target).toFixed(2), log.note || ""]);
     }
