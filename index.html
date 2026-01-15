@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teamordination Dr. Stütz & Dr. Haselgruber | Zeiterfassung v3.96</title>
+    <title>Teamordination Dr. Stütz & Dr. Haselgruber | Zeiterfassung v4.00</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -85,7 +85,7 @@
 
 <div id="loginOverlay" class="fixed inset-0 bg-slate-900 z-[9999] flex items-center justify-center p-4">
     <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-blue-600">
-        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800">Login <span class="text-blue-600">v3.96</span></h2>
+        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800">Login <span class="text-blue-600">v4.00</span></h2>
         <p class="text-[10px] font-bold text-slate-400 uppercase mb-4 tracking-widest">Teamordination Dr. Stütz & Dr. Haselgruber</p>
         <div id="loginSyncStatus" class="text-[10px] font-bold text-slate-400 uppercase text-center mb-6">● Bereit zum Start</div>
         <div class="space-y-4">
@@ -117,6 +117,8 @@
         </div>
         <div class="flex items-center gap-4">
             <div id="testHeaderUI" class="hidden flex items-center gap-2 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                <button onclick="testFillMonth()" class="bg-purple-600 hover:bg-purple-700 text-white text-[9px] px-2 py-1 rounded font-bold uppercase shadow-sm">🤖 Monat füllen</button>
+                <div class="w-px h-4 bg-amber-300 mx-1"></div>
                 <input type="datetime-local" id="headerWarpTime" class="text-[10px] p-1 border rounded"><button onclick="setHeaderWarp()" class="bg-amber-600 text-white text-[9px] px-2 py-1 rounded font-bold uppercase">Warp</button><button onclick="resetWarp()" class="bg-white text-slate-400 text-[9px] px-2 py-1 rounded font-bold uppercase border">Reset</button>
             </div>
             <div id="liveClock" class="text-2xl font-mono font-bold">00:00:00</div>
@@ -173,12 +175,21 @@
             <div id="planStatsBox" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <div class="bg-blue-600 text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Aktueller Stundensaldo (heute)</p><p id="planSaldoDisplay" class="text-3xl font-black italic">0.00h</p></div>
                 <div class="bg-emerald-600 text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Resturlaub (Tage)</p><p id="planVacDisplay" class="text-3xl font-black italic">0 Tage</p></div>
-                <div class="lg:col-span-2 flex items-center gap-2 bg-slate-50 p-3 rounded-xl border border-dashed border-slate-300">
-                    <input type="date" id="planStart" class="p-2 border rounded text-xs font-bold"><span class="text-[10px] font-bold uppercase">bis</span><input type="date" id="planEnd" class="p-2 border rounded text-xs font-bold">
-                    <select id="planType" class="p-2 border rounded text-xs font-bold">
-                        <option value="Urlaub">🌴 Urlaub</option><option value="Betriebsurlaub">🏢 Betriebsurlaub (Alle)</option><option value="Schulung">🎓 Schulung (Info)</option><option value="ZA">⏳ Zeitausgleich (ZA)</option><option value="Krank">🤒 Krank</option><option value="Sonstiges">✏️ Freitext / Zeit</option><option value="DELETE">🗑️ Eintrag löschen (Einzel)</option><option value="DELETE_ALL" class="text-red-600 font-black">🗑️ Alle Termine löschen (Zeitraum)</option>
-                    </select>
-                    <button onclick="addPlanningRange()" class="bg-blue-600 text-white px-4 py-2 rounded font-bold uppercase text-xs">Übernehmen</button>
+                
+                <div class="lg:col-span-2 flex flex-col justify-end">
+                    <div class="flex items-center shadow-sm rounded-lg border border-slate-300 bg-white overflow-hidden">
+                        <div class="flex-1 flex items-center gap-1 p-1 bg-slate-50 border-r px-2">
+                             <input type="date" id="planStart" class="bg-transparent text-xs font-bold outline-none w-full">
+                             <span class="text-[9px] font-bold text-slate-400 uppercase">bis</span>
+                             <input type="date" id="planEnd" class="bg-transparent text-xs font-bold outline-none w-full">
+                        </div>
+                        <div class="flex-[1.5] border-r">
+                             <select id="planType" class="w-full h-full p-2 bg-white text-xs font-bold outline-none cursor-pointer">
+                                <option value="Urlaub">🌴 Urlaub</option><option value="Betriebsurlaub">🏢 Betriebsurlaub (Alle)</option><option value="Schulung">🎓 Schulung (Info)</option><option value="ZA">⏳ Zeitausgleich (ZA)</option><option value="Krank">🤒 Krank</option><option value="Sonstiges">✏️ Freitext / Zeit</option><option value="DELETE">🗑️ Eintrag löschen (Einzel)</option><option value="DELETE_ALL" class="text-red-600 font-black">🗑️ Alle Termine löschen</option>
+                            </select>
+                        </div>
+                        <button onclick="addPlanningRange()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 font-bold uppercase text-[10px] tracking-wide transition-colors">Übernehmen</button>
+                    </div>
                 </div>
             </div>
             <div class="flex flex-wrap justify-between items-center gap-4 pt-4 border-t">
@@ -201,7 +212,7 @@
         <div class="bg-white shadow rounded-xl border overflow-hidden">
             <div class="p-6 border-b">
                 <div class="flex justify-between items-start mb-4">
-                    <div><h2 class="text-xl font-black uppercase italic">Zeitnachweis v3.96</h2><p class="text-xs text-blue-600 font-bold uppercase tracking-tight">Teamordination Dr. Stütz & Dr. Haselgruber</p></div>
+                    <div><h2 class="text-xl font-black uppercase italic">Zeitnachweis v4.00</h2><p class="text-xs text-blue-600 font-bold uppercase tracking-tight">Teamordination Dr. Stütz & Dr. Haselgruber</p></div>
                     <div class="text-right"><p class="text-[9px] font-bold text-slate-300 uppercase">Mitarbeiter:</p><p id="billUser" class="text-lg font-black uppercase italic leading-none mb-1">--</p><p class="text-[9px] font-bold text-slate-300 uppercase">Zeitraum:</p><p id="billPeriod" class="text-xs font-bold text-slate-400 uppercase leading-none">--</p></div>
                 </div>
                 <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
@@ -230,11 +241,12 @@
 
     <section id="tab-einstellungen" class="tab-content hidden">
         <div class="bg-white p-6 rounded-xl shadow border mb-6">
-            <h2 class="font-black text-purple-600 mb-4 uppercase italic border-b pb-2">System Einstellungen</h2>
-            <div class="flex flex-wrap gap-6">
-                <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded border"><input type="checkbox" id="checkReserve1" onchange="toggleReserve('Reserve 1')" class="w-4 h-4"><span class="text-xs font-bold uppercase">Reserve 1 anzeigen</span></label>
-                <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded border"><input type="checkbox" id="checkReserve2" onchange="toggleReserve('Reserve 2')" class="w-4 h-4"><span class="text-xs font-bold uppercase">Reserve 2 anzeigen</span></label>
-                <label class="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded border"><input type="checkbox" id="checkReserve3" onchange="toggleReserve('Reserve 3')" class="w-4 h-4"><span class="text-xs font-bold uppercase">Reserve 3 anzeigen</span></label>
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h2 class="font-black text-purple-600 uppercase italic">System Einstellungen</h2>
+                <div class="flex gap-2">
+                    <button onclick="adminAddUser()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded shadow text-xs font-bold uppercase">➕ Neuer Mitarbeiter</button>
+                    <button onclick="window.location.reload()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded shadow text-xs font-bold uppercase">🔄 App neu laden</button>
+                </div>
             </div>
         </div>
 
@@ -278,21 +290,19 @@
 
 <script>
 const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwg3vKEz3JHYX4baAFsL5gyutGFGswoNsXzD8YEZFYVwwMuKP7uc0rbGMyfWua1dfgA/exec";
-// Update v3.96: Name Fix + Privacy Fix + Admin Inbox
-const DEFAULT_NAMES = ["Michaela Pfoser", "Alexandra Reiter", "Sandra Kehrer", "Annemarie Bruckmüller", "Gerlinde Stadler", "Mitarbeiter 6", "Mitarbeiter 7", "Reserve 1", "Reserve 2", "Reserve 3"];
+// Update v4.00: Session Storage (Logout on Close), Admin Protection, Test Mode Fill
+const DEFAULT_NAMES = ["Michaela Pfoser", "Alexandra Reiter", "Sandra Kehrer", "Annemarie Bruckmüller", "Gerlinde Stadler"];
 const WEEKDAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 const DB_KEY = 'ze_profi_cloud_v3.86_FINAL'; 
+const USER_KEY = 'ze_session_user_v1'; // Moved to Session Storage
 
 const INITIAL_CONFIG = {
     "Michaela Pfoser": { 1:{start:"00:00",target:0}, 2:{start:"07:30",target:6.5}, 3:{start:"07:00",target:10}, 4:{start:"13:00",target:3.5}, 5:{start:"07:00",target:10} },
     "Alexandra Reiter": { 1:{start:"00:00",target:0}, 2:{start:"07:30",target:6.5}, 3:{start:"07:30",target:6.5}, 4:{start:"13:00",target:7}, 5:{start:"00:00",target:0} },
     "Sandra Kehrer": { 1:{start:"07:30",target:8.5}, 2:{start:"14:00",target:5}, 3:{start:"07:30",target:5.5}, 4:{start:"00:00",target:0}, 5:{start:"07:30",target:7} },
     "Annemarie Bruckmüller": { 1:{start:"07:30",target:7}, 2:{start:"07:00",target:7}, 3:{start:"00:00",target:0}, 4:{start:"13:00",target:3.5}, 5:{start:"07:30",target:5.5} },
-    "Gerlinde Stadler": { 1:{start:"07:00",target:7}, 2:{start:"14:00",target:5}, 3:{start:"00:00",target:0}, 4:{start:"00:00",target:0}, 5:{start:"00:00",target:0} },
-    "Mitarbeiter 6": { 1:{start:"08:00",target:8}, 2:{start:"08:00",target:8}, 3:{start:"08:00",target:8}, 4:{start:"08:00",target:8}, 5:{start:"08:00",target:8} },
-    "Mitarbeiter 7": { 1:{start:"08:00",target:8}, 2:{start:"08:00",target:8}, 3:{start:"08:00",target:8}, 4:{start:"08:00",target:8}, 5:{start:"08:00",target:8} },
-    "Reserve 3":     { 1:{start:"08:00",target:8}, 2:{start:"08:00",target:8}, 3:{start:"08:00",target:8}, 4:{start:"08:00",target:8}, 5:{start:"08:00",target:8} }
+    "Gerlinde Stadler": { 1:{start:"07:00",target:7}, 2:{start:"14:00",target:5}, 3:{start:"00:00",target:0}, 4:{start:"00:00",target:0}, 5:{start:"00:00",target:0} }
 };
 
 let db;
@@ -342,13 +352,7 @@ function getKulanzStart(tatsZeit, sollBeginn) {
 }
 
 function getVisibleUsers() {
-    const activeReserves = db.config.system || { reserve1: false, reserve2: false, reserve3: false };
-    return db.users.filter(u => {
-        if(u === "Reserve 1" && !activeReserves.reserve1) return false;
-        if(u === "Reserve 2" && !activeReserves.reserve2) return false;
-        if(u === "Reserve 3" && !activeReserves.reserve3) return false;
-        return true;
-    });
+    return db.users; 
 }
 
 function renderTeamSchedule() {
@@ -377,6 +381,9 @@ function performLogin() {
     const storedPass = (db.passwords && db.passwords[user]) ? db.passwords[user] : (user==="Admin"?"Va19tti!":"1234");
     if(pass === storedPass) {
         loggedInUser = user;
+        // CHANGE: Use sessionStorage so it clears on browser close
+        sessionStorage.setItem(USER_KEY, loggedInUser); 
+        
         document.getElementById('loginOverlay').classList.add('hidden');
         document.getElementById('appContainer').classList.remove('hidden');
         document.getElementById('loginErrorMsg').classList.add('hidden');
@@ -388,12 +395,7 @@ function performLogin() {
             document.getElementById('testHeaderUI').classList.remove('hidden');
             
             currentUser = db.users[0]; 
-            const sys = db.config.system || {reserve1: false, reserve2: false, reserve3: false};
-            document.getElementById('checkReserve1').checked = sys.reserve1;
-            document.getElementById('checkReserve2').checked = sys.reserve2;
-            document.getElementById('checkReserve3').checked = sys.reserve3;
 
-            // Populate Clean User Select
             const cl = document.getElementById('cleanUserSelect'); cl.innerHTML = "<option value='ALL'>ALLE MITARBEITER</option>";
             getVisibleUsers().forEach(u => { if(u!=='Admin') { let o = document.createElement('option'); o.value = u; o.innerText = u; cl.appendChild(o); } });
 
@@ -415,6 +417,7 @@ function performLogin() {
 
 function doLogout() {
     loggedInUser = null;
+    sessionStorage.removeItem(USER_KEY); 
     document.getElementById('loginOverlay').classList.remove('hidden');
     document.getElementById('appContainer').classList.add('hidden');
     document.getElementById('loginPassInput').value = "";
@@ -453,17 +456,10 @@ async function init() {
     try {
         if(!db.users.includes("Admin")) db.users.push("Admin");
         if(!db.passwords) db.passwords = {};
-        if(!db.config.system) db.config.system = { reserve1: false, reserve2: false, reserve3: false };
         if(!db.messages) db.messages = []; 
         
-        DEFAULT_NAMES.forEach(defName => {
-            if(!db.users.includes(defName)) {
-                db.users.push(defName);
-            }
-        });
-
         db.users.forEach(u => {
-            if (!db.config[u]) db.config[u] = {}; 
+            if (!db.config[u]) { db.config[u] = {}; }
             for(let d=1; d<=5; d++) {
                 if(!db.config[u][d]) {
                      if(INITIAL_CONFIG[u] && INITIAL_CONFIG[u][d]) {
@@ -480,8 +476,6 @@ async function init() {
             if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "Va19tti!" : "1234"; }
         });
         
-        if(typeof db.config.system.reserve3 === 'undefined') db.config.system.reserve3 = false;
-
         schoolHolidays = [...fallbackHolidays];
         populateSelectors();
         
@@ -503,7 +497,35 @@ async function init() {
 
         fetchHolidays();
         fetchSchoolHolidays();
-        syncFromCloud();
+        
+        // AUTO LOGIN CHECK - Now using sessionStorage
+        const savedUser = sessionStorage.getItem(USER_KEY);
+        if(savedUser && db.users.includes(savedUser)) {
+             document.getElementById('loginUserSelect').value = savedUser;
+             loggedInUser = savedUser;
+             document.getElementById('loginOverlay').classList.add('hidden');
+             document.getElementById('appContainer').classList.remove('hidden');
+             
+             if(loggedInUser === "Admin") {
+                testModeActive = true;
+                document.getElementById('userSelect').classList.remove('hidden');
+                document.getElementById('btn-einstellungen').classList.remove('hidden');
+                document.getElementById('testHeaderUI').classList.remove('hidden');
+                currentUser = db.users[0];
+                
+                const cl = document.getElementById('cleanUserSelect'); cl.innerHTML = "<option value='ALL'>ALLE MITARBEITER</option>";
+                getVisibleUsers().forEach(u => { if(u!=='Admin') { let o = document.createElement('option'); o.value = u; o.innerText = u; cl.appendChild(o); } });
+             } else {
+                testModeActive = false;
+                currentUser = loggedInUser;
+             }
+             renderUserSelect();
+             document.getElementById('userSelect').value = currentUser;
+             renderAll();
+             syncFromCloud(); 
+        } else {
+             syncFromCloud();
+        }
         
     } catch (err) {
         document.getElementById('debugLog').innerText = "FATAL ERROR: " + err.message;
@@ -526,8 +548,17 @@ async function syncFromCloud() {
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
                 statusDiv.innerText = "● Daten geladen"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
                 if(loginSync) { loginSync.innerText = "● Online (Daten da!)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
-                renderUserSelect();
-                if(loggedInUser) renderAll();
+                
+                if(loggedInUser) {
+                     renderUserSelect();
+                     renderAll();
+                } else {
+                     const ls = document.getElementById('loginUserSelect'); ls.innerHTML = "";
+                     getVisibleUsers().forEach(u => { let o = document.createElement('option'); o.value = u; o.innerText = u; ls.appendChild(o); });
+                     if(db.users.includes("Admin") && !getVisibleUsers().includes("Admin")) {
+                        let o = document.createElement('option'); o.value = "Admin"; o.innerText = "Admin"; ls.appendChild(o);
+                    }
+                }
             } 
         }
     } catch(e) { 
@@ -560,18 +591,23 @@ function toggleTeamView() {
 
 function formatDateShort(iso) { const p = iso.split('-'); return `${p[2]}.${p[1]}.`; }
 
+function safeFloat(val) {
+    if(val === undefined || val === null || isNaN(val)) return 0;
+    return parseFloat(val);
+}
+
 function calculateBalances(userName, targetYear, targetMonth, todayOnly = false) {
     if(userName === 'Admin') return { totalSaldo: 0, restVacation: 0, monthVacation: 0 };
     const admin = db.admin[userName] || {startBalance:0, startDate:"2024-01-01", yearlyVacation:25, startVacation: 0};
     const logs = db.logs[userName] || {};
-    let totalSaldo = parseFloat(admin.startBalance) || 0; 
+    let totalSaldo = safeFloat(admin.startBalance); 
     let usedVacYear = 0, usedVacMonth = 0;
-    let iter = new Date(admin.startDate); if(isNaN(iter)) iter = new Date(targetYear, 0, 1);
+    let iter = new Date(admin.startDate); if(isNaN(iter.getTime())) iter = new Date(targetYear, 0, 1);
     let endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
     while (iter <= endIter) {
         const dStr = toLocalISO(iter); const log = logs[dStr] || {};
         const isH = holidaysDB[dStr], isWE = iter.getDay()%6==0;
-        const target = (isH || isWE) ? 0 : (db.config[userName][iter.getDay()]?.target || 0);
+        const target = safeFloat((isH || isWE) ? 0 : (db.config[userName][iter.getDay()]?.target || 0));
         let ist = 0;
         
         if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
@@ -581,7 +617,7 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
                 if (iter.getMonth() === targetMonth) usedVacMonth++; 
             } 
         } else if (log.type === 'ZA') { ist = 0; }
-        else if (log.type === 'Sonstiges') { ist = log.value !== undefined ? parseFloat(log.value) : target; }
+        else if (log.type === 'Sonstiges') { ist = log.value !== undefined ? safeFloat(log.value) : target; }
         else if (log.in && log.out) {
             if (isWE || isH) { ist = 0; }
             else { 
@@ -591,12 +627,12 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
                 
                 // Calculate raw difference
                 let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
-                ist = rawDiff; 
+                ist = safeFloat(rawDiff); 
             }
         }
         totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
     }
-    return { totalSaldo, restVacation: (parseFloat(admin.startVacation || 0) + parseInt(admin.yearlyVacation)) - usedVacYear, monthVacation: usedVacMonth };
+    return { totalSaldo: safeFloat(totalSaldo), restVacation: (safeFloat(admin.startVacation) + parseInt(admin.yearlyVacation)) - usedVacYear, monthVacation: usedVacMonth };
 }
 
 function renderLogs() {
@@ -615,7 +651,8 @@ function renderLogs() {
     let mIst = 0, mSoll = 0;
     for (let i = 1; i <= new Date(y, m+1, 0).getDate(); i++) {
         const d = new Date(y, m, i), dStr = toLocalISO(d), log = (db.logs[currentUser]||{})[dStr] || {};
-        const isH = holidaysDB[dStr], isWE = d.getDay()%6==0, target = (isH || isWE) ? 0 : db.config[currentUser][d.getDay()].target;
+        const isH = holidaysDB[dStr], isWE = d.getDay()%6==0;
+        const target = safeFloat((isH || isWE) ? 0 : db.config[currentUser][d.getDay()].target);
         let ist = 0, pauseDisplay = "-", dispOut = log.out || "-";
         let rowClass = ''; 
         
@@ -636,7 +673,7 @@ function renderLogs() {
         }
         else if (log.type === 'ZA') { ist = 0; dispOut = "ZA"; }
         else if (log.type === 'Sonstiges') { 
-            ist = log.value !== undefined ? parseFloat(log.value) : target;
+            ist = log.value !== undefined ? safeFloat(log.value) : target;
             dispOut = log.title || "Sonstiges";
         }
         else if (log.type === 'Schulung') {
@@ -653,9 +690,9 @@ function renderLogs() {
             if (rawIst > 6.0) { 
                 pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
                 dispOut = getExtendedOutTime(dStr, log.in, log.out); 
-                ist = (isH || isWE) ? 0 : rawIst; 
+                ist = (isH || isWE) ? 0 : safeFloat(rawIst); 
             } else { 
-                ist = (isH || isWE) ? 0 : rawIst; 
+                ist = (isH || isWE) ? 0 : safeFloat(rawIst); 
             }
         }
         mIst += ist; mSoll += target;
@@ -939,7 +976,6 @@ function switchUser() {
     document.getElementById('displayUserName').innerText = currentUser; document.getElementById('targetName').innerText = currentUser; renderAll(); 
 }
 function renderAll() { 
-    // BUGFIX v3.96: Name im Stempelfeld wird nun immer korrekt aktualisiert
     document.getElementById('displayUserName').innerText = currentUser;
 
     if(currentUser === 'Admin') {
@@ -1050,6 +1086,15 @@ function renderTodayInfo() {
 
 function editEntry(d) {
     if(currentUser === "Admin") return alert("Admin kann nicht stempeln/bearbeiten.");
+    
+    // Check Signature Lock
+    const dObj = new Date(d);
+    const key = dObj.getFullYear() + "-" + dObj.getMonth();
+    const sigData = (db.config[currentUser]?.signatures || {})[key];
+    if(sigData && sigData.signed) {
+        return alert("⛔ Monat ist abgeschlossen/signiert! Änderungen nicht mehr möglich.");
+    }
+
     editingDateStr = d;
     const log = (db.logs[currentUser]||{})[d] || {in:'', out:'', note:'', type:''};
     
@@ -1183,21 +1228,88 @@ function deleteMessage(index) {
     renderAdminConfigs();
 }
 
-function toggleReserve(rName) {
+// ADMIN: Add / Remove User
+function adminAddUser() {
     if(loggedInUser !== "Admin") return;
-    const key = rName === "Reserve 1" ? "reserve1" : (rName === "Reserve 2" ? "reserve2" : "reserve3");
-    if(!db.config.system) db.config.system = {reserve1: false, reserve2: false, reserve3: false};
-    db.config.system[key] = document.getElementById(rName === "Reserve 1" ? "checkReserve1" : (rName === "Reserve 2" ? "checkReserve2" : "checkReserve3")).checked;
-    save();
-    
-    const ls = document.getElementById('loginUserSelect'); ls.innerHTML = "";
-    getVisibleUsers().forEach(u => { let o = document.createElement('option'); o.value = u; o.innerText = u; ls.appendChild(o); });
-    if(db.users.includes("Admin") && !getVisibleUsers().includes("Admin")) {
-         let o = document.createElement('option'); o.value = "Admin"; o.innerText = "Admin"; ls.appendChild(o);
+    const name = prompt("Name des neuen Mitarbeiters:");
+    if(name && name.trim() !== "") {
+        if(db.users.includes(name)) return alert("User existiert bereits!");
+        db.users.push(name);
+        
+        // Init defaults for new user
+        db.config[name] = {};
+        for(let d=1; d<=5; d++) db.config[name][d] = { start: "08:00", target: 8 };
+        db.config[name][0] = { start: "00:00", target: 0 };
+        db.config[name][6] = { start: "00:00", target: 0 };
+        db.admin[name] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
+        db.passwords[name] = "1234";
+
+        save();
+        alert(`Mitarbeiter ${name} angelegt.`);
+        // Reload to refresh UI properly
+        window.location.reload();
     }
-    renderUserSelect();
-    renderAll();
 }
+
+function adminDeleteUser(name) {
+    if(loggedInUser !== "Admin") return;
+    if(name === "Admin") return alert("Der Administrator kann nicht gelöscht werden."); // SECURITY BLOCK
+    
+    if(!confirm(`Benutzer "${name}" wirklich LÖSCHEN?\nAlle Daten gehen verloren!`)) return;
+    if(!confirm(`Sicher? Das kann nicht rückgängig gemacht werden.`)) return;
+    
+    const idx = db.users.indexOf(name);
+    if(idx > -1) {
+        db.users.splice(idx, 1);
+        delete db.logs[name];
+        delete db.config[name];
+        delete db.passwords[name];
+        delete db.admin[name];
+        
+        save();
+        alert("Benutzer gelöscht.");
+        window.location.reload();
+    }
+}
+
+// TEST MODE: Fill Month with Standard Hours
+function testFillMonth() {
+    if(!loggedInUser === 'Admin') return;
+    if(!confirm(`ACHTUNG: Füllt den aktuellen Monat (${MONTH_NAMES[parseInt(document.getElementById('viewMonth').value)]}) für ${currentUser} mit Standard-Arbeitszeiten! Vorhandene Einträge werden überschrieben.`)) return;
+    
+    const y = parseInt(document.getElementById('viewYear').value);
+    const m = parseInt(document.getElementById('viewMonth').value);
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const user = currentUser;
+
+    if(!db.logs[user]) db.logs[user] = {};
+
+    for(let i=1; i<=daysInMonth; i++) {
+        const d = new Date(y, m, i);
+        const dStr = toLocalISO(d);
+        if(holidaysDB[dStr]) continue; // Skip Holidays
+
+        const dayCfg = db.config[user][d.getDay()] || {target: 0, start: "00:00"};
+        if(dayCfg.target > 0) {
+            // Calculate End Time
+            let [h, min] = dayCfg.start.split(':').map(Number);
+            let minutesIn = h * 60 + min;
+            let workMinutes = dayCfg.target * 60;
+            if(dayCfg.target > 6) workMinutes += 30; // Add Break if > 6h
+
+            let totalMinutes = minutesIn + workMinutes;
+            let endH = Math.floor(totalMinutes / 60);
+            let endM = totalMinutes % 60;
+
+            let sIn = dayCfg.start;
+            let sOut = String(endH).padStart(2,'0') + ":" + String(endM).padStart(2,'0');
+
+            db.logs[user][dStr] = { in: sIn, out: sOut, type: "" };
+        }
+    }
+    save(); renderAll(); alert("Monat wurde gefüllt!");
+}
+
 
 function renderAdminConfigs() {
     if(loggedInUser !== "Admin") { document.getElementById('adminUserConfig').innerHTML = "<p>Zugriff verweigert.</p>"; return; }
@@ -1211,8 +1323,21 @@ function renderAdminConfigs() {
     const idx = db.users.indexOf(selectedEditUser); 
     const a = db.admin[selectedEditUser] || {startDate: "2024-01-01", startBalance:0, yearlyVacation:25, startVacation: 0};
     
+    // Dynamic Delete Button or Protected Message
+    let deleteBtnHtml = "";
+    if(selectedEditUser === 'Admin') {
+        deleteBtnHtml = `<span class="text-xs font-bold text-slate-400 bg-slate-200 px-2 py-1 rounded">🔒 System-Admin</span>`;
+    } else {
+        deleteBtnHtml = `<button onclick="adminDeleteUser('${selectedEditUser}')" class="bg-red-100 hover:bg-red-200 text-red-600 border border-red-200 rounded px-2 py-1 text-[10px] font-bold uppercase whitespace-nowrap h-8">🗑️ User Löschen</button>`;
+    }
+
     cont.innerHTML = `<div class="p-4 bg-slate-50 rounded-xl border mb-2 border-blue-200 shadow-inner">
-        ${testModeActive ? `<label class="text-[9px] font-bold text-slate-400 uppercase">Name bearbeiten:</label><input type="text" id="nameEdit_SINGLE" value="${selectedEditUser}" class="w-full mb-2 p-1 border rounded font-black text-blue-600 uppercase text-xs italic">` : `<p class="font-black text-blue-800 text-xs mb-2 uppercase italic">${selectedEditUser}</p>`}
+        <div class="flex justify-between items-end mb-2">
+            <div class="w-full mr-2">
+                ${testModeActive ? `<label class="text-[9px] font-bold text-slate-400 uppercase">Name bearbeiten:</label><input type="text" id="nameEdit_SINGLE" value="${selectedEditUser}" class="w-full p-1 border rounded font-black text-blue-600 uppercase text-xs italic">` : `<p class="font-black text-blue-800 text-xs uppercase italic">${selectedEditUser}</p>`}
+            </div>
+            ${deleteBtnHtml}
+        </div>
         
         <div class="grid grid-cols-2 gap-2 text-[8px] font-bold text-slate-400 uppercase mb-1"><span>Start-Datum</span><span>Zeitsaldo Alt (h)</span></div>
         <div class="grid grid-cols-2 gap-2 mb-2"><input type="date" id="admDate_SINGLE" value="${a.startDate}" class="p-2 border rounded text-xs font-bold"><input type="number" step="0.01" id="admBal_SINGLE" value="${a.startBalance}" class="p-2 border rounded text-xs font-bold"></div>
@@ -1251,6 +1376,7 @@ function saveAdminConfigs() {
     
     let newName = testModeActive ? document.getElementById(`nameEdit_SINGLE`).value.trim() : selectedEditUser;
     
+    // RENAMING LOGIC
     if(newName !== selectedEditUser) {
         const idx = db.users.indexOf(selectedEditUser);
         if(idx !== -1) db.users[idx] = newName;
@@ -1261,16 +1387,19 @@ function saveAdminConfigs() {
         db.admin[newName] = { startDate: document.getElementById(`admDate_SINGLE`).value, startBalance: parseFloat(document.getElementById(`admBal_SINGLE`).value) || 0, startVacation: parseFloat(document.getElementById(`admVacAlt_SINGLE`).value) || 0, yearlyVacation: parseInt(document.getElementById(`admVacJ_SINGLE`).value) || 25 };
         delete db.admin[selectedEditUser];
         
-        alert(`Benutzer ${selectedEditUser} wurde in ${newName} umbenannt.`);
-        
         currentUser = newName;
-        renderUserSelect();
-        document.getElementById('userSelect').value = newName;
+        // CHANGE: Use sessionStorage for persistence on reload
+        sessionStorage.setItem(USER_KEY, newName);
+        
+        save();
+        alert(`Benutzer umbenannt in ${newName}. Seite wird neu geladen.`);
+        window.location.reload(); 
     } else {
         db.admin[selectedEditUser] = { startDate: document.getElementById(`admDate_SINGLE`).value, startBalance: parseFloat(document.getElementById(`admBal_SINGLE`).value) || 0, startVacation: parseFloat(document.getElementById(`admVacAlt_SINGLE`).value) || 0, yearlyVacation: parseInt(document.getElementById(`admVacJ_SINGLE`).value) || 25 };
+        save(); 
+        alert("Daten gespeichert!"); 
+        renderAll();
     }
-    
-    save(); alert("Daten gespeichert!"); renderAll();
 }
 
 async function exportPDF() { 
@@ -1303,7 +1432,7 @@ function exportExcel() {
     const rows = [["ZEITNACHWEIS", currentUser], ["Monat", MONTH_NAMES[m], y], ["Datum", "Kommen", "Gehen", "Pause", "Ist", "Soll", "Saldo", "Notiz"]];
     for(let i=1; i<=new Date(y, m+1, 0).getDate(); i++) {
         const ds = toLocalISO(new Date(y,m,i)), log = (db.logs[currentUser]||{})[ds] || {};
-        const isH = holidaysDB[ds], isWE = new Date(y,m,i).getDay()%6==0, target = (isH || isWE) ? 0 : db.config[currentUser][new Date(y,m,i).getDay()].target;
+        const isH = holidaysDB[ds], isWE = new Date(y,m,i).getDay()%6==0, target = safeFloat((isH || isWE) ? 0 : db.config[currentUser][new Date(y,m,i).getDay()].target);
         let ist = 0, pStr = "-"; let dispOut = log.out || log.type || "";
         if(log.in && log.out) { 
             let calcIn = log.in;
@@ -1320,7 +1449,7 @@ function exportExcel() {
                 ist = (isH || isWE) ? 0 : rawIst; 
             } 
         }
-        rows.push([i+"."+(m+1)+".", log.in||"", dispOut, pStr, ist.toFixed(2), target.toFixed(2), (ist-target).toFixed(2), log.note || ""]);
+        rows.push([i+"."+(m+1)+".", log.in||"", dispOut, pStr, safeFloat(ist).toFixed(2), safeFloat(target).toFixed(2), (safeFloat(ist)-safeFloat(target)).toFixed(2), log.note || ""]);
     }
     const ws = XLSX.utils.aoa_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Journal"); XLSX.writeFile(wb, `ZE_${currentUser}.xlsx`);
 }
