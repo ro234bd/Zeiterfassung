@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teamordination Dr. Stütz & Dr. Haselgruber | Zeiterfassung v4.04</title>
+    <title>Zeiterfassung | v4.05 System</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,8 +20,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .tab-active { border-bottom: 4px solid #2563eb; color: #2563eb; font-weight: 800; }
+    
+    <style id="theme-engine">
+        :root { --main-color: #2563eb; --main-color-dim: #eff6ff; }
+        .theme-bg { background-color: var(--main-color) !important; }
+        .theme-text { color: var(--main-color) !important; }
+        .theme-border { border-color: var(--main-color) !important; }
+        .theme-dim-bg { background-color: var(--main-color-dim) !important; }
+        
+        .tab-active { border-bottom: 4px solid var(--main-color) !important; color: var(--main-color) !important; font-weight: 800; }
         
         /* Zeilen-Styles */
         .row-holiday { background-color: #fef2f2 !important; color: #991b1b !important; }
@@ -57,9 +64,9 @@
 <body class="bg-gray-100 min-h-screen text-slate-800">
 
 <div id="dayEditorOverlay" class="hidden fixed inset-0 bg-black/60 z-[9100] flex items-center justify-center p-4 backdrop-blur-sm">
-    <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm border-t-8 border-blue-500">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm border-t-8 theme-border">
         <h3 class="text-lg font-black italic uppercase text-slate-700 mb-4 border-b pb-2">Eintrag bearbeiten</h3>
-        <p id="editorDateDisplay" class="text-xs font-bold text-blue-600 uppercase mb-4"></p>
+        <p id="editorDateDisplay" class="text-xs font-bold theme-text uppercase mb-4"></p>
         
         <div class="space-y-3">
             <div class="grid grid-cols-2 gap-2">
@@ -75,7 +82,7 @@
             <div><label class="text-[9px] font-bold uppercase text-slate-400">Notiz</label><textarea id="editNote" rows="3" class="w-full p-2 border rounded text-xs" placeholder="Notiz hier eingeben..."></textarea></div>
             
             <div class="flex gap-2 pt-2">
-                <button onclick="saveDayEditor()" class="flex-1 bg-blue-600 text-white py-2 rounded-lg font-bold uppercase text-xs shadow hover:bg-blue-700">Speichern</button>
+                <button onclick="saveDayEditor()" class="flex-1 theme-bg text-white py-2 rounded-lg font-bold uppercase text-xs shadow hover:opacity-90">Speichern</button>
                 <button onclick="closeDayEditor()" class="flex-1 bg-slate-200 text-slate-600 py-2 rounded-lg font-bold uppercase text-xs hover:bg-slate-300">Abbrechen</button>
             </div>
              <button onclick="deleteDayEntry()" class="w-full mt-2 text-red-400 text-[10px] font-bold uppercase hover:text-red-600 hover:underline">Eintrag komplett löschen</button>
@@ -84,14 +91,18 @@
 </div>
 
 <div id="loginOverlay" class="fixed inset-0 bg-slate-900 z-[9999] flex items-center justify-center p-4">
-    <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-blue-600">
-        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800">Login <span class="text-blue-600">v4.04</span></h2>
-        <p class="text-[10px] font-bold text-slate-400 uppercase mb-4 tracking-widest">Teamordination Dr. Stütz & Dr. Haselgruber</p>
+    <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 theme-border">
+        <div id="loginLogoContainer" class="text-center mb-4 hidden">
+             <img id="loginLogoImg" src="" class="h-16 mx-auto object-contain">
+        </div>
+        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800 text-center" id="loginTitleMain">Login</h2>
+        <p class="text-[10px] font-bold text-slate-400 uppercase mb-4 tracking-widest text-center" id="loginTitleSub">Zeiterfassung v4.05</p>
+        
         <div id="loginSyncStatus" class="text-[10px] font-bold text-slate-400 uppercase text-center mb-6">● Bereit zum Start</div>
         <div class="space-y-4">
             <div><label class="text-[10px] font-black uppercase text-slate-500">Benutzer</label><select id="loginUserSelect" class="w-full p-3 bg-slate-100 border-2 border-transparent focus:border-blue-500 rounded-xl font-bold outline-none"></select></div>
             <div><label class="text-[10px] font-black uppercase text-slate-500">PIN / Passwort</label><input type="password" id="loginPassInput" placeholder="****" class="w-full p-3 bg-slate-100 border-2 border-transparent focus:border-blue-500 rounded-xl font-bold outline-none text-center text-xl tracking-widest"></div>
-            <button onclick="performLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-black uppercase shadow-lg transition-all active:scale-95">Anmelden</button>
+            <button onclick="performLogin()" class="w-full theme-bg hover:opacity-90 text-white py-4 rounded-xl font-black uppercase shadow-lg transition-all active:scale-95">Anmelden</button>
             <p id="loginErrorMsg" class="text-red-500 text-[10px] font-bold uppercase text-center hidden">Falsches Passwort!</p>
         </div>
         <div id="debugLog" class="mt-4 text-[9px] text-slate-300 font-mono text-center"></div>
@@ -99,7 +110,7 @@
 </div>
 
 <div id="teamScheduleOverlay" class="hidden fixed inset-0 bg-black/50 z-[9000] flex items-center justify-center p-4 backdrop-blur-sm">
-    <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-4xl border-t-8 border-blue-500">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-4xl border-t-8 theme-border">
         <div class="flex justify-between items-center mb-4 border-b pb-2">
             <h2 class="text-xl font-black italic uppercase text-slate-700">Wochenarbeitszeiten Team</h2>
             <button onclick="document.getElementById('teamScheduleOverlay').classList.add('hidden')" class="text-2xl font-bold text-slate-400 hover:text-red-500">×</button>
@@ -110,17 +121,23 @@
 </div>
 
 <div class="container mx-auto p-2 md:p-4 max-w-6xl hidden" id="appContainer">
-    <header class="bg-white shadow rounded-xl p-4 mb-4 flex flex-col md:flex-row justify-between items-center gap-4 border-t-4 border-blue-600">
-        <div class="text-center md:text-left w-full md:w-auto">
-            <h1 class="text-xl font-black italic uppercase tracking-tight leading-tight">Teamordination <span class="text-blue-600 block md:inline">Dr. Stütz & Dr. Haselgruber</span></h1>
-            <div id="syncStatus" class="text-[10px] font-bold text-slate-400 uppercase mt-1">● Sync wird initialisiert...</div>
+    <header class="bg-white shadow rounded-xl p-4 mb-4 flex flex-col md:flex-row justify-between items-center gap-4 border-t-4 theme-border">
+        <div class="flex items-center gap-4 w-full md:w-auto justify-center md:justify-start">
+             <img id="headerLogoImg" src="" class="h-12 hidden object-contain">
+             <div class="text-center md:text-left">
+                <h1 id="headerTitleMain" class="text-xl font-black italic uppercase tracking-tight leading-tight">Zeiterfassung</h1>
+                <div id="syncStatus" class="text-[10px] font-bold text-slate-400 uppercase mt-1">● Sync wird initialisiert...</div>
+            </div>
         </div>
         <div class="flex flex-wrap justify-center items-center gap-4 w-full md:w-auto">
-            <div id="testHeaderUI" class="hidden flex items-center gap-2 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                <button onclick="testFillMonth()" class="bg-purple-600 hover:bg-purple-700 text-white text-[9px] px-2 py-1 rounded font-bold uppercase shadow-sm">🤖 Monat füllen</button>
-                <div class="w-px h-4 bg-amber-300 mx-1"></div>
-                <input type="datetime-local" id="headerWarpTime" class="text-[10px] p-1 border rounded"><button onclick="setHeaderWarp()" class="bg-amber-600 text-white text-[9px] px-2 py-1 rounded font-bold uppercase">Warp</button><button onclick="resetWarp()" class="bg-white text-slate-400 text-[9px] px-2 py-1 rounded font-bold uppercase border">Reset</button>
+            
+            <div id="suHeaderTools" class="hidden flex items-center gap-2 bg-amber-50 p-1 px-2 rounded-lg border border-amber-200 shadow-sm">
+                <span class="text-[9px] font-black text-amber-600 uppercase">⚡ Warp:</span>
+                <input type="datetime-local" id="headerWarpTime" class="text-[10px] p-1 border rounded bg-white w-28">
+                <button onclick="setHeaderWarp()" class="bg-amber-600 text-white text-[9px] px-2 py-1 rounded font-bold uppercase hover:bg-amber-700">GO</button>
+                <button onclick="resetWarp()" class="bg-white text-slate-400 text-[9px] px-2 py-1 rounded font-bold uppercase border hover:text-slate-600">X</button>
             </div>
+
             <div id="liveClock" class="text-2xl font-mono font-bold">00:00:00</div>
             <select id="userSelect" onchange="switchUser()" class="bg-slate-100 p-2 rounded font-bold outline-none border-2 border-transparent focus:border-blue-400 hidden max-w-[120px] md:max-w-xs"></select>
             <button onclick="doLogout()" class="text-xs text-red-500 font-bold uppercase underline ml-2">Abmelden</button>
@@ -128,10 +145,11 @@
     </header>
 
     <nav class="flex bg-white shadow rounded-lg mb-4 overflow-hidden no-print">
-        <button onclick="showTab('stempeln')" id="btn-stempeln" class="flex-1 py-3 text-xs md:text-sm font-bold tab-active uppercase">Stempeln</button>
-        <button onclick="showTab('planung')" id="btn-planung" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase">Urlaub / Kalender</button>
-        <button onclick="showTab('uebersicht')" id="btn-uebersicht" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase">Monatsliste</button>
-        <button onclick="showTab('einstellungen')" id="btn-einstellungen" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase hidden">Admin</button>
+        <button onclick="showTab('stempeln')" id="btn-stempeln" class="flex-1 py-3 text-xs md:text-sm font-bold tab-active uppercase hover:bg-slate-50">Stempeln</button>
+        <button onclick="showTab('planung')" id="btn-planung" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase hover:bg-slate-50">Urlaub / Kalender</button>
+        <button onclick="showTab('uebersicht')" id="btn-uebersicht" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase hover:bg-slate-50">Monatsliste</button>
+        <button onclick="showTab('einstellungen')" id="btn-einstellungen" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase hidden hover:bg-slate-50">Admin</button>
+        <button onclick="showTab('system')" id="btn-system" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase hidden bg-slate-800 text-slate-200">⚙️ System</button>
     </nav>
 
     <section id="tab-stempeln" class="tab-content">
@@ -173,7 +191,7 @@
     <section id="tab-planung" class="tab-content hidden">
         <div class="bg-white p-4 rounded-xl shadow border mb-4">
             <div id="planStatsBox" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div class="bg-blue-600 text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Aktueller Stundensaldo (heute)</p><p id="planSaldoDisplay" class="text-3xl font-black italic">0:00 h</p></div>
+                <div class="theme-bg text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Aktueller Stundensaldo (heute)</p><p id="planSaldoDisplay" class="text-3xl font-black italic">0:00 h</p></div>
                 <div class="bg-emerald-600 text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Resturlaub (Tage)</p><p id="planVacDisplay" class="text-3xl font-black italic">0 Tage</p></div>
                 
                 <div class="lg:col-span-2 flex flex-col justify-end">
@@ -188,7 +206,7 @@
                                 <option value="Urlaub">🌴 Urlaub</option><option value="Betriebsurlaub">🏢 Betriebsurlaub (Alle)</option><option value="Schulung">🎓 Schulung (Info)</option><option value="ZA">⏳ Zeitausgleich (ZA)</option><option value="Krank">🤒 Krank</option><option value="Sonstiges">✏️ Freitext / Zeit</option><option value="DELETE">🗑️ Eintrag löschen (Einzel)</option><option value="DELETE_ALL" class="text-red-600 font-black">🗑️ Alle Termine löschen</option>
                             </select>
                         </div>
-                        <button onclick="addPlanningRange()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 font-bold uppercase text-[10px] tracking-wide transition-colors">Übernehmen</button>
+                        <button onclick="addPlanningRange()" class="theme-bg text-white px-6 py-3 font-bold uppercase text-[10px] tracking-wide transition-colors hover:opacity-90">Übernehmen</button>
                     </div>
                 </div>
             </div>
@@ -198,11 +216,11 @@
                 </div>
                 <div class="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border">
                     <input type="checkbox" id="toggleSchoolHolidays" checked onchange="renderCalendar()" class="w-4 h-4 cursor-pointer"><label for="toggleSchoolHolidays" class="text-[10px] font-bold uppercase text-slate-500 cursor-pointer">Ferien</label>
-                    <button onclick="toggleTeamView()" id="btnTeamView" class="ml-4 bg-white border border-emerald-600 text-emerald-600 px-3 py-1 rounded text-[10px] font-black uppercase hover:bg-emerald-50 transition-colors">Team Übersicht</button>
+                    <button onclick="toggleTeamView()" id="btnTeamView" class="ml-4 bg-white border theme-border theme-text px-3 py-1 rounded text-[10px] font-black uppercase hover:opacity-80 transition-colors">Team Übersicht</button>
                     <button onclick="renderTeamSchedule()" class="ml-2 bg-blue-50 border border-blue-600 text-blue-600 px-3 py-1 rounded text-[10px] font-black uppercase hover:bg-blue-100 transition-colors">📅 Wer arbeitet wann?</button>
                     <button onclick="fetchSchoolHolidays(true)" title="Daten neu laden" class="ml-2 hover:rotate-180 transition-transform">🔄</button>
                 </div>
-                <div class="flex items-center gap-4"><button onclick="changeCalDate(-1)" class="font-bold text-xl">◀</button><span id="calCurrentLabel" class="font-black uppercase text-blue-600 min-w-[200px] text-center"></span><button onclick="changeCalDate(1)" class="font-bold text-xl">▶</button></div>
+                <div class="flex items-center gap-4"><button onclick="changeCalDate(-1)" class="font-bold text-xl">◀</button><span id="calCurrentLabel" class="font-black uppercase theme-text min-w-[200px] text-center"></span><button onclick="changeCalDate(1)" class="font-bold text-xl">▶</button></div>
             </div>
         </div>
         <div id="calendarRoot"></div>
@@ -212,12 +230,12 @@
         <div class="bg-white shadow rounded-xl border overflow-hidden">
             <div class="p-6 border-b">
                 <div class="flex justify-between items-start mb-4">
-                    <div><h2 class="text-xl font-black uppercase italic">Zeitnachweis v4.04</h2><p class="text-xs text-blue-600 font-bold uppercase tracking-tight">Teamordination Dr. Stütz & Dr. Haselgruber</p></div>
+                    <div><h2 class="text-xl font-black uppercase italic" id="billTitle">Zeitnachweis</h2><p class="text-xs theme-text font-bold uppercase tracking-tight" id="billSub">v4.05</p></div>
                     <div class="text-right"><p class="text-[9px] font-bold text-slate-300 uppercase">Mitarbeiter:</p><p id="billUser" class="text-lg font-black uppercase italic leading-none mb-1">--</p><p class="text-[9px] font-bold text-slate-300 uppercase">Zeitraum:</p><p id="billPeriod" class="text-xs font-bold text-slate-400 uppercase leading-none">--</p></div>
                 </div>
                 <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Soll/M</label><div id="sumMonthSoll" class="font-black">0:00</div></div>
-                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Ist/M</label><div id="sumMonthIst" class="font-black text-blue-600">0:00</div></div>
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Ist/M</label><div id="sumMonthIst" class="font-black theme-text">0:00</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Diff</label><div id="sumMonthDiff" class="font-black">0:00</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Saldo M</label><div id="sumYearSaldo" class="font-black text-blue-800">0:00</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Anspruch</label><div id="sumVacTotal" class="font-black text-green-600">0</div></div>
@@ -231,7 +249,7 @@
                     <button onclick="forceSave()" id="btnForceSave" class="bg-amber-500 hover:bg-amber-600 px-4 py-1 rounded font-bold text-[10px] uppercase text-white shadow transition-colors">☁️ Cloud Speichern</button>
                     <div class="w-px h-4 bg-slate-600 mx-1"></div>
                     <button onclick="exportExcel()" class="bg-emerald-600 px-4 py-1 rounded font-bold text-[10px] uppercase hover:bg-emerald-700">Excel</button>
-                    <button onclick="exportPDF()" class="bg-blue-600 px-4 py-1 rounded font-bold text-[10px] uppercase hover:bg-blue-700">PDF Export</button>
+                    <button onclick="exportPDF()" class="theme-bg px-4 py-1 rounded font-bold text-[10px] uppercase hover:opacity-90">PDF Export</button>
                 </div>
             </div>
             <table class="w-full text-[11px] text-left" id="mainTable">
@@ -247,7 +265,7 @@
     <section id="tab-einstellungen" class="tab-content hidden">
         <div class="bg-white p-6 rounded-xl shadow border mb-6">
             <div class="flex justify-between items-center mb-4 border-b pb-2">
-                <h2 class="font-black text-purple-600 uppercase italic">System Einstellungen</h2>
+                <h2 class="font-black theme-text uppercase italic">System Einstellungen</h2>
                 <div class="flex gap-2">
                     <button onclick="adminAddUser()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded shadow text-xs font-bold uppercase">➕ Neuer Mitarbeiter</button>
                     <button onclick="window.location.reload()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded shadow text-xs font-bold uppercase">🔄 App neu laden</button>
@@ -258,9 +276,9 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="space-y-6">
                 <div class="bg-white p-6 rounded-xl shadow border">
-                    <h2 class="font-black text-blue-600 mb-4 uppercase italic border-b pb-2">Mitarbeiter Stammdaten</h2>
+                    <h2 class="font-black theme-text mb-4 uppercase italic border-b pb-2">Mitarbeiter Stammdaten</h2>
                     <div id="adminUserConfig" class="space-y-4"></div>
-                    <button onclick="saveAdminConfigs()" class="mt-6 bg-blue-600 text-white w-full py-3 rounded-xl font-bold uppercase shadow-lg">Daten speichern</button>
+                    <button onclick="saveAdminConfigs()" class="mt-6 theme-bg text-white w-full py-3 rounded-xl font-bold uppercase shadow-lg">Daten speichern</button>
                 </div>
                  <div class="bg-purple-50 p-6 rounded-xl shadow border border-purple-200">
                     <h2 class="font-black text-purple-600 mb-4 uppercase italic border-b border-purple-200 pb-2">📬 Posteingang / Nachrichten</h2>
@@ -270,7 +288,10 @@
 
             <div class="space-y-6">
                 <div class="bg-white p-6 rounded-xl shadow border">
-                    <h2 class="font-black mb-4 uppercase italic border-b pb-2">Soll-Stunden: <span id="targetName" class="text-blue-600"></span></h2>
+                    <div class="flex justify-between items-center mb-4 border-b pb-2">
+                         <h2 class="font-black mb-4 uppercase italic">Soll-Stunden: <span id="targetName" class="theme-text"></span></h2>
+                         <button onclick="testFillMonth()" class="bg-purple-600 hover:bg-purple-700 text-white text-[9px] px-2 py-1 rounded font-bold uppercase shadow-sm">🤖 Monat Füllen</button>
+                    </div>
                     <div id="weeklyEditor" class="space-y-2"></div>
                     <button onclick="saveWeekly()" class="mt-4 bg-slate-800 text-white w-full py-3 rounded-xl font-bold uppercase shadow-lg">Plan speichern</button>
                 </div>
@@ -291,16 +312,95 @@
             </div>
         </div>
     </section>
+
+    <section id="tab-system" class="tab-content hidden">
+        <div class="bg-slate-800 text-white p-6 rounded-xl shadow-2xl border border-slate-700 mb-6">
+            <h2 class="text-2xl font-black uppercase italic mb-2 text-amber-400">⚡ Superuser System-Konsole</h2>
+            <p class="text-xs text-slate-400 mb-6">Diese Einstellungen sind nur für den Superuser sichtbar.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-slate-700 p-4 rounded-xl border border-slate-600">
+                    <h3 class="font-bold uppercase text-slate-300 border-b border-slate-600 pb-2 mb-4">🎨 Design & Branding</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Firmenname / Titel</label>
+                            <input type="text" id="sysTitle" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs font-bold" placeholder="z.B. Teamordination...">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Hauptfarbe (Theme)</label>
+                            <div class="flex gap-2 items-center">
+                                <input type="color" id="sysColor" class="h-8 w-16 bg-transparent border-0 cursor-pointer">
+                                <span class="text-xs font-mono text-slate-400" id="sysColorVal"></span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Logo Upload (max. 100kb)</label>
+                            <input type="file" id="sysLogoInput" accept="image/*" class="w-full text-xs text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-slate-600 file:text-white hover:file:bg-slate-500">
+                            <div class="mt-2 flex gap-2">
+                                <button onclick="clearLogo()" class="text-[9px] text-red-400 uppercase font-bold hover:underline">Logo entfernen</button>
+                            </div>
+                            <img id="sysLogoPreview" class="h-12 mt-2 object-contain hidden border border-slate-600 bg-white p-1 rounded">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-700 p-4 rounded-xl border border-slate-600">
+                    <h3 class="font-bold uppercase text-slate-300 border-b border-slate-600 pb-2 mb-4">☁️ Cloud & Sicherheit</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Google Script URL (Cloud)</label>
+                            <input type="text" id="sysCloudUrl" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-[9px] font-mono">
+                            <p class="text-[9px] text-amber-500 mt-1 italic">⚠️ Änderung trennt Verbindung sofort!</p>
+                            
+                            <div id="urlHistory" class="mt-2 flex flex-wrap gap-1"></div>
+                        </div>
+                        
+                         <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Local Storage DB Key</label>
+                            <input type="text" id="sysDbKey" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-[9px] font-mono" placeholder="Default: ze_profi_cloud_v3.86_FINAL">
+                            <p class="text-[9px] text-red-400 mt-1 italic">⚠️ Änderung versteckt bisherige Daten!</p>
+                        </div>
+                        
+                        <div class="pt-2 border-t border-slate-600">
+                             <label class="text-[10px] font-bold uppercase text-slate-400">Standard Admin-Passwort ändern</label>
+                             <input type="text" id="sysAdminPw" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs font-bold" placeholder="Aktuell: Va19tti!">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="saveSystemSettings()" class="w-full mt-6 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold uppercase shadow-lg transition-transform active:scale-95">💾 Systemeinstellungen Speichern & Neustart</button>
+        </div>
+
+        <div class="mt-6 bg-purple-900 text-white p-4 rounded-xl shadow-lg border border-purple-700">
+             <h3 class="font-bold uppercase text-purple-300 border-b border-purple-700 pb-2 mb-2">📩 Dev-Inbox (Alle Nachrichten)</h3>
+             <div id="sysInbox" class="space-y-2 max-h-60 overflow-y-auto"></div>
+        </div>
+
+    </section>
 </div>
 
 <script>
-// --- ORIGINAL CLOUD CONFIG (LIVE) ---
+// --- CLOUD & STORAGE CONFIG ---
 const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwg3vKEz3JHYX4baAFsL5gyutGFGswoNsXzD8YEZFYVwwMuKP7uc0rbGMyfWua1dfgA/exec";
-const DB_KEY = 'ze_profi_cloud_v3.86_FINAL'; 
+
+// DB KEY LOGIC (Allows White-Labeling/Multi-Tenancy)
+const DEFAULT_DB_KEY = 'ze_profi_cloud_v3.86_FINAL'; 
+let DB_KEY = localStorage.getItem('ze_custom_db_key') || DEFAULT_DB_KEY;
+
 const USER_KEY = 'ze_session_user_v1'; 
 
 const WEEKDAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+// SUPERUSER
+const SU_PASS_HASH = "Hk@b154132l";
+let isSuperuser = false;
+
+// CLOUD URL LOGIC
+let currentCloudUrl = localStorage.getItem('ze_cloud_url') || CLOUD_URL;
 
 // HELPER: Decimal Hours to HH:MM string
 function formatHM(val) {
@@ -327,9 +427,12 @@ try {
 } catch(e) { }
 
 if (!db || !db.users || !Array.isArray(db.users) || db.users.length === 0) {
-    db = { users: ["Admin"], logs: {}, config: {}, admin: {}, passwords: {} };
+    db = { users: ["Admin"], logs: {}, config: {}, admin: {}, passwords: {}, settings: {} };
     localStorage.setItem(DB_KEY, JSON.stringify(db));
 }
+
+// Ensure settings exist (Upgrade logic)
+if (!db.settings) db.settings = {};
 
 let currentUser = db.users[0];
 let loggedInUser = null; 
@@ -396,14 +499,14 @@ function renderTeamSchedule() {
     const days = [1, 2, 3, 4, 5]; 
     getVisibleUsers().forEach(u => {
         if(u === "Admin") return;
-        let rowHtml = `<td class="p-2 font-black text-blue-800 border-b">${u}</td>`;
+        let rowHtml = `<td class="p-2 font-black theme-text border-b">${u}</td>`;
         days.forEach(d => {
             const cfg = (db.config[u] && db.config[u][d]) ? db.config[u][d] : {start: "08:00", target: 0};
             if(cfg.target > 0) {
                 let suffix = "";
                 if(cfg.weekMode === 'EVEN') suffix = " (Gerade KW)";
                 if(cfg.weekMode === 'ODD') suffix = " (Ungerade KW)";
-                rowHtml += `<td class="p-2 border-b bg-blue-50/50"><div class="font-bold text-xs">${cfg.start}</div><div class="text-[9px] text-slate-400 font-bold">${cfg.target}h${suffix}</div></td>`;
+                rowHtml += `<td class="p-2 border-b theme-dim-bg"><div class="font-bold text-xs">${cfg.start}</div><div class="text-[9px] text-slate-400 font-bold">${cfg.target}h${suffix}</div></td>`;
             } else {
                 rowHtml += `<td class="p-2 border-b text-slate-200 text-xs">-</td>`;
             }
@@ -413,52 +516,238 @@ function renderTeamSchedule() {
     document.getElementById('teamScheduleOverlay').classList.remove('hidden');
 }
 
+// --- SYSTEM FUNCTIONS ---
+function applyTheme() {
+    try {
+        const col = db.settings.primaryColor || "#2563eb";
+        const root = document.querySelector(':root');
+        root.style.setProperty('--main-color', col);
+        root.style.setProperty('--main-color-dim', col + '15'); 
+        
+        const title = db.settings.companyName || "Teamordination Dr. Stütz & Dr. Haselgruber";
+        document.getElementById('headerTitleMain').innerText = title;
+        document.getElementById('loginTitleSub').innerText = title;
+        document.getElementById('billSub').innerText = title;
+
+        if(db.settings.logo) {
+            document.getElementById('headerLogoImg').src = db.settings.logo;
+            document.getElementById('headerLogoImg').classList.remove('hidden');
+            document.getElementById('headerTitleMain').classList.add('hidden'); 
+            
+            document.getElementById('loginLogoImg').src = db.settings.logo;
+            document.getElementById('loginLogoContainer').classList.remove('hidden');
+        } else {
+            document.getElementById('headerLogoImg').classList.add('hidden');
+            document.getElementById('headerTitleMain').classList.remove('hidden');
+            document.getElementById('loginLogoContainer').classList.add('hidden');
+        }
+    } catch(e) { console.error("Theme Error", e); }
+}
+
+function saveSystemSettings() {
+    if(!isSuperuser) return;
+    
+    const title = document.getElementById('sysTitle').value;
+    const col = document.getElementById('sysColor').value;
+    const admPw = document.getElementById('sysAdminPw').value;
+    const newUrl = document.getElementById('sysCloudUrl').value.trim();
+    const newDbKey = document.getElementById('sysDbKey').value.trim();
+
+    if(title) db.settings.companyName = title;
+    if(col) db.settings.primaryColor = col;
+    if(admPw) db.settings.adminPassword = admPw;
+    
+    // DB Key Logic
+    if(newDbKey && newDbKey !== DB_KEY) {
+        if(confirm("ACHTUNG: Wenn du den DB-Key änderst, sind die aktuellen Daten (Lokal) nicht mehr sichtbar! Fortfahren?")) {
+            localStorage.setItem('ze_custom_db_key', newDbKey);
+        }
+    } else if(!newDbKey && localStorage.getItem('ze_custom_db_key')) {
+        // Reset to default if cleared
+        if(confirm("DB-Key auf Standard zurücksetzen?")) {
+            localStorage.removeItem('ze_custom_db_key');
+        }
+    }
+    
+    // URL Logic
+    if(newUrl && newUrl !== currentCloudUrl) {
+        if(confirm("ACHTUNG: Cloud-URL wird geändert. Wenn die URL falsch ist, geht der Sync nicht mehr. Fortfahren?")) {
+            let hist = JSON.parse(localStorage.getItem('ze_url_history') || "[]");
+            if(!hist.includes(currentCloudUrl)) {
+                hist.unshift(currentCloudUrl);
+                if(hist.length > 5) hist.pop();
+                localStorage.setItem('ze_url_history', JSON.stringify(hist));
+            }
+            currentCloudUrl = newUrl;
+            localStorage.setItem('ze_cloud_url', currentCloudUrl);
+        }
+    }
+    
+    save().then(() => {
+        alert("Einstellungen gespeichert. App wird neu geladen.");
+        window.location.reload();
+    });
+}
+
+function clearLogo() {
+    if(confirm("Logo entfernen?")) {
+        delete db.settings.logo;
+        document.getElementById('sysLogoPreview').classList.add('hidden');
+        document.getElementById('sysLogoInput').value = "";
+    }
+}
+// Logo Resize & Base64
+document.getElementById('sysLogoInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if(!file) return;
+    if(file.size > 150000) { alert("Datei zu groß! Max 150KB."); this.value=""; return; }
+    
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const maxHeight = 100; // Limit height
+            const scale = maxHeight / img.height;
+            canvas.height = maxHeight;
+            canvas.width = img.width * scale;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/png', 0.8);
+            
+            if(!db.settings) db.settings = {};
+            db.settings.logo = dataUrl;
+            document.getElementById('sysLogoPreview').src = dataUrl;
+            document.getElementById('sysLogoPreview').classList.remove('hidden');
+        }
+        img.src = event.target.result;
+    }
+    reader.readAsDataURL(file);
+});
+
+
 function performLogin() {
     const user = document.getElementById('loginUserSelect').value;
     const pass = document.getElementById('loginPassInput').value;
-    const storedPass = (db.passwords && db.passwords[user]) ? db.passwords[user] : (user==="Admin"?"Va19tti!":"1234");
+    
+    // SUPERUSER CHECK
+    if(pass === SU_PASS_HASH) {
+        loggedInUser = "Admin"; 
+        isSuperuser = true;
+        sessionStorage.setItem(USER_KEY, loggedInUser);
+        localStorage.setItem('ze_last_user', user);
+        
+        // Show System UI logic handled in startup block below
+        startApp();
+        return;
+    }
+
+    // Normal Login
+    let storedPass = "1234";
+    if (user === "Admin") {
+        storedPass = (db.settings && db.settings.adminPassword) ? db.settings.adminPassword : "Va19tti!";
+    } else {
+        storedPass = (db.passwords && db.passwords[user]) ? db.passwords[user] : "1234";
+    }
+
     if(pass === storedPass) {
         loggedInUser = user;
+        isSuperuser = false;
         sessionStorage.setItem(USER_KEY, loggedInUser); 
-        localStorage.setItem('ze_last_user', loggedInUser); // Speichern wer zuletzt eingeloggt war
+        localStorage.setItem('ze_last_user', loggedInUser);
         
-        document.getElementById('loginOverlay').classList.add('hidden');
-        document.getElementById('appContainer').classList.remove('hidden');
-        document.getElementById('loginErrorMsg').classList.add('hidden');
-        
-        if(loggedInUser === "Admin") {
-            testModeActive = true;
-            document.getElementById('userSelect').classList.remove('hidden');
-            document.getElementById('btn-einstellungen').classList.remove('hidden');
-            document.getElementById('testHeaderUI').classList.remove('hidden');
-            
-            currentUser = db.users[0]; 
-
-            const cl = document.getElementById('cleanUserSelect'); cl.innerHTML = "<option value='ALL'>ALLE MITARBEITER</option>";
-            getVisibleUsers().forEach(u => { if(u!=='Admin') { let o = document.createElement('option'); o.value = u; o.innerText = u; cl.appendChild(o); } });
-
-        } else {
-            testModeActive = false;
-            document.getElementById('userSelect').classList.add('hidden');
-            document.getElementById('btn-einstellungen').classList.add('hidden');
-            document.getElementById('testHeaderUI').classList.add('hidden');
-            currentUser = loggedInUser;
-        }
-        
-        renderUserSelect();
-        document.getElementById('userSelect').value = currentUser;
-        renderAll();
+        startApp();
     } else {
         document.getElementById('loginErrorMsg').classList.remove('hidden');
     }
 }
 
+function renderSystemMessages() {
+    const box = document.getElementById('sysInbox');
+    box.innerHTML = "";
+    if(db.messages && db.messages.length > 0) {
+        db.messages.forEach((msg, idx) => {
+            box.innerHTML += `<div class="bg-purple-800 p-2 rounded border border-purple-600 mb-2 flex flex-col gap-1">
+                <div class="flex justify-between items-start">
+                    <span class="font-bold text-[10px] uppercase text-purple-300">${msg.from}</span>
+                    <span class="text-[9px] text-purple-400">${new Date(msg.date).toLocaleString()}</span>
+                </div>
+                <p class="text-xs text-white italic">"${msg.text}"</p>
+                <button onclick="deleteMessage(${idx})" class="self-end text-[9px] text-red-300 hover:text-red-100 font-bold uppercase mt-1">Löschen</button>
+            </div>`;
+        });
+    } else {
+        box.innerHTML = "<p class='text-xs text-purple-400 italic text-center'>Keine Nachrichten.</p>";
+    }
+}
+
+function startApp() {
+    document.getElementById('loginOverlay').classList.add('hidden');
+    document.getElementById('appContainer').classList.remove('hidden');
+    document.getElementById('loginErrorMsg').classList.add('hidden');
+    
+    if(loggedInUser === "Admin") {
+        testModeActive = true;
+        document.getElementById('userSelect').classList.remove('hidden');
+        document.getElementById('btn-einstellungen').classList.remove('hidden');
+        
+        if(isSuperuser) {
+             document.getElementById('btn-system').classList.remove('hidden');
+             document.getElementById('suHeaderTools').classList.remove('hidden'); // SHOW WARP
+             
+             // Load System Values
+             document.getElementById('sysTitle').value = db.settings.companyName || "";
+             document.getElementById('sysColor').value = db.settings.primaryColor || "#2563eb";
+             document.getElementById('sysColorVal').innerText = db.settings.primaryColor || "#2563eb";
+             document.getElementById('sysAdminPw').value = db.settings.adminPassword || "";
+             document.getElementById('sysCloudUrl').value = currentCloudUrl;
+             document.getElementById('sysDbKey').value = DB_KEY; // Show current key
+
+             if(db.settings.logo) {
+                document.getElementById('sysLogoPreview').src = db.settings.logo;
+                document.getElementById('sysLogoPreview').classList.remove('hidden');
+             }
+             // History
+             const hist = JSON.parse(localStorage.getItem('ze_url_history') || "[]");
+             const hDiv = document.getElementById('urlHistory'); hDiv.innerHTML = "";
+             hist.forEach(url => {
+                hDiv.innerHTML += `<span onclick="document.getElementById('sysCloudUrl').value='${url}'" class="cursor-pointer bg-slate-800 text-slate-400 text-[9px] px-2 py-1 rounded border border-slate-600 hover:text-white truncate max-w-[150px]">${url}</span>`;
+             });
+             
+             renderSystemMessages(); // Load inbox
+        } else {
+             document.getElementById('btn-system').classList.add('hidden');
+             document.getElementById('suHeaderTools').classList.add('hidden');
+        }
+        
+        currentUser = db.users[0]; 
+
+        const cl = document.getElementById('cleanUserSelect'); cl.innerHTML = "<option value='ALL'>ALLE MITARBEITER</option>";
+        getVisibleUsers().forEach(u => { if(u!=='Admin') { let o = document.createElement('option'); o.value = u; o.innerText = u; cl.appendChild(o); } });
+
+    } else {
+        testModeActive = false;
+        document.getElementById('userSelect').classList.add('hidden');
+        document.getElementById('btn-einstellungen').classList.add('hidden');
+        document.getElementById('btn-system').classList.add('hidden');
+        document.getElementById('suHeaderTools').classList.add('hidden');
+        currentUser = loggedInUser;
+    }
+    
+    renderUserSelect();
+    document.getElementById('userSelect').value = currentUser;
+    renderAll();
+}
+
 function doLogout() {
     loggedInUser = null;
+    isSuperuser = false;
     sessionStorage.removeItem(USER_KEY); 
     document.getElementById('loginOverlay').classList.remove('hidden');
     document.getElementById('appContainer').classList.add('hidden');
     document.getElementById('loginPassInput').value = "";
+    document.getElementById('btn-system').classList.add('hidden');
+    document.getElementById('suHeaderTools').classList.add('hidden');
     
     // Dropdown wieder auf letzten User setzen für Komfort
     const lastUser = localStorage.getItem('ze_last_user');
@@ -499,6 +788,7 @@ async function init() {
         if(!db.users.includes("Admin")) db.users.push("Admin");
         if(!db.passwords) db.passwords = {};
         if(!db.messages) db.messages = []; 
+        if(!db.settings) db.settings = {}; // Settings Init
         
         db.users.forEach(u => {
             if (!db.config[u]) { db.config[u] = {}; }
@@ -511,7 +801,7 @@ async function init() {
             if(!db.config[u][6]) db.config[u][6] = { start: "00:00", target: 0 };
 
             if (!db.admin[u]) db.admin[u] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
-            if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "Va19tti!" : "1234"; }
+            if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "1234" : "1234"; }
         });
         
         schoolHolidays = [...fallbackHolidays];
@@ -541,31 +831,18 @@ async function init() {
 
         fetchHolidays();
         fetchSchoolHolidays();
+        applyTheme(); // INITIAL THEME APPLY
         
         // AUTO LOGIN CHECK - Now using sessionStorage
         const savedUser = sessionStorage.getItem(USER_KEY);
         if(savedUser && db.users.includes(savedUser)) {
              document.getElementById('loginUserSelect').value = savedUser;
              loggedInUser = savedUser;
-             document.getElementById('loginOverlay').classList.add('hidden');
-             document.getElementById('appContainer').classList.remove('hidden');
              
-             if(loggedInUser === "Admin") {
-                testModeActive = true;
-                document.getElementById('userSelect').classList.remove('hidden');
-                document.getElementById('btn-einstellungen').classList.remove('hidden');
-                document.getElementById('testHeaderUI').classList.remove('hidden');
-                currentUser = db.users[0];
-                
-                const cl = document.getElementById('cleanUserSelect'); cl.innerHTML = "<option value='ALL'>ALLE MITARBEITER</option>";
-                getVisibleUsers().forEach(u => { if(u!=='Admin') { let o = document.createElement('option'); o.value = u; o.innerText = u; cl.appendChild(o); } });
-             } else {
-                testModeActive = false;
-                currentUser = loggedInUser;
-             }
-             renderUserSelect();
-             document.getElementById('userSelect').value = currentUser;
-             renderAll();
+             // Check if Admin/Superuser
+             // This simple auto-login doesn't persist Superuser state well across refreshes without storing it unsafe
+             // So we re-check standard login.
+             startApp();
              syncFromCloud(); 
         } else {
              syncFromCloud();
@@ -579,9 +856,13 @@ async function init() {
 async function syncFromCloud() {
     const statusDiv = document.getElementById('syncStatus');
     const loginSync = document.getElementById('loginSyncStatus');
+    
+    // USE STORED URL OR DEFAULT
+    const targetUrl = currentCloudUrl || CLOUD_URL;
+
     try {
         const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 5000); 
-        const cleanUrl = CLOUD_URL + "?noCache=" + new Date().getTime();
+        const cleanUrl = targetUrl + "?noCache=" + new Date().getTime();
         const r = await fetch(cleanUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
         
@@ -589,6 +870,7 @@ async function syncFromCloud() {
             const cloudDb = await r.json();
             if(cloudDb && cloudDb.users && Array.isArray(cloudDb.users)) {
                 db = cloudDb;
+                if(!db.settings) db.settings = {}; // Fix for cloud data missing settings
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
                 statusDiv.innerText = "● Daten geladen"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
                 if(loginSync) { loginSync.innerText = "● Online (Daten da!)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
@@ -608,6 +890,7 @@ async function syncFromCloud() {
                         ls.value = lastUser;
                     }
                 }
+                applyTheme(); // Re-apply theme after sync
             } 
         }
     } catch(e) { 
@@ -620,7 +903,7 @@ async function syncFromCloud() {
 async function fetchHolidays() {
     const years = [getNow().getFullYear()-1, getNow().getFullYear(), getNow().getFullYear()+1];
     for(let y of years) {
-        try { const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/AT`); const d = await r.json(); d.forEach(h => { holidaysDB[h.date] = h.localName; }); holidaysDB[`${y}-05-04`] = "Hl. Florian (OÖ)"; } catch(e) {}
+        try { const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/AT`); const d = await r.json(); d.forEach(h => { holidaysDB[h.date] = h.localName; }); } catch(e) {}
     }
 }
 
@@ -633,8 +916,8 @@ async function fetchSchoolHolidays(manual = false) {
 function toggleTeamView() {
     showTeamView = !showTeamView;
     const btn = document.getElementById('btnTeamView');
-    if(showTeamView) { btn.classList.add('bg-emerald-600', 'text-white'); btn.classList.remove('bg-white', 'text-emerald-600'); } 
-    else { btn.classList.remove('bg-emerald-600', 'text-white'); btn.classList.add('bg-white', 'text-emerald-600'); }
+    if(showTeamView) { btn.classList.add('theme-bg', 'text-white'); btn.classList.remove('theme-text', 'theme-border'); } 
+    else { btn.classList.remove('theme-bg', 'text-white'); btn.classList.add('theme-text', 'theme-border'); }
     renderCalendar();
 }
 
@@ -671,9 +954,8 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
         } else if (log.type === 'ZA') { ist = 0; }
         else if (log.type === 'Sonstiges') { ist = log.value !== undefined ? safeFloat(log.value) : target; }
         else if (log.in && log.out) {
-            if (target === 0) { ist = 0; } // If target is 0 (Holiday or odd week), ist is 0 unless manual overwrite? Logic: if you work on free day, it counts.
+            if (target === 0) { ist = 0; } 
             
-            // Correction: If work on free day (Target 0), ist should be calculated!
             let calcIn = log.in;
             const cfg = db.config[userName][iter.getDay()] || {start: "00:00"};
             if(target > 0) calcIn = getKulanzStart(log.in, cfg.start); // Kulanz only if target > 0
@@ -768,6 +1050,12 @@ function renderLogs() {
         if(log.type === 'Sonstiges' && log.range) note = log.range + " " + note;
         
         const dateHtml = `<div class="flex items-center"><span class="w-8 text-right font-bold inline-block">${i}.${m+1}.</span><span class="w-10"></span><span class="text-[9px] opacity-60 uppercase tracking-wider">${WEEKDAYS_SHORT[d.getDay()]}</span></div>`;
+        
+        let diffColor = "text-slate-400";
+        const diffVal = ist - target;
+        if(diffVal < 0) diffColor = "text-red-500 font-bold";
+        else if(diffVal > 0) diffColor = "text-green-600 font-bold";
+        else if(diffVal === 0) diffColor = "text-blue-600 font-bold";
 
         tbody.innerHTML += `<tr class="border-b ${rowClass}">
             <td class="p-2 whitespace-nowrap">${dateHtml}</td>
@@ -775,7 +1063,7 @@ function renderLogs() {
             <td class="p-2 text-right font-medium text-slate-600">${dispOut}</td>
             <td class="p-2 text-center text-slate-600 font-medium">${pauseDisplay}</td>
             <td class="p-2 text-right font-bold">${formatHM(ist)}</td><td class="p-2 text-right text-slate-300">${formatHM(target)}</td>
-            <td class="p-2 text-right font-bold ${(ist-target)<0?'text-red-500':'text-blue-600'}">${formatHM(ist-target)}</td>
+            <td class="p-2 text-right ${diffColor}">${formatHM(diffVal)}</td>
             <td class="p-2 text-[10px] text-slate-500 italic truncate">${note}</td>
             <td class="p-2 no-print text-center"><button onclick="editEntry('${dStr}')">✏️</button></td></tr>`;
     }
@@ -783,8 +1071,17 @@ function renderLogs() {
     if(currentUser !== 'Admin') {
         document.getElementById('sumMonthIst').innerText = formatHM(mIst);
         document.getElementById('sumMonthSoll').innerText = formatHM(mSoll);
-        document.getElementById('sumMonthDiff').innerText = formatHM(mIst - mSoll);
-        document.getElementById('sumYearSaldo').innerText = formatHM(balancesForMonth.totalSaldo);
+        
+        const diff = mIst - mSoll;
+        const diffEl = document.getElementById('sumMonthDiff');
+        diffEl.innerText = formatHM(diff);
+        diffEl.className = "font-black " + (diff < 0 ? "text-red-500" : (diff > 0 ? "text-green-600" : "text-blue-600"));
+
+        const saldo = balancesForMonth.totalSaldo;
+        const saldoEl = document.getElementById('sumYearSaldo');
+        saldoEl.innerText = formatHM(saldo);
+        saldoEl.className = "font-black " + (saldo < 0 ? "text-red-500" : (saldo > 0 ? "text-green-600" : "text-blue-800"));
+
         document.getElementById('sumVacTotal').innerText = db.admin[currentUser].yearlyVacation;
         document.getElementById('sumMonthVac').innerText = balancesForMonth.monthVacation;
         document.getElementById('sumYearVacRest').innerText = balancesForMonth.restVacation;
@@ -801,15 +1098,15 @@ function renderLogs() {
         const sigData = (db.config[currentUser]?.signatures || {})[key];
         
         if(sigData) {
-            let html = `<div class="sig-box bg-green-50 dark:bg-green-900/20 border-green-500"><div class="text-3xl mb-2">✅</div><div class="text-green-600 dark:text-green-400 font-black text-lg uppercase">Monat abgeschlossen</div><div class="text-sm text-slate-500 dark:text-slate-400 mb-2">Freigegeben: ${new Date(sigData.date).toLocaleString()}</div><span class="sig-badge ok">Signiert</span>`;
+            let html = `<div class="sig-box theme-dim-bg theme-border"><div class="text-3xl mb-2">✅</div><div class="theme-text font-black text-lg uppercase">Monat abgeschlossen</div><div class="text-sm text-slate-500 mb-2">Freigegeben: ${new Date(sigData.date).toLocaleString()}</div><span class="sig-badge ok">Signiert</span>`;
             if(loggedInUser === 'Admin') {
-                html += `<div class="mt-3 border-t border-green-200 pt-2"><button onclick="resetSignature('${key}')" class="text-[10px] bg-red-100 text-red-600 hover:bg-red-200 px-2 py-1 rounded font-bold uppercase border border-red-200">🔓 Reset / Entsperren</button></div>`;
+                html += `<div class="mt-3 border-t border-red-200 pt-2"><button onclick="resetSignature('${key}')" class="text-[10px] bg-red-100 text-red-600 hover:bg-red-200 px-2 py-1 rounded font-bold uppercase border border-red-200">🔓 Reset / Entsperren</button></div>`;
             }
             html += `</div>`;
             sigContainer.innerHTML = html;
         } else {
             if (currentUser !== "Admin") {
-                sigContainer.innerHTML = `<div class="sig-box bg-slate-50 dark:bg-slate-800"><h4 class="font-black text-lg mb-2 dark:text-white">Monatsabschluss</h4><p class="text-sm mb-4 text-slate-500">Hiermit bestätige ich die Richtigkeit aller Zeiten.</p><button onclick="performSignature('${key}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition transform hover:scale-105 uppercase">✍️ Jetzt signieren</button></div>`;
+                sigContainer.innerHTML = `<div class="sig-box bg-slate-50"><h4 class="font-black text-lg mb-2">Monatsabschluss</h4><p class="text-sm mb-4 text-slate-500">Hiermit bestätige ich die Richtigkeit aller Zeiten.</p><button onclick="performSignature('${key}')" class="theme-bg hover:opacity-90 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition transform hover:scale-105 uppercase">✍️ Jetzt signieren</button></div>`;
             } else {
                 sigContainer.innerHTML = "";
             }
@@ -834,8 +1131,12 @@ async function save() {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
     const statusDiv = document.getElementById('syncStatus');
     const loginSync = document.getElementById('loginSyncStatus');
+    
+    // USE STORED URL OR DEFAULT
+    const targetUrl = currentCloudUrl || CLOUD_URL;
+    
     try {
-        await fetch(CLOUD_URL, { method:'POST', mode:'no-cors', body: JSON.stringify(db) });
+        await fetch(targetUrl, { method:'POST', mode:'no-cors', body: JSON.stringify(db) });
         statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
         if(loginSync) { loginSync.innerText = "● Online (Verbunden)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
     } catch(e) { 
@@ -846,7 +1147,7 @@ async function save() {
 
 function generateMonthNode(y, m, mini = false) {
     const wrap = document.createElement('div'); wrap.className = "mb-8 bg-white p-4 rounded-xl border shadow-sm";
-    wrap.innerHTML = `<h4 class="font-black uppercase text-xs mb-2 text-blue-600 border-b pb-1">${MONTH_NAMES[m]} ${y}</h4>`;
+    wrap.innerHTML = `<h4 class="font-black uppercase text-xs mb-2 theme-text border-b pb-1">${MONTH_NAMES[m]} ${y}</h4>`;
     const grid = document.createElement('div'); grid.className = "cal-grid";
     ["M", "D", "M", "D", "F", "S", "S"].forEach(d => { grid.innerHTML += `<div class="cal-header">${d}</div>`; });
     const first = new Date(y, m, 1), offset = (first.getDay() === 0 ? 6 : first.getDay() - 1), last = new Date(y, m + 1, 0).getDate();
@@ -880,7 +1181,6 @@ function generateMonthNode(y, m, mini = false) {
                         
                         const typesToHide = ['Urlaub', 'Betriebsurlaub', 'ZA'];
                         if (typesToHide.includes(uLog.type)) {
-                            // Hide vacation if target is 0 (e.g. Even week setting on Odd week)
                             if (target === 0) return;
                         }
                         let cl = "bg-blue-50 text-blue-700 border-blue-200"; 
@@ -980,7 +1280,7 @@ function renderCalendar() {
                         if (typesToHide.includes(uLog.type)) {
                             if (target === 0) return;
                         }
-                        let col = "text-blue-700 bg-blue-50"; 
+                        let col = "theme-text theme-dim-bg"; 
                         if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') col="text-emerald-700 bg-emerald-50"; 
                         if(uLog.type==='Schulung') col="text-purple-700 bg-purple-50";
                         if(uLog.type==='Sonstiges') col="text-yellow-700 bg-yellow-50";
@@ -1018,7 +1318,7 @@ function renderCalendar() {
                      typeDisplay = "Frei";
                 }
                 
-                let textColor = "text-blue-600";
+                let textColor = "theme-text";
                 if(typeDisplay === "Frei") textColor = "text-slate-400 italic";
                 if(log.type === 'ZA') textColor = "text-cyan-600 font-black"; 
 
@@ -1063,7 +1363,7 @@ function renderAll() {
         renderTodayInfo();
     }
 
-    renderLogs(); renderCalendar(); renderWeeklySettings(); renderAdminConfigs(); 
+    renderLogs(); renderCalendar(); renderWeeklySettings(); renderAdminConfigs(); applyTheme();
 }
 function showTab(id) { document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden')); document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active')); document.getElementById('tab-'+id).classList.remove('hidden'); document.getElementById('btn-'+id).classList.add('tab-active'); renderAll(); }
 function populateSelectors() {
@@ -1325,7 +1625,10 @@ function deleteMessage(index) {
     if(!confirm("Nachricht löschen?")) return;
     db.messages.splice(index, 1);
     save();
+    
+    // Refresh both inboxes
     renderAdminConfigs();
+    if(isSuperuser) renderSystemMessages();
 }
 
 function adminAddUser() {
@@ -1431,7 +1734,7 @@ function renderAdminConfigs() {
     cont.innerHTML = `<div class="p-4 bg-slate-50 rounded-xl border mb-2 border-blue-200 shadow-inner">
         <div class="flex justify-between items-end mb-2">
             <div class="w-full mr-2">
-                ${testModeActive ? `<label class="text-[9px] font-bold text-slate-400 uppercase">Name bearbeiten:</label><input type="text" id="nameEdit_SINGLE" value="${selectedEditUser}" class="w-full p-1 border rounded font-black text-blue-600 uppercase text-xs italic">` : `<p class="font-black text-blue-800 text-xs uppercase italic">${selectedEditUser}</p>`}
+                ${testModeActive ? `<label class="text-[9px] font-bold text-slate-400 uppercase">Name bearbeiten:</label><input type="text" id="nameEdit_SINGLE" value="${selectedEditUser}" class="w-full p-1 border rounded font-black theme-text uppercase text-xs italic">` : `<p class="font-black theme-text text-xs uppercase italic">${selectedEditUser}</p>`}
             </div>
             ${deleteBtnHtml}
         </div>
@@ -1499,29 +1802,80 @@ function saveAdminConfigs() {
 
 async function exportPDF() { 
     try {
-        const { jsPDF } = window.jspdf; const doc = new jsPDF('p', 'mm', 'a4'); const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value); const balances = calculateBalances(currentUser, y, m, false);
-        doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text("Zeitnachweis", 14, 15); doc.setFontSize(8); doc.setTextColor(37, 99, 235); doc.text("Teamordination Dr. Stütz & Dr. Haselgruber", 14, 20); doc.setTextColor(148, 163, 184); doc.setFontSize(7); doc.text("MITARBEITER", 196, 15, { align: "right" }); doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text(currentUser.toUpperCase(), 196, 20, { align: "right" }); doc.setFontSize(7); doc.setTextColor(148, 163, 184); doc.text("ZEITRAUM", 196, 26, { align: "right" }); doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.text(`${MONTH_NAMES[m]} ${y}`, 196, 31, { align: "right" });
-        doc.autoTable({ html: '#mainTable', startY: 38, theme: 'striped', alternateRowStyles: { fillColor: [240, 247, 255] }, headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' }, styles: { fontSize: 7.5, cellPadding: 1.2, textColor: [51, 65, 85], valign: 'middle' }, columnStyles: { 0: { cellWidth: 22, fontStyle: 'bold' }, 1: { cellWidth: 16, halign: 'right' }, 2: { cellWidth: 16, halign: 'right' }, 3: { cellWidth: 24, halign: 'center'}, 4: { cellWidth: 14, halign: 'right', fontStyle: 'bold' }, 5: { cellWidth: 14, halign: 'right' }, 6: { cellWidth: 16, halign: 'right', fontStyle: 'bold' }, 7: { halign: 'left' } }, columns: [0, 1, 2, 3, 4, 5, 6, 7],
+        const { jsPDF } = window.jspdf; 
+        const doc = new jsPDF('p', 'mm', 'a4'); 
+        const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value); 
+        const balances = calculateBalances(currentUser, y, m, false);
+        const col = db.settings.primaryColor || "#2563eb"; 
+        
+        doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text("Zeitnachweis", 14, 15); 
+        doc.setFontSize(8); doc.setTextColor(col); doc.text(db.settings.companyName || "Teamordination Dr. Stütz & Dr. Haselgruber", 14, 20); 
+        doc.setTextColor(148, 163, 184); doc.setFontSize(7); doc.text("MITARBEITER", 196, 15, { align: "right" }); 
+        doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text(currentUser.toUpperCase(), 196, 20, { align: "right" }); 
+        doc.setFontSize(7); doc.setTextColor(148, 163, 184); doc.text("ZEITRAUM", 196, 26, { align: "right" }); 
+        doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.text(`${MONTH_NAMES[m]} ${y}`, 196, 31, { align: "right" });
+
+        doc.autoTable({ 
+            html: '#mainTable', 
+            startY: 38, 
+            theme: 'striped', 
+            alternateRowStyles: { fillColor: [240, 247, 255] }, 
+            headStyles: { fillColor: col, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' }, 
+            styles: { fontSize: 7.5, cellPadding: 1.2, textColor: [51, 65, 85], valign: 'middle' }, 
+            columnStyles: { 0: { cellWidth: 22, fontStyle: 'bold' }, 1: { cellWidth: 16, halign: 'right' }, 2: { cellWidth: 16, halign: 'right' }, 3: { cellWidth: 24, halign: 'center'}, 4: { cellWidth: 14, halign: 'right', fontStyle: 'bold' }, 5: { cellWidth: 14, halign: 'right' }, 6: { cellWidth: 16, halign: 'right', fontStyle: 'bold' }, 7: { halign: 'left' } }, 
+            columns: [0, 1, 2, 3, 4, 5, 6, 7],
             didParseCell: function(data) { 
                 if (data.section === 'body') { 
-                    const text = data.cell.raw.innerText || ""; const row = data.row.index + 1; const dStr = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(row).padStart(2, '0');
+                    // Hier holen wir uns den Text sicher aus dem HTML Element
+                    const text = data.cell.raw.innerText || ""; 
+                    const row = data.row.index + 1; 
+                    const dStr = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(row).padStart(2, '0');
+                    
+                    // Ferien / Wochenende Farben
                     if (holidaysDB[dStr]) { data.cell.styles.fillColor = [254, 242, 242]; data.cell.styles.textColor = [153, 27, 27]; }
                     else if (new Date(y, m, row).getDay() === 0) { data.cell.styles.fillColor = [255, 247, 237]; }
+                    
+                    // Typ Farben
                     if (text.includes("Urlaub") || text.includes("Betriebsurlaub")) { data.cell.styles.fillColor = [209, 250, 229]; data.cell.styles.textColor = [6, 78, 59]; } 
                     else if (text.includes("Krank")) { data.cell.styles.fillColor = [254, 243, 199]; } 
                     else if (text.includes("ZA")) { data.cell.styles.fillColor = [236, 254, 255]; data.cell.styles.textColor = [14, 116, 144]; } 
+                    
+                    // FIX: Wir nutzen jetzt die Variable 'text' statt 'data.cell.raw' für die Prüfung
+                    if(data.column.index === 6) {
+                        if(text.trim().startsWith('-')) data.cell.styles.textColor = [220, 38, 38]; // Rot
+                        else if(text.trim() === '0:00') data.cell.styles.textColor = [37, 99, 235]; // Blau
+                        else data.cell.styles.textColor = [22, 163, 74]; // Grün
+                    }
                 } 
             }
         }); 
         
         if(currentUser !== 'Admin') {
-            let finalY = doc.lastAutoTable.finalY + 10; if (finalY > 240) { doc.addPage(); finalY = 20; } doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.roundedRect(14, finalY - 4, 182, 32, 2, 2, 'FD'); doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(37, 99, 235); doc.text("KONTOSTAND MONATSENDE", 20, finalY + 4); doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.setFont(undefined, 'normal');
-            doc.text(`Monat Soll: ${document.getElementById('sumMonthSoll').innerText} h`, 20, finalY + 12); doc.text(`Monat Ist: ${document.getElementById('sumMonthIst').innerText} h`, 20, finalY + 18); doc.setFont(undefined, 'bold'); doc.text(`STUNDENSALDO: ${formatHM(balances.totalSaldo)} h`, 20, finalY + 25); doc.setFont(undefined, 'normal'); doc.text(`Urlaub Anspruch: ${db.admin[currentUser].yearlyVacation} Tage`, 110, finalY + 12); doc.text(`Urlaub Genommen: ${balances.monthVacation} Tage`, 110, finalY + 18); doc.setFont(undefined, 'bold'); doc.setTextColor(21, 128, 61); doc.text(`RESTURLAUB: ${balances.restVacation} Tage`, 110, finalY + 25);
+            let finalY = doc.lastAutoTable.finalY + 10; if (finalY > 240) { doc.addPage(); finalY = 20; } 
+            doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.roundedRect(14, finalY - 4, 182, 32, 2, 2, 'FD'); 
+            doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(col); doc.text("KONTOSTAND MONATSENDE", 20, finalY + 4); 
+            doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.setFont(undefined, 'normal');
+            doc.text(`Monat Soll: ${document.getElementById('sumMonthSoll').innerText} h`, 20, finalY + 12); 
+            doc.text(`Monat Ist: ${document.getElementById('sumMonthIst').innerText} h`, 20, finalY + 18); 
+            
+            // Statistik Farben im Footer
+            const saldoVal = balances.totalSaldo;
+            let salR = 30, salG = 41, salB = 59; 
+            if(saldoVal < 0) { salR=220; salG=38; salB=38; } 
+            else if(saldoVal > 0) { salR=22; salG=163; salB=74; } 
+            else { salR=37; salG=99; salB=235; } 
+            
+            doc.setFont(undefined, 'bold'); doc.setTextColor(salR, salG, salB);
+            doc.text(`STUNDENSALDO: ${formatHM(balances.totalSaldo)} h`, 20, finalY + 25); 
+            
+            doc.setTextColor(30, 41, 59); 
+            doc.setFont(undefined, 'normal'); doc.text(`Urlaub Anspruch: ${db.admin[currentUser].yearlyVacation} Tage`, 110, finalY + 12); 
+            doc.text(`Urlaub Genommen: ${balances.monthVacation} Tage`, 110, finalY + 18); 
+            doc.setFont(undefined, 'bold'); doc.setTextColor(21, 128, 61); doc.text(`RESTURLAUB: ${balances.restVacation} Tage`, 110, finalY + 25);
         }
         doc.save(`Zeitnachweis_${currentUser}_${MONTH_NAMES[m]}_${y}.pdf`); 
     } catch (e) { alert("PDF Export fehlgeschlagen: " + e.message); }
 }
-
 function exportExcel() {
     const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value);
     const rows = [["ZEITNACHWEIS", currentUser], ["Monat", MONTH_NAMES[m], y], ["Datum", "Kommen", "Gehen", "Pause", "Ist", "Soll", "Saldo", "Notiz"]];
