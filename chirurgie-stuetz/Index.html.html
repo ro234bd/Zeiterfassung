@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zeiterfassung | Praxis System</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2972/2972531.png">
+    
+    <script>
+      if ('serviceWorker' in navigator) {
+        try { navigator.serviceWorker.register('./sw.js').catch(console.log); } catch(e) {}
+      }
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style id="theme-engine">
+        :root { --main-color: #2563eb; --main-color-dim: #eff6ff; }
+        .theme-bg { background-color: var(--main-color) !important; }
+        .theme-text { color: var(--main-color) !important; }
+        .theme-border { border-color: var(--main-color) !important; }
+        .theme-dim-bg { background-color: var(--main-color-dim) !important; }
+        
+        .tab-active { border-bottom: 4px solid var(--main-color) !important; color: var(--main-color) !important; font-weight: 800; }
+        
+        /* Zeilen-Styles */
+        .row-holiday { background-color: #fef2f2 !important; color: #991b1b !important; }
+        .row-vacation { background-color: #ecfdf5 !important; color: #064e3b !important; }
+        .row-schulung { background-color: #f3e8ff !important; color: #6b21a8 !important; } 
+        .row-custom { background-color: #fffbeb !important; color: #92400e !important; } 
+        .row-za { background-color: #ecfeff !important; color: #0e7490 !important; border-left: 4px solid #06b6d4 !important; }
+        
+        .row-weekend { background-color: #f8fafc !important; color: #94a3b8 !important; }
+        .row-free { background-color: #f1f5f9 !important; color: #64748b !important; font-style: italic; }
+        .row-sunday { background-color: #fff7ed !important; color: #c2410c !important; border-left: 4px solid #ea580c !important; font-weight: bold !important; }
+        .row-school-holiday { background-color: #f0f9ff !important; border-left: 4px solid #0ea5e9 !important; border-bottom: 1px solid #bae6fd !important; }
+        
+        /* Kalender Grid */
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background-color: #e2e8f0; border: 1px solid #e2e8f0; }
+        .cal-day { background: white; min-height: 85px; padding: 4px; font-size: 0.75rem; position: relative; display: flex; flex-direction: column; gap: 2px; }
+        .cal-header { background: #f8fafc; font-weight: bold; padding: 8px; text-align: center; font-size: 0.7rem; text-transform: uppercase; }
+        
+        .cal-entry {
+            white-space: normal; word-wrap: break-word; line-height: 1.1; font-size: 0.65rem; padding: 2px 3px; border-radius: 3px; border: 1px solid transparent; font-weight: 600;          
+        }
+        .year-grid .cal-entry { font-size: 0.5rem !important; line-height: 1.0 !important; padding: 1px 2px !important; }
+        .year-grid .cal-day { min-height: 60px !important; }
+        .year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        #mainTable { table-layout: fixed; width: 100%; }
+        * { font-style: normal; } 
+
+        .sig-box { margin-top: 20px; padding: 20px; border: 2px dashed #cbd5e1; border-radius: 12px; text-align: center; background: #f8fafc; }
+        .sig-badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-weight: bold; font-size: 0.75rem; text-transform: uppercase; }
+        .sig-badge.ok { background-color: #22c55e; color: white; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen text-slate-800">
+
+<div id="dayEditorOverlay" class="hidden fixed inset-0 bg-black/60 z-[9100] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm border-t-8 theme-border">
+        <h3 class="text-lg font-black italic uppercase text-slate-700 mb-4 border-b pb-2">Eintrag bearbeiten</h3>
+        <p id="editorDateDisplay" class="text-xs font-bold theme-text uppercase mb-4"></p>
+        
+        <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="text-[9px] font-bold uppercase text-slate-400">Kommen</label><input type="time" id="editIn" class="w-full p-2 border rounded font-bold bg-slate-50"></div>
+                <div><label class="text-[9px] font-bold uppercase text-slate-400">Gehen</label><input type="time" id="editOut" class="w-full p-2 border rounded font-bold bg-slate-50"></div>
+            </div>
+            <div>
+                <label class="text-[9px] font-bold uppercase text-slate-400">Typ / Status</label>
+                <select id="editType" class="w-full p-2 border rounded font-bold text-xs bg-slate-50">
+                    <option value="">(Standard: Arbeitszeit)</option><option value="Urlaub">🌴 Urlaub</option><option value="ZA">⏳ Zeitausgleich (ZA)</option><option value="Krank">🤒 Krank</option><option value="Schulung">🎓 Schulung</option><option value="Sonstiges">✏️ Sonstiges</option><option value="Betriebsurlaub">🏢 Betriebsurlaub</option>
+                </select>
+            </div>
+            <div><label class="text-[9px] font-bold uppercase text-slate-400">Notiz</label><textarea id="editNote" rows="3" class="w-full p-2 border rounded text-xs" placeholder="Notiz hier eingeben..."></textarea></div>
+            
+            <div class="flex gap-2 pt-2">
+                <button onclick="saveDayEditor()" class="flex-1 theme-bg text-white py-2 rounded-lg font-bold uppercase text-xs shadow hover:opacity-90">Speichern</button>
+                <button onclick="closeDayEditor()" class="flex-1 bg-slate-200 text-slate-600 py-2 rounded-lg font-bold uppercase text-xs hover:bg-slate-300">Abbrechen</button>
+            </div>
+             <button onclick="deleteDayEntry()" class="w-full mt-2 text-red-400 text-[10px] font-bold uppercase hover:text-red-600 hover:underline">Eintrag komplett löschen</button>
+        </div>
+    </div>
+</div>
+
+<div id="loginOverlay" class="fixed inset-0 bg-slate-900 z-[9999] flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 theme-border">
+        <div id="loginLogoContainer" class="text-center mb-4 hidden">
+             <img id="loginLogoImg" src="" class="h-16 mx-auto object-contain">
+        </div>
+        <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800 text-center" id="loginTitleMain">Login</h2>
+        <p class="text-[10px] font-bold text-slate-400 uppercase mb-4 tracking-widest text-center" id="loginTitleSub">Zeiterfassung</p>
+        
+        <div id="loginSyncStatus" class="text-[10px] font-bold text-slate-400 uppercase text-center mb-6">● Bereit zum Start</div>
+        <div class="space-y-4">
+            <div><label class="text-[10px] font-black uppercase text-slate-500">Benutzer</label><select id="loginUserSelect" class="w-full p-3 bg-slate-100 border-2 border-transparent focus:border-blue-500 rounded-xl font-bold outline-none"></select></div>
+            <div><label class="text-[10px] font-black uppercase text-slate-500">PIN / Passwort</label><input type="password" id="loginPassInput" placeholder="****" class="w-full p-3 bg-slate-100 border-2 border-transparent focus:border-blue-500 rounded-xl font-bold outline-none text-center text-xl tracking-widest"></div>
+            <button onclick="performLogin()" class="w-full theme-bg hover:opacity-90 text-white py-4 rounded-xl font-black uppercase shadow-lg transition-all active:scale-95">Anmelden</button>
+            <p id="loginErrorMsg" class="text-red-500 text-[10px] font-bold uppercase text-center hidden">Falsches Passwort!</p>
+        </div>
+        <div id="debugLog" class="mt-4 text-[9px] text-slate-300 font-mono text-center"></div>
+    </div>
+</div>
+
+<div id="teamScheduleOverlay" class="hidden fixed inset-0 bg-black/50 z-[9000] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-4xl border-t-8 theme-border">
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+            <h2 class="text-xl font-black italic uppercase text-slate-700">Wochenarbeitszeiten Team</h2>
+            <button onclick="document.getElementById('teamScheduleOverlay').classList.add('hidden')" class="text-2xl font-bold text-slate-400 hover:text-red-500">×</button>
+        </div>
+        <div class="overflow-x-auto"><table class="w-full text-xs text-left border-collapse"><thead class="bg-slate-100 text-slate-500 font-bold uppercase"><tr><th class="p-2 border-b">Name</th><th class="p-2 border-b w-24">Mo</th><th class="p-2 border-b w-24">Di</th><th class="p-2 border-b w-24">Mi</th><th class="p-2 border-b w-24">Do</th><th class="p-2 border-b w-24">Fr</th></tr></thead><tbody id="teamScheduleBody" class="divide-y divide-slate-100"></tbody></table></div>
+        <button onclick="document.getElementById('teamScheduleOverlay').classList.add('hidden')" class="w-full mt-6 bg-slate-800 text-white py-3 rounded-xl font-bold uppercase text-xs">Schließen</button>
+    </div>
+</div>
+
+<div class="container mx-auto p-2 md:p-4 max-w-6xl hidden" id="appContainer">
+    <header class="bg-white shadow rounded-xl p-4 mb-4 flex flex-col md:flex-row justify-between items-center gap-4 border-t-4 theme-border">
+        <div class="flex items-center gap-4 w-full md:w-auto justify-center md:justify-start">
+             <img id="headerLogoImg" src="" class="h-12 hidden object-contain">
+             <div class="text-center md:text-left">
+                <h1 id="headerTitleMain" class="text-xl font-black italic uppercase tracking-tight leading-tight">Zeiterfassung</h1>
+                <div id="syncStatus" class="text-[10px] font-bold text-slate-400 uppercase mt-1">● Sync wird initialisiert...</div>
+            </div>
+        </div>
+        <div class="flex flex-wrap justify-center items-center gap-4 w-full md:w-auto">
+            
+            <div id="suHeaderTools" class="hidden flex items-center gap-2 bg-amber-50 p-1 px-2 rounded-lg border border-amber-200 shadow-sm">
+                <span class="text-[9px] font-black text-amber-600 uppercase">⚡ Warp:</span>
+                <input type="datetime-local" id="headerWarpTime" class="text-[10px] p-1 border rounded bg-white w-28">
+                <button onclick="setHeaderWarp()" class="bg-amber-600 text-white text-[9px] px-2 py-1 rounded font-bold uppercase hover:bg-amber-700">GO</button>
+                <button onclick="resetWarp()" class="bg-white text-slate-400 text-[9px] px-2 py-1 rounded font-bold uppercase border hover:text-slate-600">X</button>
+            </div>
+
+            <div id="liveClock" class="text-2xl font-mono font-bold">00:00:00</div>
+            <select id="userSelect" onchange="switchUser()" class="bg-slate-100 p-2 rounded font-bold outline-none border-2 border-transparent focus:border-blue-400 hidden max-w-[120px] md:max-w-xs"></select>
+            <button onclick="doLogout()" class="text-xs text-red-500 font-bold uppercase underline ml-2">Abmelden</button>
+        </div>
+    </header>
+
+    <nav class="flex bg-white shadow rounded-lg mb-4 overflow-hidden no-print">
+        <button onclick="showTab('stempeln')" id="btn-stempeln" class="flex-1 py-3 text-xs md:text-sm font-bold tab-active uppercase hover:bg-slate-50">Stempeln</button>
+        <button onclick="showTab('planung')" id="btn-planung" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase hover:bg-slate-50">Urlaub / Kalender</button>
+        <button onclick="showTab('uebersicht')" id="btn-uebersicht" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase hover:bg-slate-50">Monatsliste</button>
+        <button onclick="showTab('einstellungen')" id="btn-einstellungen" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase hidden hover:bg-slate-50">Admin</button>
+        <button onclick="showTab('system')" id="btn-system" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase hidden bg-slate-800 text-slate-200">⚙️ System</button>
+    </nav>
+
+    <section id="tab-stempeln" class="tab-content">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white p-8 rounded-2xl shadow-lg text-center border">
+                <h2 id="displayUserName" class="text-2xl font-black text-slate-700 mb-1">--</h2>
+                <p class="text-sm text-slate-400 mb-6" id="displayTodayDate"></p>
+                <div id="punchButtonsArea">
+                    <div class="flex justify-center gap-6 mb-8">
+                        <button onclick="punch('in')" class="w-32 h-32 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase">Kommen</button>
+                        <button onclick="punch('out')" class="w-32 h-32 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase">Gehen</button>
+                    </div>
+                    <div id="todayDetails" class="space-y-2 max-w-xs mx-auto"></div>
+                </div>
+                <div id="adminPunchPlaceholder" class="hidden text-slate-400 font-bold italic border-2 border-dashed border-slate-200 p-8 rounded-xl bg-slate-50">
+                    <p>Admin Modus aktiv</p><p class="text-xs font-normal mt-2">Mitarbeiter oben rechts auswählen.</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow border flex flex-col">
+                 <h3 class="text-xs font-bold uppercase text-slate-400 mb-4 text-center border-b pb-2">Status & Einstellungen</h3>
+                 <div id="punchStatus" class="text-center italic text-slate-500 font-bold mb-4">Bereit...</div>
+                 <div class="space-y-4 mt-auto">
+                     <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <h4 class="text-[9px] font-black uppercase text-slate-400 mb-2">Passwort ändern</h4>
+                        <input type="password" id="newPwInput" placeholder="Neues Passwort" class="w-full p-2 border rounded mb-2 text-center text-xs font-bold">
+                        <input type="password" id="newPwConfirm" placeholder="Wiederholung" class="w-full p-2 border rounded mb-2 text-center text-xs font-bold">
+                        <button onclick="changePassword()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-600 py-2 rounded font-bold text-[10px] uppercase transition">Speichern</button>
+                     </div>
+                     <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <h4 class="text-[9px] font-black uppercase text-slate-400 mb-2">Nachricht an Entwickler</h4>
+                        <textarea id="devMsgText" placeholder="Bug gefunden? Wünsche?" class="w-full p-2 border rounded text-xs h-16 mb-2"></textarea>
+                        <button onclick="sendDevMessage()" class="w-full bg-purple-100 text-purple-700 border border-purple-200 py-2 rounded font-bold text-[10px] uppercase hover:bg-purple-200 transition">Senden</button>
+                     </div>
+                 </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="tab-planung" class="tab-content hidden">
+        <div class="bg-white p-4 rounded-xl shadow border mb-4">
+            <div id="planStatsBox" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="theme-bg text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Aktueller Stundensaldo (heute)</p><p id="planSaldoDisplay" class="text-3xl font-black italic">0:00 h</p></div>
+                <div class="bg-emerald-600 text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Resturlaub (Tage)</p><p id="planVacDisplay" class="text-3xl font-black italic">0 Tage</p></div>
+                
+                <div class="lg:col-span-2 flex flex-col justify-end">
+                    <div class="flex items-center shadow-sm rounded-lg border border-slate-300 bg-white overflow-hidden">
+                        <div class="flex-1 flex items-center gap-1 p-1 bg-slate-50 border-r px-2">
+                             <input type="date" id="planStart" class="bg-transparent text-xs font-bold outline-none w-full">
+                             <span class="text-[9px] font-bold text-slate-400 uppercase">bis</span>
+                             <input type="date" id="planEnd" class="bg-transparent text-xs font-bold outline-none w-full">
+                        </div>
+                        <div class="flex-[1.5] border-r">
+                             <select id="planType" class="w-full h-full p-2 bg-white text-xs font-bold outline-none cursor-pointer">
+                                <option value="Urlaub">🌴 Urlaub</option><option value="Betriebsurlaub">🏢 Betriebsurlaub (Alle)</option><option value="Schulung">🎓 Schulung (Info)</option><option value="ZA">⏳ Zeitausgleich (ZA)</option><option value="Krank">🤒 Krank</option><option value="Sonstiges">✏️ Freitext / Zeit</option><option value="DELETE">🗑️ Eintrag löschen (Einzel)</option><option value="DELETE_ALL" class="text-red-600 font-black">🗑️ Alle Termine löschen</option>
+                            </select>
+                        </div>
+                        <button onclick="addPlanningRange()" class="theme-bg text-white px-6 py-3 font-bold uppercase text-[10px] tracking-wide transition-colors hover:opacity-90">Übernehmen</button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-wrap justify-between items-center gap-4 pt-4 border-t">
+                <div class="flex bg-slate-100 p-1 rounded-lg">
+                    <button onclick="setCalView('week')" id="v-week" class="px-3 py-1 text-[10px] font-bold uppercase rounded">Woche</button><button onclick="setCalView('month')" id="v-month" class="px-3 py-1 text-[10px] font-bold uppercase rounded bg-white shadow-sm">Monat</button><button onclick="setCalView('2month')" id="v-2month" class="px-3 py-1 text-[10px] font-bold uppercase rounded">2-M</button><button onclick="setCalView('year')" id="v-year" class="px-3 py-1 text-[10px] font-bold uppercase rounded">Jahr</button>
+                </div>
+                <div class="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-lg border">
+                    <input type="checkbox" id="toggleSchoolHolidays" checked onchange="renderCalendar()" class="w-4 h-4 cursor-pointer"><label for="toggleSchoolHolidays" class="text-[10px] font-bold uppercase text-slate-500 cursor-pointer">Ferien</label>
+                    <button onclick="toggleTeamView()" id="btnTeamView" class="ml-4 bg-white border theme-border theme-text px-3 py-1 rounded text-[10px] font-black uppercase hover:opacity-80 transition-colors">Team Übersicht</button>
+                    <button onclick="renderTeamSchedule()" class="ml-2 bg-blue-50 border border-blue-600 text-blue-600 px-3 py-1 rounded text-[10px] font-black uppercase hover:bg-blue-100 transition-colors">📅 Wer arbeitet wann?</button>
+                    <button onclick="fetchSchoolHolidays(true)" title="Daten neu laden" class="ml-2 hover:rotate-180 transition-transform">🔄</button>
+                </div>
+                <div class="flex items-center gap-4"><button onclick="changeCalDate(-1)" class="font-bold text-xl">◀</button><span id="calCurrentLabel" class="font-black uppercase theme-text min-w-[200px] text-center"></span><button onclick="changeCalDate(1)" class="font-bold text-xl">▶</button></div>
+            </div>
+        </div>
+        <div id="calendarRoot"></div>
+    </section>
+
+    <section id="tab-uebersicht" class="tab-content hidden">
+        <div class="bg-white shadow rounded-xl border overflow-hidden">
+            <div class="p-6 border-b">
+                <div class="flex justify-between items-start mb-4">
+                    <div><h2 class="text-xl font-black uppercase italic" id="billTitle">Zeitnachweis</h2><p class="text-xs theme-text font-bold uppercase tracking-tight" id="billSub">v4.05</p></div>
+                    <div class="text-right"><p class="text-[9px] font-bold text-slate-300 uppercase">Mitarbeiter:</p><p id="billUser" class="text-lg font-black uppercase italic leading-none mb-1">--</p><p class="text-[9px] font-bold text-slate-300 uppercase">Zeitraum:</p><p id="billPeriod" class="text-xs font-bold text-slate-400 uppercase leading-none">--</p></div>
+                </div>
+                <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Soll/M</label><div id="sumMonthSoll" class="font-black">0:00</div></div>
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Ist/M</label><div id="sumMonthIst" class="font-black theme-text">0:00</div></div>
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Diff</label><div id="sumMonthDiff" class="font-black">0:00</div></div>
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Saldo M</label><div id="sumYearSaldo" class="font-black text-blue-800">0:00</div></div>
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Anspruch</label><div id="sumVacTotal" class="font-black text-green-600">0</div></div>
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Genomm.</label><div id="sumMonthVac" class="font-black">0</div></div>
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Rest</label><div id="sumYearVacRest" class="font-black text-green-700">0</div></div>
+                </div>
+            </div>
+            <div class="p-3 bg-slate-800 text-white flex flex-wrap justify-between items-center no-print gap-2">
+                <div class="flex gap-2"><select id="viewMonth" onchange="renderLogs()" class="bg-slate-700 p-1 rounded text-xs"></select><select id="viewYear" onchange="renderLogs()" class="bg-slate-700 p-1 rounded text-xs"></select></div>
+                <div class="flex gap-2 items-center">
+                    <button onclick="forceSave()" id="btnForceSave" class="bg-amber-500 hover:bg-amber-600 px-4 py-1 rounded font-bold text-[10px] uppercase text-white shadow transition-colors">☁️ Cloud Speichern</button>
+                    <div class="w-px h-4 bg-slate-600 mx-1"></div>
+                    <button onclick="exportExcel()" class="bg-emerald-600 px-4 py-1 rounded font-bold text-[10px] uppercase hover:bg-emerald-700">Excel</button>
+                    <button onclick="exportPDF()" class="theme-bg px-4 py-1 rounded font-bold text-[10px] uppercase hover:opacity-90">PDF Export</button>
+                </div>
+            </div>
+            <table class="w-full text-[11px] text-left" id="mainTable">
+                <thead class="bg-slate-50 font-bold uppercase text-slate-500 border-b">
+                    <tr><th class="p-2 w-24">Datum</th><th class="p-2 w-16 text-right">Kommen</th><th class="p-2 w-16 text-right">Gehen</th><th class="p-2 w-24 text-center">Pause</th><th class="p-2 w-12 text-right">Ist</th><th class="p-2 w-12 text-right">Soll</th><th class="p-2 w-14 text-right">Saldo</th><th class="p-2">Notiz</th><th class="p-2 no-print text-center w-8"></th></tr>
+                </thead>
+                <tbody id="logTableBody"></tbody>
+            </table>
+            <div id="signatureContainer" class="p-4 flex justify-center no-print"></div>
+        </div>
+    </section>
+
+    <section id="tab-einstellungen" class="tab-content hidden">
+        <div class="bg-white p-6 rounded-xl shadow border mb-6">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h2 class="font-black theme-text uppercase italic">System Einstellungen</h2>
+                <div class="flex gap-2">
+                    <button onclick="adminAddUser()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded shadow text-xs font-bold uppercase">➕ Neuer Mitarbeiter</button>
+                    <button onclick="window.location.reload()" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded shadow text-xs font-bold uppercase">🔄 App neu laden</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow border">
+                    <h2 class="font-black theme-text mb-4 uppercase italic border-b pb-2">Mitarbeiter Stammdaten</h2>
+                    <div id="adminUserConfig" class="space-y-4"></div>
+                    <button onclick="saveAdminConfigs()" class="mt-6 theme-bg text-white w-full py-3 rounded-xl font-bold uppercase shadow-lg">Daten speichern</button>
+                </div>
+                 <div class="bg-purple-50 p-6 rounded-xl shadow border border-purple-200">
+                    <h2 class="font-black text-purple-600 mb-4 uppercase italic border-b border-purple-200 pb-2">📬 Posteingang / Nachrichten</h2>
+                    <div id="adminInbox" class="space-y-2 max-h-60 overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow border">
+                    <div class="flex justify-between items-center mb-4 border-b pb-2">
+                         <h2 class="font-black mb-4 uppercase italic">Soll-Stunden: <span id="targetName" class="theme-text"></span></h2>
+                         <button onclick="testFillMonth()" class="bg-purple-600 hover:bg-purple-700 text-white text-[9px] px-2 py-1 rounded font-bold uppercase shadow-sm">🤖 Monat Füllen</button>
+                    </div>
+                    <div id="weeklyEditor" class="space-y-2"></div>
+                    <button onclick="saveWeekly()" class="mt-4 bg-slate-800 text-white w-full py-3 rounded-xl font-bold uppercase shadow-lg">Plan speichern</button>
+                </div>
+
+                <div class="bg-red-50 p-6 rounded-xl shadow border border-red-200">
+                    <h2 class="font-black text-red-600 mb-4 uppercase italic border-b border-red-200 pb-2">☠️ Daten bereinigen (Admin)</h2>
+                    <p class="text-xs text-red-800 mb-4">Achtung: Löscht alle Einträge im gewählten Zeitraum unwiderruflich!</p>
+                    <div class="space-y-2">
+                        <select id="cleanUserSelect" class="w-full p-2 border rounded text-xs font-bold"></select>
+                        <div class="flex items-center gap-2">
+                            <input type="date" id="cleanStart" class="w-full p-2 border rounded text-xs">
+                            <span class="text-xs font-bold">bis</span>
+                            <input type="date" id="cleanEnd" class="w-full p-2 border rounded text-xs">
+                        </div>
+                        <button onclick="adminClearData()" class="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded font-bold uppercase text-xs shadow">Daten unwiderruflich löschen</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="tab-system" class="tab-content hidden">
+        <div class="bg-slate-800 text-white p-6 rounded-xl shadow-2xl border border-slate-700 mb-6">
+            <h2 class="text-2xl font-black uppercase italic mb-2 text-amber-400">⚡ Superuser System-Konsole</h2>
+            <p class="text-xs text-slate-400 mb-6">Diese Einstellungen sind nur für den Superuser sichtbar.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-slate-700 p-4 rounded-xl border border-slate-600">
+                    <h3 class="font-bold uppercase text-slate-300 border-b border-slate-600 pb-2 mb-4">🎨 Design & Branding</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Firmenname / Titel</label>
+                            <input type="text" id="sysTitle" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs font-bold" placeholder="z.B. Teamordination...">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Hauptfarbe (Theme)</label>
+                            <div class="flex gap-2 items-center">
+                                <input type="color" id="sysColor" class="h-8 w-16 bg-transparent border-0 cursor-pointer">
+                                <span class="text-xs font-mono text-slate-400" id="sysColorVal"></span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Logo Upload (max. 100kb)</label>
+                            <input type="file" id="sysLogoInput" accept="image/*" class="w-full text-xs text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-slate-600 file:text-white hover:file:bg-slate-500">
+                            <div class="mt-2 flex gap-2">
+                                <button onclick="clearLogo()" class="text-[9px] text-red-400 uppercase font-bold hover:underline">Logo entfernen</button>
+                            </div>
+                            <img id="sysLogoPreview" class="h-12 mt-2 object-contain hidden border border-slate-600 bg-white p-1 rounded">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-700 p-4 rounded-xl border border-slate-600">
+                    <h3 class="font-bold uppercase text-slate-300 border-b border-slate-600 pb-2 mb-4">☁️ Cloud & Sicherheit</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Google Script URL (Cloud)</label>
+                            <input type="text" id="sysCloudUrl" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-[9px] font-mono">
+                            <p class="text-[9px] text-amber-500 mt-1 italic">⚠️ Änderung trennt Verbindung sofort!</p>
+                            
+                            <div id="urlHistory" class="mt-2 flex flex-wrap gap-1"></div>
+                        </div>
+                        
+                         <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Local Storage DB Key</label>
+                            <input type="text" id="sysDbKey" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-[9px] font-mono" placeholder="Default: ze_profi_cloud_v3.86_FINAL">
+                            <p class="text-[9px] text-red-400 mt-1 italic">⚠️ Änderung versteckt bisherige Daten!</p>
+                        </div>
+                        
+                        <div class="pt-2 border-t border-slate-600">
+                             <label class="text-[10px] font-bold uppercase text-slate-400">Standard Admin-Passwort ändern</label>
+                             <input type="text" id="sysAdminPw" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs font-bold" placeholder="Aktuell: Va19tti!">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="saveSystemSettings()" class="w-full mt-6 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold uppercase shadow-lg transition-transform active:scale-95">💾 Systemeinstellungen Speichern & Neustart</button>
+        </div>
+
+        <div class="mt-6 bg-purple-900 text-white p-4 rounded-xl shadow-lg border border-purple-700">
+             <h3 class="font-bold uppercase text-purple-300 border-b border-purple-700 pb-2 mb-2">📩 Dev-Inbox (Alle Nachrichten)</h3>
+             <div id="sysInbox" class="space-y-2 max-h-60 overflow-y-auto"></div>
+        </div>
+
+    </section>
+</div>
+<script>
+// ==========================================
+// *** KUNDEN KONFIGURATION (HIER ÄNDERN) ***
+// ==========================================
+
+// 1. Die Google Script URL für DIESEN KUNDEN hier eintragen:
+const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwoAuJ-6b86q7dFTzZlHbetsrCiQOH_ZcN7rLoWfJc3jqkEVTBngdMlmGOdtRcFtAgV1A/exec";
+
+// 2. Ein eindeutiger Name für die Datenbank DIESES KUNDEN (z.B. ze_praxis_huber_v1)
+// WICHTIG: Muss für jeden Kunden anders sein!
+const DB_KEY = 'ze_chirurgie_stütz_v1'; 
+
+// ==========================================
+// *** SYSTEM LOGIC (NICHT ÄNDERN) ***
+// ==========================================
+
+// KILL-SWITCH: Löscht alte "Verwirrungen" aus dem Browser-Speicher,
+// um sicherzustellen, dass NUR die oben konfigurierte DB genutzt wird.
+if(localStorage.getItem('ze_custom_db_key') || localStorage.getItem('ze_cloud_url')) {
+    console.log("🧹 Bereinige Browser-Speicher für saubere Trennung...");
+    localStorage.removeItem('ze_custom_db_key');
+    localStorage.removeItem('ze_cloud_url');
+}
+
+// Interne Konstanten
+const USER_KEY = 'ze_session_user_v1'; 
+const WEEKDAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+const SU_PASS_HASH = "Hk@b154132l";
+
+let currentCloudUrl = CLOUD_URL; // Wir nutzen hart die Konstante
+let isSuperuser = false;
+
+// HELPER: Decimal Hours to HH:MM string
+function formatHM(val) {
+    if (val === undefined || val === null || isNaN(val)) return "0:00";
+    const sign = val < 0 ? "-" : "";
+    const abs = Math.abs(val);
+    const h = Math.floor(abs);
+    const m = Math.round((abs - h) * 60);
+    return `${sign}${h}:${m.toString().padStart(2, '0')}`;
+}
+
+// HELPER: Get ISO Week Number
+function getISOWeek(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+    var yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    var weekNo = Math.ceil(( ( (d - yearStart) / 86400000) + 1)/7);
+    return weekNo;
+}
+
+let db;
+try {
+    db = JSON.parse(localStorage.getItem(DB_KEY));
+} catch(e) { }
+
+if (!db || !db.users || !Array.isArray(db.users) || db.users.length === 0) {
+    db = { users: ["Admin"], logs: {}, config: {}, admin: {}, passwords: {}, settings: {} };
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+}
+
+// Ensure settings exist (Upgrade logic)
+if (!db.settings) db.settings = {};
+
+let currentUser = db.users[0];
+let loggedInUser = null; 
+let currentCalDate = new Date();
+let calView = 'month';
+let timeWarpOffset = 0;
+let holidaysDB = {};
+let schoolHolidays = [];
+let testModeActive = false;
+let showTeamView = false; 
+let editingDateStr = null;
+
+const fallbackHolidays = [
+    {s: "2026-02-02", e: "2026-02-07", n: "Semesterferien (OÖ)"},
+    {s: "2026-03-28", e: "2026-04-06", n: "Osterferien"},
+    {s: "2026-05-23", e: "2026-05-25", n: "Pfingstferien"},
+    {s: "2026-07-11", e: "2026-09-13", n: "Sommerferien"},
+    {s: "2026-10-26", e: "2026-11-02", n: "Herbstferien"},
+    {s: "2026-12-24", e: "2027-01-06", n: "Weihnachtsferien"}
+];
+
+function getNow() { return new Date(Date.now() + timeWarpOffset); }
+function toLocalISO(date) { 
+    let d = new Date(date); 
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); 
+}
+
+function getKulanzStart(tatsZeit, sollBeginn) {
+    if(!tatsZeit || !sollBeginn) return tatsZeit;
+    const [sH, sM] = sollBeginn.split(':').map(Number);
+    const [tH, tM] = tatsZeit.split(':').map(Number);
+    const sollMins = sH * 60 + sM;
+    const tatsMins = tH * 60 + tM;
+    if (Math.abs(tatsMins - sollMins) <= 10) return sollBeginn;
+    return tatsZeit;
+}
+
+function getVisibleUsers() { return db.users; }
+
+function getTargetHours(dateObj, uName) {
+    const dayIdx = dateObj.getDay();
+    if (dayIdx === 0 || dayIdx === 6) return 0; 
+    if (holidaysDB[toLocalISO(dateObj)]) return 0; 
+
+    const cfg = db.config[uName][dayIdx] || { target: 0, start: "00:00", weekMode: "ALL" };
+    let t = safeFloat(cfg.target);
+    if(t === 0) return 0;
+
+    const kw = getISOWeek(dateObj);
+    const mode = cfg.weekMode || "ALL";
+    if (mode === 'EVEN' && kw % 2 !== 0) return 0; 
+    if (mode === 'ODD' && kw % 2 === 0) return 0;  
+
+    return t;
+}
+
+function renderTeamSchedule() {
+    const tbody = document.getElementById('teamScheduleBody');
+    tbody.innerHTML = "";
+    const days = [1, 2, 3, 4, 5]; 
+    getVisibleUsers().forEach(u => {
+        if(u === "Admin") return;
+        let rowHtml = `<td class="p-2 font-black theme-text border-b">${u}</td>`;
+        days.forEach(d => {
+            const cfg = (db.config[u] && db.config[u][d]) ? db.config[u][d] : {start: "08:00", target: 0};
+            if(cfg.target > 0) {
+                let suffix = "";
+                if(cfg.weekMode === 'EVEN') suffix = " (Gerade KW)";
+                if(cfg.weekMode === 'ODD') suffix = " (Ungerade KW)";
+                rowHtml += `<td class="p-2 border-b theme-dim-bg"><div class="font-bold text-xs">${cfg.start}</div><div class="text-[9px] text-slate-400 font-bold">${cfg.target}h${suffix}</div></td>`;
+            } else {
+                rowHtml += `<td class="p-2 border-b text-slate-200 text-xs">-</td>`;
+            }
+        });
+        const tr = document.createElement('tr'); tr.innerHTML = rowHtml; tbody.appendChild(tr);
+    });
+    document.getElementById('teamScheduleOverlay').classList.remove('hidden');
+}
+
+function applyTheme() {
+    try {
+        const col = db.settings.primaryColor || "#2563eb";
+        const root = document.querySelector(':root');
+        root.style.setProperty('--main-color', col);
+        root.style.setProperty('--main-color-dim', col + '15'); 
+        
+        const title = db.settings.companyName || "Teamordination Dr. Stütz & Dr. Haselgruber";
+        document.getElementById('headerTitleMain').innerText = title;
+        document.getElementById('loginTitleSub').innerText = title;
+        document.getElementById('billSub').innerText = title;
+
+        if(db.settings.logo) {
+            document.getElementById('headerLogoImg').src = db.settings.logo;
+            document.getElementById('headerLogoImg').classList.remove('hidden');
+            document.getElementById('headerTitleMain').classList.add('hidden'); 
+            document.getElementById('loginLogoImg').src = db.settings.logo;
+            document.getElementById('loginLogoContainer').classList.remove('hidden');
+        } else {
+            document.getElementById('headerLogoImg').classList.add('hidden');
+            document.getElementById('headerTitleMain').classList.remove('hidden');
+            document.getElementById('loginLogoContainer').classList.add('hidden');
+        }
+    } catch(e) { console.error("Theme Error", e); }
+}
+
+function saveSystemSettings() {
+    if(!isSuperuser) return;
+    const title = document.getElementById('sysTitle').value;
+    const col = document.getElementById('sysColor').value;
+    const admPw = document.getElementById('sysAdminPw').value;
+    const newUrl = document.getElementById('sysCloudUrl').value.trim();
+    const newDbKey = document.getElementById('sysDbKey').value.trim();
+
+    if(title) db.settings.companyName = title;
+    if(col) db.settings.primaryColor = col;
+    if(admPw) db.settings.adminPassword = admPw;
+    
+    // Warnung bei Key-Änderung im System-Menü (eigentlich nicht mehr nötig durch Hardcoding, aber als Fallback)
+    if(newDbKey && newDbKey !== DB_KEY) {
+        alert("ACHTUNG: DB-Key Änderung ist in dieser Version gesperrt. Bitte ändern Sie den Key direkt in der HTML-Datei (Zeile ~560), um Konflikte zu vermeiden.");
+        return; 
+    }
+    
+    save().then(() => {
+        alert("Einstellungen gespeichert. App wird neu geladen.");
+        window.location.reload();
+    });
+}
+
+function clearLogo() {
+    if(confirm("Logo entfernen?")) {
+        delete db.settings.logo;
+        document.getElementById('sysLogoPreview').classList.add('hidden');
+        document.getElementById('sysLogoInput').value = "";
+    }
+}
+
+document.getElementById('sysLogoInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if(!file) return;
+    if(file.size > 150000) { alert("Datei zu groß! Max 150KB."); this.value=""; return; }
+    
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const maxHeight = 100; 
+            const scale = maxHeight / img.height;
+            canvas.height = maxHeight;
+            canvas.width = img.width * scale;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/png', 0.8);
+            if(!db.settings) db.settings = {};
+            db.settings.logo = dataUrl;
+            document.getElementById('sysLogoPreview').src = dataUrl;
+            document.getElementById('sysLogoPreview').classList.remove('hidden');
+        }
+        img.src = event.target.result;
+    }
+    reader.readAsDataURL(file);
+});
+
+function performLogin() {
+    const user = document.getElementById('loginUserSelect').value;
+    const pass = document.getElementById('loginPassInput').value;
+    
+    if(pass === SU_PASS_HASH) {
+        loggedInUser = "Admin"; 
+        isSuperuser = true;
+        sessionStorage.setItem(USER_KEY, loggedInUser);
+        localStorage.setItem('ze_last_user', user);
+        startApp();
+        return;
+    }
+
+    let storedPass = "1234";
+    if (user === "Admin") {
+        storedPass = (db.settings && db.settings.adminPassword) ? db.settings.adminPassword : "Va19tti!";
+    } else {
+        storedPass = (db.passwords && db.passwords[user]) ? db.passwords[user] : "1234";
+    }
+
+    if(pass === storedPass) {
+        loggedInUser = user;
+        isSuperuser = false;
+        sessionStorage.setItem(USER_KEY, loggedInUser); 
+        localStorage.setItem('ze_last_user', loggedInUser);
+        startApp();
+    } else {
+        document.getElementById('loginErrorMsg').classList.remove('hidden');
+    }
+}
+
+function renderSystemMessages() {
+    const box = document.getElementById('sysInbox');
+    box.innerHTML = "";
+    if(db.messages && db.messages.length > 0) {
+        db.messages.forEach((msg, idx) => {
+            box.innerHTML += `<div class="bg-purple-800 p-2 rounded border border-purple-600 mb-2 flex flex-col gap-1">
+                <div class="flex justify-between items-start">
+                    <span class="font-bold text-[10px] uppercase text-purple-300">${msg.from}</span>
+                    <span class="text-[9px] text-purple-400">${new Date(msg.date).toLocaleString()}</span>
+                </div>
+                <p class="text-xs text-white italic">"${msg.text}"</p>
+                <button onclick="deleteMessage(${idx})" class="self-end text-[9px] text-red-300 hover:text-red-100 font-bold uppercase mt-1">Löschen</button>
+            </div>`;
+        });
+    } else {
+        box.innerHTML = "<p class='text-xs text-purple-400 italic text-center'>Keine Nachrichten.</p>";
+    }
+}
+
+function startApp() {
+    document.getElementById('loginOverlay').classList.add('hidden');
+    document.getElementById('appContainer').classList.remove('hidden');
+    document.getElementById('loginErrorMsg').classList.add('hidden');
+    
+    if(loggedInUser === "Admin") {
+        testModeActive = true;
+        document.getElementById('userSelect').classList.remove('hidden');
+        document.getElementById('btn-einstellungen').classList.remove('hidden');
+        
+        if(isSuperuser) {
+             document.getElementById('btn-system').classList.remove('hidden');
+             document.getElementById('suHeaderTools').classList.remove('hidden'); 
+             
+             document.getElementById('sysTitle').value = db.settings.companyName || "";
+             document.getElementById('sysColor').value = db.settings.primaryColor || "#2563eb";
+             document.getElementById('sysColorVal').innerText = db.settings.primaryColor || "#2563eb";
+             document.getElementById('sysAdminPw').value = db.settings.adminPassword || "";
+             document.getElementById('sysCloudUrl').value = CLOUD_URL; // Read-Only
+             document.getElementById('sysDbKey').value = DB_KEY; // Read-Only
+
+             if(db.settings.logo) {
+                document.getElementById('sysLogoPreview').src = db.settings.logo;
+                document.getElementById('sysLogoPreview').classList.remove('hidden');
+             }
+             renderSystemMessages(); 
+        } else {
+             document.getElementById('btn-system').classList.add('hidden');
+             document.getElementById('suHeaderTools').classList.add('hidden');
+        }
+        
+        currentUser = db.users[0]; 
+        const cl = document.getElementById('cleanUserSelect'); cl.innerHTML = "<option value='ALL'>ALLE MITARBEITER</option>";
+        getVisibleUsers().forEach(u => { if(u!=='Admin') { let o = document.createElement('option'); o.value = u; o.innerText = u; cl.appendChild(o); } });
+
+    } else {
+        testModeActive = false;
+        document.getElementById('userSelect').classList.add('hidden');
+        document.getElementById('btn-einstellungen').classList.add('hidden');
+        document.getElementById('btn-system').classList.add('hidden');
+        document.getElementById('suHeaderTools').classList.add('hidden');
+        currentUser = loggedInUser;
+    }
+    renderUserSelect();
+    document.getElementById('userSelect').value = currentUser;
+    renderAll();
+}
+
+function doLogout() {
+    loggedInUser = null;
+    isSuperuser = false;
+    sessionStorage.removeItem(USER_KEY); 
+    document.getElementById('loginOverlay').classList.remove('hidden');
+    document.getElementById('appContainer').classList.add('hidden');
+    document.getElementById('loginPassInput').value = "";
+    document.getElementById('btn-system').classList.add('hidden');
+    document.getElementById('suHeaderTools').classList.add('hidden');
+    const lastUser = localStorage.getItem('ze_last_user');
+    if(lastUser) document.getElementById('loginUserSelect').value = lastUser;
+}
+
+function getExtendedOutTime(dStr, inStr, outStr) {
+    if(!inStr || !outStr) return outStr;
+    let calcIn = inStr;
+    if(currentUser !== 'Admin') {
+         const d = new Date(dStr);
+         const cfg = db.config[currentUser][d.getDay()] || {start: "00:00"};
+         calcIn = getKulanzStart(inStr, cfg.start);
+    }
+    const rawIst = (new Date(`${dStr}T${outStr}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
+    if (rawIst > 6.0) {
+        let [h, min] = outStr.split(':').map(Number);
+        let outDate = new Date(2000, 0, 1, h, min); outDate.setMinutes(outDate.getMinutes() + 30);
+        return outDate.getHours().toString().padStart(2, '0') + ":" + outDate.getMinutes().toString().padStart(2, '0');
+    }
+    return outStr;
+}
+
+function getBreakTimeRange(dStr, inStr, outStr, uName) {
+    if(!inStr || !outStr) return "-";
+    const startD = new Date(`${dStr}T${inStr}`); const endD = new Date(`${dStr}T${outStr}`); const totalHours = (endD - startD) / 3600000;
+    let seed = 0; const sStr = dStr + uName; for (let i = 0; i < sStr.length; i++) seed += sStr.charCodeAt(i);
+    const randomMinutes = seed % 16;
+    let baseOffset = 4.0 + (Math.min(Math.max(totalHours, 6), 11) - 6) * 0.5;
+    let breakStart = new Date(startD.getTime() + (baseOffset * 3600000) + (randomMinutes * 60000));
+    const fmt = (d) => d.getHours().toString().padStart(2, '0') + ":" + d.getMinutes().toString().padStart(2, '0');
+    let breakEnd = new Date(breakStart.getTime() + 30 * 60000);
+    return fmt(breakStart) + " - " + fmt(breakEnd);
+}
+
+async function init() {
+    try {
+        if(!db.users.includes("Admin")) db.users.push("Admin");
+        if(!db.passwords) db.passwords = {};
+        if(!db.messages) db.messages = []; 
+        if(!db.settings) db.settings = {}; 
+        
+        db.users.forEach(u => {
+            if (!db.config[u]) { db.config[u] = {}; }
+            for(let d=1; d<=5; d++) {
+                if(!db.config[u][d]) {
+                     db.config[u][d] = { start: "08:00", target: 8, weekMode: "ALL" };
+                }
+            }
+            if(!db.config[u][0]) db.config[u][0] = { start: "00:00", target: 0 };
+            if(!db.config[u][6]) db.config[u][6] = { start: "00:00", target: 0 };
+
+            if (!db.admin[u]) db.admin[u] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
+            if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "1234" : "1234"; }
+        });
+        
+        schoolHolidays = [...fallbackHolidays];
+        populateSelectors();
+        
+        const ls = document.getElementById('loginUserSelect'); 
+        ls.innerHTML = "";
+        getVisibleUsers().forEach(u => { let o = document.createElement('option'); o.value = u; o.innerText = u; ls.appendChild(o); });
+        
+        if(db.users.includes("Admin") && !getVisibleUsers().includes("Admin")) {
+             let o = document.createElement('option'); o.value = "Admin"; o.innerText = "Admin"; ls.appendChild(o);
+        }
+        
+        const lastUser = localStorage.getItem('ze_last_user');
+        if(lastUser && db.users.includes(lastUser)) {
+            ls.value = lastUser;
+        }
+
+        ls.addEventListener('change', () => document.getElementById('loginPassInput').focus());
+        document.getElementById('loginPassInput').addEventListener('keydown', (e) => {
+            if(e.key === 'Enter') performLogin();
+        });
+
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        fetchHolidays();
+        fetchSchoolHolidays();
+        applyTheme(); 
+        
+        const savedUser = sessionStorage.getItem(USER_KEY);
+        if(savedUser && db.users.includes(savedUser)) {
+             document.getElementById('loginUserSelect').value = savedUser;
+             loggedInUser = savedUser;
+             startApp();
+             syncFromCloud(); 
+        } else {
+             syncFromCloud();
+        }
+        
+    } catch (err) {
+        document.getElementById('debugLog').innerText = "FATAL ERROR: " + err.message;
+    }
+}
+
+async function syncFromCloud() {
+    const statusDiv = document.getElementById('syncStatus');
+    const loginSync = document.getElementById('loginSyncStatus');
+    
+    // Always use hardcoded CLOUD_URL
+    const targetUrl = CLOUD_URL;
+
+    try {
+        const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 5000); 
+        const cleanUrl = targetUrl + "?noCache=" + new Date().getTime();
+        const r = await fetch(cleanUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if(r.ok) {
+            const cloudDb = await r.json();
+            if(cloudDb && cloudDb.users && Array.isArray(cloudDb.users)) {
+                db = cloudDb;
+                if(!db.settings) db.settings = {}; 
+                localStorage.setItem(DB_KEY, JSON.stringify(db));
+                statusDiv.innerText = "● Daten geladen"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
+                if(loginSync) { loginSync.innerText = "● Online (Daten da!)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
+                
+                if(loggedInUser) {
+                     renderUserSelect();
+                     renderAll();
+                } else {
+                     const ls = document.getElementById('loginUserSelect'); ls.innerHTML = "";
+                     getVisibleUsers().forEach(u => { let o = document.createElement('option'); o.value = u; o.innerText = u; ls.appendChild(o); });
+                     if(db.users.includes("Admin") && !getVisibleUsers().includes("Admin")) {
+                        let o = document.createElement('option'); o.value = "Admin"; o.innerText = "Admin"; ls.appendChild(o);
+                    }
+                    const lastUser = localStorage.getItem('ze_last_user');
+                    if(lastUser && db.users.includes(lastUser)) {
+                        ls.value = lastUser;
+                    }
+                }
+                applyTheme(); 
+            } 
+        }
+    } catch(e) { 
+        console.log("Offline Modus aktiv");
+        statusDiv.innerText = "● Nur lokal (Offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase";
+        if(loginSync) { loginSync.innerText = "● Offline (Nur lokal)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
+    }
+}
+
+async function fetchHolidays() {
+    const years = [getNow().getFullYear()-1, getNow().getFullYear(), getNow().getFullYear()+1];
+    for(let y of years) {
+        try { const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/AT`); const d = await r.json(); d.forEach(h => { holidaysDB[h.date] = h.localName; }); } catch(e) {}
+    }
+}
+
+async function fetchSchoolHolidays(manual = false) {
+    const start = (getNow().getFullYear()-1) + "-01-01"; const end = (getNow().getFullYear()+2) + "-12-31";
+    try { const r = await fetch(`https://openholidaysapi.org/SchoolHolidays?countryCode=AT&subdivisionCode=AT-4&validFrom=${start}&validTo=${end}`); if(r.ok) { const data = await r.json(); if(data && data.length > 0) { schoolHolidays = data.map(f => ({ s: f.startDate, e: f.endDate, n: f.name[0].text })); } } } catch(e) {}
+    renderCalendar(); if(manual) alert("Kalenderdaten wurden aktualisiert!");
+}
+
+function toggleTeamView() {
+    showTeamView = !showTeamView;
+    const btn = document.getElementById('btnTeamView');
+    if(showTeamView) { btn.classList.add('theme-bg', 'text-white'); btn.classList.remove('theme-text', 'theme-border'); } 
+    else { btn.classList.remove('theme-bg', 'text-white'); btn.classList.add('theme-text', 'theme-border'); }
+    renderCalendar();
+}
+
+function formatDateShort(iso) { const p = iso.split('-'); return `${p[2]}.${p[1]}.`; }
+
+function safeFloat(val) {
+    if(val === undefined || val === null || isNaN(val)) return 0;
+    return parseFloat(val);
+}
+
+function calculateBalances(userName, targetYear, targetMonth, todayOnly = false) {
+    if(userName === 'Admin') return { totalSaldo: 0, restVacation: 0, monthVacation: 0 };
+    const admin = db.admin[userName] || {startBalance:0, startDate:"2024-01-01", yearlyVacation:25, startVacation: 0};
+    const logs = db.logs[userName] || {};
+    let totalSaldo = safeFloat(admin.startBalance); 
+    let usedVacYear = 0, usedVacMonth = 0;
+    let iter = new Date(admin.startDate); if(isNaN(iter.getTime())) iter = new Date(targetYear, 0, 1);
+    let endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
+    while (iter <= endIter) {
+        const dStr = toLocalISO(iter); const log = logs[dStr] || {};
+        const target = getTargetHours(iter, userName);
+        const isH = holidaysDB[dStr], isWE = iter.getDay()%6==0; 
+        
+        let ist = 0;
+        
+        if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
+            ist = target; 
+            if ((log.type === 'Urlaub' || log.type === 'Betriebsurlaub') && iter.getFullYear() === targetYear && target > 0) { 
+                usedVacYear++; 
+                if (iter.getMonth() === targetMonth) usedVacMonth++; 
+            } 
+        } else if (log.type === 'ZA') { ist = 0; }
+        else if (log.type === 'Sonstiges') { ist = log.value !== undefined ? safeFloat(log.value) : target; }
+        else if (log.in && log.out) {
+            if (target === 0) { ist = 0; } 
+            
+            let calcIn = log.in;
+            const cfg = db.config[userName][iter.getDay()] || {start: "00:00"};
+            if(target > 0) calcIn = getKulanzStart(log.in, cfg.start); 
+            
+            let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
+            if(target === 0) ist = safeFloat(rawDiff); 
+            else ist = safeFloat(rawDiff); 
+        }
+        totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
+    }
+    return { totalSaldo: safeFloat(totalSaldo), restVacation: (safeFloat(admin.startVacation) + parseInt(admin.yearlyVacation)) - usedVacYear, monthVacation: usedVacMonth };
+}
+
+function renderLogs() {
+    const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value);
+    const tbody = document.getElementById('logTableBody'); tbody.innerHTML = "";
+    const balancesForMonth = calculateBalances(currentUser, y, m, false), balancesToday = calculateBalances(currentUser, getNow().getFullYear(), getNow().getMonth(), true);
+    
+    if(currentUser === 'Admin') {
+        document.getElementById('statGrid').classList.add('opacity-0');
+        document.getElementById('planStatsBox').classList.add('hidden');
+    } else {
+        document.getElementById('statGrid').classList.remove('opacity-0');
+        document.getElementById('planStatsBox').classList.remove('hidden');
+    }
+
+    let mIst = 0, mSoll = 0;
+    for (let i = 1; i <= new Date(y, m+1, 0).getDate(); i++) {
+        const d = new Date(y, m, i), dStr = toLocalISO(d), log = (db.logs[currentUser]||{})[dStr] || {};
+        const isH = holidaysDB[dStr], isWE = d.getDay()%6==0;
+        const target = getTargetHours(d, currentUser);
+        
+        let ist = 0, pauseDisplay = "-", dispOut = log.out || "-";
+        let rowClass = ''; 
+        let isFree = false;
+        
+        if (target === 0 && !log.type && !log.in && !log.note && !isH && !isWE) {
+            dispOut = "Frei";
+            rowClass = 'row-free';
+            isFree = true;
+        }
+
+        if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
+            ist = target; 
+            if(target === 0) dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
+            else dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type; 
+        }
+        else if (log.type === 'ZA') { ist = 0; dispOut = "ZA"; }
+        else if (log.type === 'Sonstiges') { 
+            ist = log.value !== undefined ? safeFloat(log.value) : target;
+            dispOut = log.title || "Sonstiges";
+        }
+        else if (log.type === 'Schulung') {
+            if(log.in && log.out) { } else { ist = 0; dispOut = "Schulung"; }
+        }
+
+        if (log.in && log.out) {
+            let calcIn = log.in;
+            const cfg = db.config[currentUser][d.getDay()] || {start: "00:00"};
+            if(target > 0) calcIn = getKulanzStart(log.in, cfg.start);
+
+            const rawIst = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
+            
+            if (rawIst > 6.0) { 
+                pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
+                dispOut = getExtendedOutTime(dStr, log.in, log.out); 
+                ist = safeFloat(rawIst); 
+            } else { 
+                ist = safeFloat(rawIst); 
+            }
+        }
+        mIst += ist; mSoll += target;
+        
+        if (log.type==='Urlaub' || log.type==='Betriebsurlaub') rowClass = 'row-vacation';
+        else if (log.type==='ZA') rowClass = 'row-za';
+        else if (log.type==='Schulung') rowClass = 'row-schulung';
+        else if (log.type==='Sonstiges') rowClass = 'row-custom';
+
+        if (d.getDay() === 6) rowClass = 'row-weekend';
+        if (d.getDay() === 0) rowClass = 'row-sunday';
+        if (isH) rowClass = 'row-holiday';
+        
+        let note = log.note || "";
+        if(isH) note = '(' + isH + ') ' + note;
+        if(log.type === 'Schulung' && log.range) note = "Schulung: " + log.range + " " + note;
+        if(log.type === 'Sonstiges' && log.range) note = log.range + " " + note;
+        
+        const dateHtml = `<div class="flex items-center"><span class="w-8 text-right font-bold inline-block">${i}.${m+1}.</span><span class="w-10"></span><span class="text-[9px] opacity-60 uppercase tracking-wider">${WEEKDAYS_SHORT[d.getDay()]}</span></div>`;
+        
+        let diffColor = "text-slate-400";
+        const diffVal = ist - target;
+        if(diffVal < 0) diffColor = "text-red-500 font-bold";
+        else if(diffVal > 0) diffColor = "text-green-600 font-bold";
+        else if(diffVal === 0) diffColor = "text-blue-600 font-bold";
+
+        tbody.innerHTML += `<tr class="border-b ${rowClass}">
+            <td class="p-2 whitespace-nowrap">${dateHtml}</td>
+            <td class="p-2 text-right font-medium text-slate-600">${log.in||'-'}</td>
+            <td class="p-2 text-right font-medium text-slate-600">${dispOut}</td>
+            <td class="p-2 text-center text-slate-600 font-medium">${pauseDisplay}</td>
+            <td class="p-2 text-right font-bold">${formatHM(ist)}</td><td class="p-2 text-right text-slate-300">${formatHM(target)}</td>
+            <td class="p-2 text-right ${diffColor}">${formatHM(diffVal)}</td>
+            <td class="p-2 text-[10px] text-slate-500 italic truncate">${note}</td>
+            <td class="p-2 no-print text-center"><button onclick="editEntry('${dStr}')">✏️</button></td></tr>`;
+    }
+    
+    if(currentUser !== 'Admin') {
+        document.getElementById('sumMonthIst').innerText = formatHM(mIst);
+        document.getElementById('sumMonthSoll').innerText = formatHM(mSoll);
+        
+        const diff = mIst - mSoll;
+        const diffEl = document.getElementById('sumMonthDiff');
+        diffEl.innerText = formatHM(diff);
+        diffEl.className = "font-black " + (diff < 0 ? "text-red-500" : (diff > 0 ? "text-green-600" : "text-blue-600"));
+
+        const saldo = balancesForMonth.totalSaldo;
+        const saldoEl = document.getElementById('sumYearSaldo');
+        saldoEl.innerText = formatHM(saldo);
+        saldoEl.className = "font-black " + (saldo < 0 ? "text-red-500" : (saldo > 0 ? "text-green-600" : "text-blue-800"));
+
+        document.getElementById('sumVacTotal').innerText = db.admin[currentUser].yearlyVacation;
+        document.getElementById('sumMonthVac').innerText = balancesForMonth.monthVacation;
+        document.getElementById('sumYearVacRest').innerText = balancesForMonth.restVacation;
+        document.getElementById('planSaldoDisplay').innerText = formatHM(balancesToday.totalSaldo) + " h";
+        document.getElementById('planVacDisplay').innerText = balancesToday.restVacation + " Tage";
+    }
+
+    document.getElementById('billUser').innerText = currentUser;
+    document.getElementById('billPeriod').innerText = `${MONTH_NAMES[m]} ${y}`;
+
+    const sigContainer = document.getElementById('signatureContainer');
+    if(sigContainer) {
+        const key = y + "-" + m;
+        const sigData = (db.config[currentUser]?.signatures || {})[key];
+        
+        if(sigData) {
+            let html = `<div class="sig-box theme-dim-bg theme-border"><div class="text-3xl mb-2">✅</div><div class="theme-text font-black text-lg uppercase">Monat abgeschlossen</div><div class="text-sm text-slate-500 mb-2">Freigegeben: ${new Date(sigData.date).toLocaleString()}</div><span class="sig-badge ok">Signiert</span>`;
+            if(loggedInUser === 'Admin') {
+                html += `<div class="mt-3 border-t border-red-200 pt-2"><button onclick="resetSignature('${key}')" class="text-[10px] bg-red-100 text-red-600 hover:bg-red-200 px-2 py-1 rounded font-bold uppercase border border-red-200">🔓 Reset / Entsperren</button></div>`;
+            }
+            html += `</div>`;
+            sigContainer.innerHTML = html;
+        } else {
+            if (currentUser !== "Admin") {
+                sigContainer.innerHTML = `<div class="sig-box bg-slate-50"><h4 class="font-black text-lg mb-2">Monatsabschluss</h4><p class="text-sm mb-4 text-slate-500">Hiermit bestätige ich die Richtigkeit aller Zeiten.</p><button onclick="performSignature('${key}')" class="theme-bg hover:opacity-90 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition transform hover:scale-105 uppercase">✍️ Jetzt signieren</button></div>`;
+            } else {
+                sigContainer.innerHTML = "";
+            }
+        }
+    }
+}
+
+async function forceSave() {
+    const btn = document.getElementById('btnForceSave');
+    const originalText = btn.innerText;
+    btn.innerText = "⏳ Speichert...";
+    btn.disabled = true;
+    await save();
+    btn.innerText = "✅ Gespeichert!";
+    setTimeout(() => {
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }, 2000);
+}
+
+async function save() {
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+    const statusDiv = document.getElementById('syncStatus');
+    const loginSync = document.getElementById('loginSyncStatus');
+    const targetUrl = CLOUD_URL;
+    try {
+        await fetch(targetUrl, { method:'POST', mode:'no-cors', body: JSON.stringify(db) });
+        statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
+        if(loginSync) { loginSync.innerText = "● Online (Verbunden)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
+    } catch(e) { 
+        statusDiv.innerText = "● Nur lokal (Offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; 
+        if(loginSync) { loginSync.innerText = "● Offline (Nur lokal)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
+    }
+}
+
+function generateMonthNode(y, m, mini = false) {
+    const wrap = document.createElement('div'); wrap.className = "mb-8 bg-white p-4 rounded-xl border shadow-sm";
+    wrap.innerHTML = `<h4 class="font-black uppercase text-xs mb-2 theme-text border-b pb-1">${MONTH_NAMES[m]} ${y}</h4>`;
+    const grid = document.createElement('div'); grid.className = "cal-grid";
+    ["M", "D", "M", "D", "F", "S", "S"].forEach(d => { grid.innerHTML += `<div class="cal-header">${d}</div>`; });
+    const first = new Date(y, m, 1), offset = (first.getDay() === 0 ? 6 : first.getDay() - 1), last = new Date(y, m + 1, 0).getDate();
+    const showFerien = document.getElementById('toggleSchoolHolidays')?.checked ?? true;
+    for(let i=0; i<offset+last; i++) {
+        const cell = document.createElement('div'); cell.className = `cal-day border ${mini?'min-h-[60px]':''}`;
+        if(i >= offset) {
+            const day = i - offset + 1, d = new Date(y, m, day), dStr = toLocalISO(d);
+            const isH = holidaysDB[dStr], isF = schoolHolidays.find(f => dStr >= f.s && dStr <= f.e);
+            cell.innerHTML = `<b>${day}</b>`;
+            if(isH) { cell.classList.add('row-holiday'); cell.innerHTML += `<div class='text-[7px] leading-tight'>${isH}</div>`; }
+            else if(d.getDay() === 6) { cell.classList.add('row-weekend'); }
+            else if(d.getDay() === 0) { cell.classList.add('row-sunday'); }
+            else if(isF && showFerien) { cell.classList.add('row-school-holiday'); if(dStr === isF.s) cell.innerHTML += `<div class='text-[7px] text-blue-500 font-black mt-1 leading-none uppercase'>${isF.n}</div>`; }
+            
+            if(showTeamView) {
+                getVisibleUsers().forEach(u => {
+                    if (u === "Admin") return;
+                    const uLog = (db.logs[u]||{})[dStr] || {};
+                    const target = getTargetHours(d, u);
+                    if(uLog.type) {
+                        if (uLog.type === 'Krank') return;
+                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'ZA'];
+                        if (typesToHide.includes(uLog.type)) { if (target === 0) return; }
+                        let cl = "bg-blue-50 text-blue-700 border-blue-200"; 
+                        if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') cl="bg-emerald-50 text-emerald-700 border-emerald-200"; 
+                        if(uLog.type==='Schulung') cl="bg-purple-100 text-purple-700 border-purple-200";
+                        if(uLog.type==='Sonstiges') cl="bg-yellow-50 text-yellow-700 border-yellow-200";
+                        if(uLog.type==='ZA') cl="bg-cyan-50 text-cyan-700 border-cyan-200";
+                        let label = u.split(' ')[0];
+                        if(uLog.type==='Schulung' && uLog.range) label += ` (${uLog.range})`;
+                        else if(uLog.type==='Sonstiges' && uLog.title) { label += ` (${uLog.title}`; if(uLog.range) label += `, ${uLog.range}`; label += `)`; }
+                        else if(uLog.type!=='Urlaub'&&uLog.type!=='Betriebsurlaub') label += `: ${uLog.type}`;
+                        cell.innerHTML += `<div class='cal-entry ${cl}'>${label}</div>`;
+                    }
+                });
+            } else {
+                const log = (db.logs[currentUser]||{})[dStr] || {};
+                const target = getTargetHours(d, currentUser);
+                if(log && log.type) { 
+                    let showLog = true;
+                    const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
+                    if (typesToHide.includes(log.type)) { if (target === 0) showLog = false; }
+                    if(showLog) {
+                        if(!isH && d.getDay() !== 6 && d.getDay() !== 0) {
+                            if(log.type==='Urlaub' || log.type==='Betriebsurlaub') cell.classList.add('row-vacation'); 
+                            else if(log.type==='ZA') { }
+                            else if(log.type==='Schulung') cell.classList.add('row-schulung');
+                            else if(log.type==='Sonstiges') cell.classList.add('row-custom');
+                            else cell.classList.add('bg-amber-50'); 
+                        }
+                        let txt = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
+                        if(log.type === 'Sonstiges' && log.title) txt = log.title;
+                        if(log.type === 'Schulung' && log.range) txt = "Schulung (" + log.range + ")";
+                        let extraClass = log.type === 'ZA' ? 'bg-cyan-50 text-cyan-800 border border-cyan-200' : '';
+                        cell.innerHTML += `<div class='cal-entry ${extraClass}'>${txt}</div>`; 
+                    }
+                } 
+                else if (!isH && d.getDay() !== 6 && d.getDay() !== 0 && target === 0 && !log.in && !log.note) {
+                    cell.innerHTML += `<div class='cal-entry text-slate-400 italic bg-slate-50'>Frei</div>`;
+                }
+            }
+        } else cell.classList.add('bg-slate-50');
+        grid.appendChild(cell);
+    }
+    wrap.appendChild(grid); return wrap;
+}
+
+function setCalView(v) { calView = v; renderCalendar(); }
+function changeCalDate(dir) {
+    if(calView === 'week') currentCalDate.setDate(currentCalDate.getDate() + (dir * 7));
+    else if(calView === 'year') currentCalDate.setFullYear(currentCalDate.getFullYear() + dir);
+    else currentCalDate.setMonth(currentCalDate.getMonth() + dir);
+    renderCalendar();
+}
+
+function renderCalendar() {
+    const root = document.getElementById('calendarRoot'); root.innerHTML = "";
+    const y = currentCalDate.getFullYear(), m = currentCalDate.getMonth();
+    ['week','month','2month','year'].forEach(v => { const btn = document.getElementById('v-'+v); if(btn) { if(v === calView) { btn.classList.add('bg-white', 'shadow-sm'); } else { btn.classList.remove('bg-white', 'shadow-sm'); } } });
+    if(calView === 'year') {
+        document.getElementById('calCurrentLabel').innerText = "Jahr " + y; const container = document.createElement('div'); container.className = "year-grid";
+        for(let i=0; i<12; i++) container.appendChild(generateMonthNode(y, i, true)); root.appendChild(container);
+    } else if(calView === '2month') {
+        document.getElementById('calCurrentLabel').innerText = "Vorschau 2 Monate"; root.appendChild(generateMonthNode(y, m));
+        let nm = m+1, ny = y; if(nm>11){nm=0; ny++;} root.appendChild(generateMonthNode(ny, nm));
+    } else if(calView === 'month') {
+        document.getElementById('calCurrentLabel').innerText = MONTH_NAMES[m] + " " + y; root.appendChild(generateMonthNode(y, m));
+    } else {
+        let start = new Date(currentCalDate); let diff = start.getDay() === 0 ? 6 : start.getDay() - 1; start.setDate(start.getDate() - diff);
+        document.getElementById('calCurrentLabel').innerText = "Woche " + start.getDate() + "." + (start.getMonth()+1) + ".";
+        const grid = document.createElement('div'); grid.className = "grid grid-cols-1 md:grid-cols-7 gap-2";
+        for(let i=0; i<7; i++) {
+            const d = new Date(start); d.setDate(d.getDate() + i); const dStr = toLocalISO(d); const isH = holidaysDB[dStr];
+            let content = `<p class="text-[9px] uppercase font-bold text-slate-400">${WEEKDAYS_SHORT[d.getDay()]}</p><p class="text-xl font-black">${d.getDate()}.${d.getMonth()+1}.</p>`;
+            if(showTeamView) {
+                getVisibleUsers().forEach(u => {
+                    if (u === "Admin") return;
+                    const uLog = (db.logs[u]||{})[dStr] || {};
+                    const target = getTargetHours(d, u);
+                    if(uLog.type) { 
+                        if (uLog.type === 'Krank') return;
+                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'ZA'];
+                        if (typesToHide.includes(uLog.type)) { if (target === 0) return; }
+                        let col = "theme-text theme-dim-bg"; 
+                        if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') col="text-emerald-700 bg-emerald-50"; 
+                        if(uLog.type==='Schulung') col="text-purple-700 bg-purple-50";
+                        if(uLog.type==='Sonstiges') col="text-yellow-700 bg-yellow-50";
+                        if(uLog.type==='ZA') col="text-cyan-700 bg-cyan-50 border border-cyan-200"; 
+                        let txt = u.split(' ')[0];
+                        if(uLog.type==='Schulung' && uLog.range) txt += ` (${uLog.range})`;
+                        else if(uLog.type==='Sonstiges' && uLog.title) { txt += ` (${uLog.title}`; if(uLog.range) txt += `, ${uLog.range}`; txt += `)`; }
+                        else if(uLog.type!=='Urlaub'&&uLog.type!=='Betriebsurlaub') txt += `: ${uLog.type}`;
+                        content += `<div class='text-[8px] font-bold ${col} p-1 rounded mt-1 border truncate'>${txt}</div>`; 
+                    }
+                });
+            } else {
+                const log = (db.logs[currentUser]||{})[dStr] || {};
+                let dt = (log.in ? log.in + ' - ' + (getExtendedOutTime(dStr, log.in, log.out) || '') : '');
+                const target = getTargetHours(d, currentUser);
+                let typeDisplay = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
+                if(log.type === 'Sonstiges' && log.title) typeDisplay = log.title;
+                if(log.type === 'Schulung' && log.range) typeDisplay = "Schulung (" + log.range + ")";
+                const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
+                if (typesToHide.includes(log.type)) { if (target === 0) typeDisplay = ""; }
+                if (!typeDisplay && !isH && d.getDay() !== 0 && d.getDay() !== 6 && target === 0 && !log.in && !log.note) { typeDisplay = "Frei"; }
+                let textColor = "theme-text";
+                if(typeDisplay === "Frei") textColor = "text-slate-400 italic";
+                if(log.type === 'ZA') textColor = "text-cyan-600 font-black"; 
+                content += `<p class="text-[10px] mt-2 font-bold ${textColor} truncate">${isH || typeDisplay || dt}</p>`;
+            }
+            grid.innerHTML += `<div class="p-4 bg-white border rounded-xl shadow-sm ${isH?'row-holiday':''}">${content}</div>`;
+        }
+        root.appendChild(grid);
+    }
+}
+
+function updateClock() { const n = getNow(); document.getElementById('liveClock').innerText = n.toLocaleTimeString('de-DE'); document.getElementById('displayTodayDate').innerText = n.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long'}); }
+function punch(t) {
+    if (currentUser === "Admin") return; 
+    const n = getNow(), ds = toLocalISO(n);
+    let ts = n.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+    const isWE = n.getDay() === 0 || n.getDay() === 6;
+    const isH = holidaysDB[ds];
+    if (t === 'in' && !isWE && !isH) {
+        const config = (db.config[currentUser] && db.config[currentUser][n.getDay()]) ? db.config[currentUser][n.getDay()] : {start:"00:00"};
+        ts = getKulanzStart(ts, config.start);
+    }
+    if(!db.logs[currentUser]) db.logs[currentUser] = {}; if(t==='in') db.logs[currentUser][ds] = {in:ts, out:null}; else if(db.logs[currentUser][ds]) db.logs[currentUser][ds].out=ts; save(); renderAll();
+}
+function switchUser() { 
+    if(loggedInUser !== "Admin") return; 
+    currentUser = document.getElementById('userSelect').value; 
+    document.getElementById('displayUserName').innerText = currentUser; document.getElementById('targetName').innerText = currentUser; renderAll(); 
+}
+function renderAll() { 
+    document.getElementById('displayUserName').innerText = currentUser;
+    if(currentUser === 'Admin') {
+        document.getElementById('punchButtonsArea').classList.add('hidden');
+        document.getElementById('adminPunchPlaceholder').classList.remove('hidden');
+        document.getElementById('todayDetails').innerHTML = "";
+    } else {
+        document.getElementById('punchButtonsArea').classList.remove('hidden');
+        document.getElementById('adminPunchPlaceholder').classList.add('hidden');
+        renderTodayInfo();
+    }
+    renderLogs(); renderCalendar(); renderWeeklySettings(); renderAdminConfigs(); applyTheme();
+}
+function showTab(id) { document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden')); document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active')); document.getElementById('tab-'+id).classList.remove('hidden'); document.getElementById('btn-'+id).classList.add('tab-active'); renderAll(); }
+function populateSelectors() {
+    const sm = document.getElementById('viewMonth'), sy = document.getElementById('viewYear'), n = getNow(); sm.innerHTML = ""; sy.innerHTML = "";
+    for(let i=0; i<12; i++) { let o = document.createElement('option'); o.value = i; o.innerText = MONTH_NAMES[i]; o.selected = i === n.getMonth(); sm.appendChild(o); }
+    for(let i=2024; i<=2027; i++) { let o = document.createElement('option'); o.value = i; o.innerText = i; o.selected = i === n.getFullYear(); sy.appendChild(o); }
+}
+function renderUserSelect() { 
+    const s = document.getElementById('userSelect'); s.innerHTML = ""; 
+    getVisibleUsers().forEach(u => { let o = document.createElement('option'); o.value = u; o.innerText = u; s.appendChild(o); }); 
+}
+function renderWeeklySettings() {
+    const cont = document.getElementById('weeklyEditor'); cont.innerHTML = "";
+    if (currentUser === "Admin") { cont.innerHTML = "<p class='text-xs italic text-slate-400'>Admin hat keine Arbeitszeiten.</p>"; return; }
+    for(let i=1; i<=5; i++) { 
+        const c = db.config[currentUser][i] || {start:"08:00", target:8, weekMode: "ALL"}; 
+        const selAll = (!c.weekMode || c.weekMode === 'ALL') ? 'selected' : '';
+        const selEven = (c.weekMode === 'EVEN') ? 'selected' : '';
+        const selOdd = (c.weekMode === 'ODD') ? 'selected' : '';
+        cont.innerHTML += `<div class="flex flex-col md:flex-row items-start md:items-center gap-2 p-3 bg-slate-50 rounded-lg border italic"><span class="w-16 font-bold text-xs uppercase">${WEEKDAYS_SHORT[i]}</span><div class="flex items-center gap-2"><input type="time" id="ws_${i}" value="${c.start}" class="border p-1 rounded text-xs"><input type="number" id="wt_${i}" value="${c.target}" step="0.5" class="border p-1 rounded w-16 text-right text-xs font-black"> <span class="text-xs">h</span></div><select id="wm_${i}" class="text-[10px] border rounded bg-white p-1"><option value="ALL" ${selAll}>Jede Woche</option><option value="EVEN" ${selEven}>Gerade KW (2,4..)</option><option value="ODD" ${selOdd}>Ungerade KW (1,3..)</option></select></div>`; 
+    }
+}
+function saveWeekly() { 
+    if(currentUser==="Admin") return;
+    for(let i=1; i<=5; i++) { 
+        db.config[currentUser][i] = { start: document.getElementById('ws_'+i).value, target: parseFloat(document.getElementById('wt_'+i).value) || 0, weekMode: document.getElementById('wm_'+i).value }; 
+    } 
+    save(); alert("Plan gespeichert!"); renderAll(); 
+}
+
+function addPlanningRange() {
+    const start = document.getElementById('planStart').value, end = document.getElementById('planEnd').value, type = document.getElementById('planType').value;
+    if(start) {
+        let current = new Date(start), finish = end ? new Date(end) : new Date(start);
+        let customTitle = null, customValue = null, customRange = null, schulungRange = null;
+        let forAll = false;
+        if(type === 'Sonstiges') {
+            customTitle = prompt("Titel für den Eintrag (z.B. Teamsitzung):"); if(!customTitle) return;
+            customRange = prompt("Zeitraum (z.B. 12:00 - 14:00) - Optional:", "");
+            customValue = prompt("Stundenanzahl (Optional - leer lassen für Tagessoll):", "");
+            if(confirm("Soll dieser Eintrag für ALLE Mitarbeiter gelten?\nOK = Ja, für alle\nAbbrechen = Nein, nur für " + currentUser)) { forAll = true; }
+        }
+        if(type === 'Schulung') {
+            schulungRange = prompt("Zeitraum (z.B. 09:00 - 12:00):"); if(!schulungRange) return;
+            if(confirm("Soll diese Schulung für ALLE Mitarbeiter gelten?\nOK = Ja, für alle\nAbbrechen = Nein, nur für " + currentUser)) { forAll = true; }
+        }
+        let targets = [currentUser];
+        if(type === 'Betriebsurlaub' || type === 'DELETE_BU' || type === 'DELETE_ALL' || forAll) { targets = getVisibleUsers().filter(u => u !== 'Admin'); } else if (currentUser === 'Admin' && !forAll) { alert("Admin hat keine Urlaubsfunktion."); return; }
+        while(current <= finish) { 
+            const dIso = toLocalISO(current);
+            targets.forEach(u => {
+                if(!db.logs[u]) db.logs[u] = {}; 
+                if(type === 'DELETE_BU') { if(db.logs[u][dIso]?.type === 'Betriebsurlaub') delete db.logs[u][dIso]; } 
+                else if(type === "DELETE") { delete db.logs[u][dIso]; } 
+                else if(type === "DELETE_ALL") { if(db.logs[u][dIso]) delete db.logs[u][dIso]; } 
+                else {
+                    let entry = db.logs[u][dIso] || {}; entry.type = type;
+                    if(type === 'Sonstiges') { entry.title = customTitle; if(customValue !== "") entry.value = customValue; if(customRange !== "") entry.range = customRange; }
+                    if(type === 'Schulung') { entry.range = schulungRange; }
+                    db.logs[u][dIso] = entry; 
+                }
+            });
+            current.setDate(current.getDate() + 1); 
+        }
+        save(); renderAll();
+        if(type === 'Betriebsurlaub') alert("Betriebsurlaub für alle Mitarbeiter eingetragen!");
+        if(type === 'DELETE_ALL') alert("Alle Termine im Zeitraum gelöscht.");
+        if(forAll) alert("Eintrag '" + (customTitle || "Schulung") + "' wurde für ALLE Mitarbeiter erstellt.");
+    }
+}
+
+function renderTodayInfo() { 
+    if(currentUser === 'Admin') return;
+    const ds = toLocalISO(getNow()), log = (db.logs[currentUser]||{})[ds] || {in:'--', out:null}; 
+    let dispOut = log.out ? getExtendedOutTime(ds, log.in, log.out) : '--:--';
+    document.getElementById('todayDetails').innerHTML = `<div class="flex justify-between p-2 bg-green-50 rounded border text-xs italic"><span>KOMMEN:</span><span class="font-black">${log.in || '--:--'}</span></div><div class="flex justify-between p-2 bg-red-50 rounded border text-xs italic"><span>GEHEN:</span><span class="font-black">${dispOut}</span></div>`; 
+}
+
+function editEntry(d) {
+    if(currentUser === "Admin") return alert("Admin kann nicht stempeln/bearbeiten.");
+    const dObj = new Date(d); const key = dObj.getFullYear() + "-" + dObj.getMonth();
+    const sigData = (db.config[currentUser]?.signatures || {})[key];
+    if(sigData && sigData.signed) { return alert("⛔ Monat ist abgeschlossen/signiert! Änderungen nicht mehr möglich."); }
+    editingDateStr = d;
+    const log = (db.logs[currentUser]||{})[d] || {in:'', out:'', note:'', type:''};
+    document.getElementById('editorDateDisplay').innerText = new Date(d).toLocaleDateString('de-DE', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+    document.getElementById('editIn').value = log.in || '';
+    document.getElementById('editOut').value = log.out || '';
+    document.getElementById('editNote').value = log.note || '';
+    document.getElementById('editType').value = log.type || '';
+    document.getElementById('dayEditorOverlay').classList.remove('hidden');
+}
+
+function closeDayEditor() { document.getElementById('dayEditorOverlay').classList.add('hidden'); editingDateStr = null; }
+function saveDayEditor() {
+    if(!editingDateStr) return;
+    const i = document.getElementById('editIn').value; const o = document.getElementById('editOut').value;
+    const n = document.getElementById('editNote').value.trim(); const t = document.getElementById('editType').value;
+    if(!db.logs[currentUser]) db.logs[currentUser] = {};
+    if(!i && !o && !n && !t) { delete db.logs[currentUser][editingDateStr]; } 
+    else {
+        let entry = db.logs[currentUser][editingDateStr] || {};
+        entry.in = i; entry.out = o; entry.note = n; entry.type = t;
+        if(!entry.in) delete entry.in; if(!entry.out) delete entry.out; if(!entry.note) delete entry.note; if(!entry.type) delete entry.type;
+        db.logs[currentUser][editingDateStr] = entry;
+    }
+    save(); renderAll(); closeDayEditor();
+}
+
+function deleteDayEntry() {
+    if(!editingDateStr) return;
+    if(confirm("Eintrag für diesen Tag wirklich komplett löschen?")) {
+        if(db.logs[currentUser] && db.logs[currentUser][editingDateStr]) { delete db.logs[currentUser][editingDateStr]; save(); renderAll(); }
+        closeDayEditor();
+    }
+}
+
+function adminClearData() {
+    if(loggedInUser !== "Admin") return;
+    const targetUser = document.getElementById('cleanUserSelect').value;
+    const sStr = document.getElementById('cleanStart').value; const eStr = document.getElementById('cleanEnd').value;
+    if(!sStr || !eStr) return alert("Bitte Start- und Enddatum wählen.");
+    if(!confirm(`ACHTUNG: Wirklich alle Daten für ${targetUser === 'ALL' ? 'ALLE Mitarbeiter' : targetUser} im Zeitraum ${sStr} bis ${eStr} unwiderruflich löschen?`)) return;
+    let start = new Date(sStr); let end = new Date(eStr); let count = 0;
+    const usersToClean = targetUser === 'ALL' ? db.users : [targetUser];
+    usersToClean.forEach(u => {
+        if(db.logs[u]) {
+            let loop = new Date(start);
+            while(loop <= end) {
+                const dIso = toLocalISO(loop);
+                if(db.logs[u][dIso]) { delete db.logs[u][dIso]; count++; }
+                loop.setDate(loop.getDate() + 1);
+            }
+        }
+    });
+    save(); renderAll(); alert(`${count} Einträge gelöscht.`);
+}
+
+function setHeaderWarp() { const val = document.getElementById('headerWarpTime').value; if(val) { timeWarpOffset = new Date(val).getTime() - Date.now(); renderAll(); alert("Warp aktiv!"); } }
+function resetWarp() { timeWarpOffset = 0; document.getElementById('headerWarpTime').value = ""; alert("Zeit zurückgesetzt."); renderAll(); }
+function performSignature(key) {
+    if(!confirm("Monat wirklich signieren?")) return;
+    if(!db.config[currentUser]) db.config[currentUser] = {}; if(!db.config[currentUser].signatures) db.config[currentUser].signatures = {};
+    db.config[currentUser].signatures[key] = { signed: true, date: new Date().toISOString() };
+    save(); renderLogs();
+}
+function resetSignature(key) {
+    if(!confirm("Signatur wirklich entfernen? Der Monat ist dann wieder offen.")) return;
+    if(db.config[currentUser]?.signatures?.[key]) { delete db.config[currentUser].signatures[key]; save(); renderLogs(); }
+}
+
+function changePassword() {
+    const newPw = document.getElementById('newPwInput').value; 
+    const confirmPw = document.getElementById('newPwConfirm').value;
+    
+    if(newPw.length < 4) return alert("Passwort muss mindestens 4 Zeichen haben!");
+    if(newPw !== confirmPw) return alert("Passwörter stimmen nicht überein!");
+    
+    // FIX: Unterscheidung zwischen Admin und normalem User
+    if(currentUser === "Admin") {
+        if(!db.settings) db.settings = {};
+        db.settings.adminPassword = newPw;
+    } else {
+        if(!db.passwords) db.passwords = {}; 
+        db.passwords[currentUser] = newPw; 
+    }
+    
+    save(); 
+    alert("Passwort erfolgreich geändert!");
+    document.getElementById('newPwInput').value = ""; 
+    document.getElementById('newPwConfirm').value = "";
+}
+function sendDevMessage() {
+    const txt = document.getElementById('devMsgText').value; if(!txt) return;
+    if(!db.messages) db.messages = []; db.messages.push({from: currentUser, date: new Date().toISOString(), text: txt}); save(); 
+    document.getElementById('devMsgText').value = ""; alert("Nachricht gesendet!");
+}
+
+function deleteMessage(index) {
+    if(!confirm("Nachricht löschen?")) return;
+    db.messages.splice(index, 1); save(); renderAdminConfigs();
+    if(isSuperuser) renderSystemMessages();
+}
+
+function adminAddUser() {
+    if(loggedInUser !== "Admin") return;
+    const name = prompt("Name des neuen Mitarbeiters:");
+    if(name && name.trim() !== "") {
+        if(db.users.includes(name)) return alert("User existiert bereits!");
+        db.users.push(name);
+        db.config[name] = {};
+        for(let d=1; d<=5; d++) db.config[name][d] = { start: "08:00", target: 8, weekMode: "ALL" };
+        db.config[name][0] = { start: "00:00", target: 0 }; db.config[name][6] = { start: "00:00", target: 0 };
+        db.admin[name] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
+        db.passwords[name] = "1234";
+        save(); alert(`Mitarbeiter ${name} angelegt.`); window.location.reload();
+    }
+}
+
+function adminDeleteUser(name) {
+    if(loggedInUser !== "Admin") return;
+    if(name === "Admin") return alert("Der Administrator kann nicht gelöscht werden."); 
+    if(!confirm(`Benutzer "${name}" wirklich LÖSCHEN?\nAlle Daten gehen verloren!`)) return;
+    if(!confirm(`Sicher? Das kann nicht rückgängig gemacht werden.`)) return;
+    const idx = db.users.indexOf(name);
+    if(idx > -1) {
+        db.users.splice(idx, 1);
+        delete db.logs[name]; delete db.config[name]; delete db.passwords[name]; delete db.admin[name];
+        save(); alert("Benutzer gelöscht."); window.location.reload();
+    }
+}
+
+function testFillMonth() {
+    if(!loggedInUser === 'Admin') return;
+    if(!confirm(`ACHTUNG: Füllt den aktuellen Monat (${MONTH_NAMES[parseInt(document.getElementById('viewMonth').value)]}) für ${currentUser} mit Standard-Arbeitszeiten! Vorhandene Einträge werden überschrieben.`)) return;
+    const y = parseInt(document.getElementById('viewYear').value); const m = parseInt(document.getElementById('viewMonth').value);
+    const daysInMonth = new Date(y, m + 1, 0).getDate(); const user = currentUser;
+    if(!db.logs[user]) db.logs[user] = {};
+    for(let i=1; i<=daysInMonth; i++) {
+        const d = new Date(y, m, i); const dStr = toLocalISO(d);
+        if(holidaysDB[dStr]) continue; 
+        const target = getTargetHours(d, user);
+        if(target > 0) {
+            const dayCfg = db.config[user][d.getDay()];
+            let [h, min] = dayCfg.start.split(':').map(Number);
+            let minutesIn = h * 60 + min; let workMinutes = dayCfg.target * 60;
+            if(dayCfg.target > 6) workMinutes += 30; 
+            let totalMinutes = minutesIn + workMinutes;
+            let endH = Math.floor(totalMinutes / 60); let endM = totalMinutes % 60;
+            let sIn = dayCfg.start; let sOut = String(endH).padStart(2,'0') + ":" + String(endM).padStart(2,'0');
+            db.logs[user][dStr] = { in: sIn, out: sOut, type: "" };
+        }
+    }
+    save(); renderAll(); alert("Monat wurde gefüllt!");
+}
+
+function renderAdminConfigs() {
+    if(loggedInUser !== "Admin") { document.getElementById('adminUserConfig').innerHTML = "<p>Zugriff verweigert.</p>"; return; }
+    const selectedEditUser = currentUser; if(!selectedEditUser) return;
+    const cont = document.getElementById('adminUserConfig'); cont.innerHTML = "";
+    const idx = db.users.indexOf(selectedEditUser); 
+    const a = db.admin[selectedEditUser] || {startDate: "2024-01-01", startBalance:0, yearlyVacation:25, startVacation: 0};
+    let deleteBtnHtml = "";
+    if(selectedEditUser === 'Admin') { deleteBtnHtml = `<span class="text-xs font-bold text-slate-400 bg-slate-200 px-2 py-1 rounded">🔒 System-Admin</span>`; } 
+    else { deleteBtnHtml = `<button onclick="adminDeleteUser('${selectedEditUser}')" class="bg-red-100 hover:bg-red-200 text-red-600 border border-red-200 rounded px-2 py-1 text-[10px] font-bold uppercase whitespace-nowrap h-8">🗑️ User Löschen</button>`; }
+
+    cont.innerHTML = `<div class="p-4 bg-slate-50 rounded-xl border mb-2 border-blue-200 shadow-inner">
+        <div class="flex justify-between items-end mb-2">
+            <div class="w-full mr-2">${testModeActive ? `<label class="text-[9px] font-bold text-slate-400 uppercase">Name bearbeiten:</label><input type="text" id="nameEdit_SINGLE" value="${selectedEditUser}" class="w-full p-1 border rounded font-black theme-text uppercase text-xs italic">` : `<p class="font-black theme-text text-xs uppercase italic">${selectedEditUser}</p>`}</div>
+            ${deleteBtnHtml}
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-[8px] font-bold text-slate-400 uppercase mb-1"><span>Start-Datum</span><span>Zeitsaldo Alt (h)</span></div>
+        <div class="grid grid-cols-2 gap-2 mb-2"><input type="date" id="admDate_SINGLE" value="${a.startDate}" class="p-2 border rounded text-xs font-bold"><input type="number" step="0.01" id="admBal_SINGLE" value="${a.startBalance}" class="p-2 border rounded text-xs font-bold"></div>
+        <div class="grid grid-cols-2 gap-2 text-[8px] font-bold text-slate-400 uppercase mb-1"><span>Urlaub Alt (Tage)</span><span>Urlaub / Jahr</span></div>
+        <div class="grid grid-cols-2 gap-2"><input type="number" id="admVacAlt_SINGLE" value="${a.startVacation || 0}" class="p-2 border rounded text-xs font-bold"><input type="number" id="admVacJ_SINGLE" value="${a.yearlyVacation}" class="p-2 border rounded text-xs font-bold"></div>
+        <div class="mt-4 pt-4 border-t border-slate-200">
+            <div class="text-[8px] font-bold text-slate-400 uppercase">PIN Reset</div>
+            <button onclick="db.passwords['${selectedEditUser}']='1234';save();alert('PIN für ${selectedEditUser} auf 1234 gesetzt.');" class="bg-red-100 text-red-500 hover:bg-red-200 px-3 py-2 rounded text-[9px] mt-1 font-bold w-full">PIN auf 1234 zurücksetzen</button>
+        </div>
+    </div>`;
+
+    const inbox = document.getElementById('adminInbox'); inbox.innerHTML = "";
+    if(db.messages && db.messages.length > 0) {
+        db.messages.forEach((msg, idx) => {
+            inbox.innerHTML += `<div class="bg-white p-3 rounded-lg border border-purple-100 shadow-sm flex flex-col gap-1">
+                <div class="flex justify-between items-start"><span class="font-bold text-[10px] uppercase text-purple-600">${msg.from}</span><span class="text-[9px] text-slate-400">${new Date(msg.date).toLocaleString()}</span></div>
+                <p class="text-xs text-slate-700 italic">"${msg.text}"</p><button onclick="deleteMessage(${idx})" class="self-end text-[9px] text-red-400 hover:text-red-600 font-bold uppercase mt-1">Erledigt / Löschen</button>
+            </div>`;
+        });
+    } else { inbox.innerHTML = `<p class="text-xs text-slate-400 text-center italic">Keine neuen Nachrichten.</p>`; }
+}
+
+function saveAdminConfigs() {
+    const selectedEditUser = currentUser; if(!selectedEditUser) return;
+    let newName = testModeActive ? document.getElementById(`nameEdit_SINGLE`).value.trim() : selectedEditUser;
+    if(newName !== selectedEditUser) {
+        const idx = db.users.indexOf(selectedEditUser);
+        if(idx !== -1) db.users[idx] = newName;
+        db.logs[newName] = db.logs[selectedEditUser]; delete db.logs[selectedEditUser];
+        db.config[newName] = db.config[selectedEditUser]; delete db.config[selectedEditUser];
+        db.passwords[newName] = db.passwords[selectedEditUser]; delete db.passwords[selectedEditUser];
+        db.admin[newName] = { startDate: document.getElementById(`admDate_SINGLE`).value, startBalance: parseFloat(document.getElementById(`admBal_SINGLE`).value) || 0, startVacation: parseFloat(document.getElementById(`admVacAlt_SINGLE`).value) || 0, yearlyVacation: parseInt(document.getElementById(`admVacJ_SINGLE`).value) || 25 };
+        delete db.admin[selectedEditUser];
+        currentUser = newName;
+        sessionStorage.setItem(USER_KEY, newName); localStorage.setItem('ze_last_user', newName); 
+        save(); alert(`Benutzer umbenannt in ${newName}. Seite wird neu geladen.`); window.location.reload(); 
+    } else {
+        db.admin[selectedEditUser] = { startDate: document.getElementById(`admDate_SINGLE`).value, startBalance: parseFloat(document.getElementById(`admBal_SINGLE`).value) || 0, startVacation: parseFloat(document.getElementById(`admVacAlt_SINGLE`).value) || 0, yearlyVacation: parseInt(document.getElementById(`admVacJ_SINGLE`).value) || 25 };
+        save(); alert("Daten gespeichert!"); renderAll();
+    }
+}
+
+async function exportPDF() { 
+    try {
+        const { jsPDF } = window.jspdf; const doc = new jsPDF('p', 'mm', 'a4'); const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value); const balances = calculateBalances(currentUser, y, m, false);
+        const col = db.settings.primaryColor || "#2563eb"; 
+        
+        doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text("Zeitnachweis", 14, 15); doc.setFontSize(8); doc.setTextColor(col); doc.text(db.settings.companyName || "Teamordination Dr. Stütz & Dr. Haselgruber", 14, 20); doc.setTextColor(148, 163, 184); doc.setFontSize(7); doc.text("MITARBEITER", 196, 15, { align: "right" }); doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text(currentUser.toUpperCase(), 196, 20, { align: "right" }); doc.setFontSize(7); doc.setTextColor(148, 163, 184); doc.text("ZEITRAUM", 196, 26, { align: "right" }); doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.text(`${MONTH_NAMES[m]} ${y}`, 196, 31, { align: "right" });
+        doc.autoTable({ html: '#mainTable', startY: 38, theme: 'striped', alternateRowStyles: { fillColor: [240, 247, 255] }, headStyles: { fillColor: col, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' }, styles: { fontSize: 7.5, cellPadding: 1.2, textColor: [51, 65, 85], valign: 'middle' }, columnStyles: { 0: { cellWidth: 22, fontStyle: 'bold' }, 1: { cellWidth: 16, halign: 'right' }, 2: { cellWidth: 16, halign: 'right' }, 3: { cellWidth: 24, halign: 'center'}, 4: { cellWidth: 14, halign: 'right', fontStyle: 'bold' }, 5: { cellWidth: 14, halign: 'right' }, 6: { cellWidth: 16, halign: 'right', fontStyle: 'bold' }, 7: { halign: 'left' } }, columns: [0, 1, 2, 3, 4, 5, 6, 7],
+            didParseCell: function(data) { 
+                if (data.section === 'body') { 
+                    const raw = data.cell.raw;
+                    const text = (raw.innerText || raw || "").toString().trim();
+                    const row = data.row.index + 1; const dStr = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(row).padStart(2, '0');
+                    if (holidaysDB[dStr]) { data.cell.styles.fillColor = [254, 242, 242]; data.cell.styles.textColor = [153, 27, 27]; }
+                    else if (new Date(y, m, row).getDay() === 0) { data.cell.styles.fillColor = [255, 247, 237]; }
+                    if (text.includes("Urlaub") || text.includes("Betriebsurlaub")) { data.cell.styles.fillColor = [209, 250, 229]; data.cell.styles.textColor = [6, 78, 59]; } 
+                    else if (text.includes("Krank")) { data.cell.styles.fillColor = [254, 243, 199]; } 
+                    else if (text.includes("ZA")) { data.cell.styles.fillColor = [236, 254, 255]; data.cell.styles.textColor = [14, 116, 144]; } 
+                    
+                    if(data.column.index === 6) {
+                        if(text.startsWith('-')) data.cell.styles.textColor = [220, 38, 38]; 
+                        else if(text === '0:00') data.cell.styles.textColor = [37, 99, 235]; 
+                        else data.cell.styles.textColor = [22, 163, 74]; 
+                    }
+                } 
+            }
+        }); 
+        
+        if(currentUser !== 'Admin') {
+            let finalY = doc.lastAutoTable.finalY + 10; if (finalY > 240) { doc.addPage(); finalY = 20; } doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.roundedRect(14, finalY - 4, 182, 32, 2, 2, 'FD'); doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(col); doc.text("KONTOSTAND MONATSENDE", 20, finalY + 4); doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.setFont(undefined, 'normal');
+            doc.text(`Monat Soll: ${document.getElementById('sumMonthSoll').innerText} h`, 20, finalY + 12); doc.text(`Monat Ist: ${document.getElementById('sumMonthIst').innerText} h`, 20, finalY + 18); 
+            
+            const saldoVal = balances.totalSaldo;
+            let salR = 30, salG = 41, salB = 59; 
+            if(saldoVal < 0) { salR=220; salG=38; salB=38; } else if(saldoVal > 0) { salR=22; salG=163; salB=74; } else { salR=37; salG=99; salB=235; } 
+            
+            doc.setFont(undefined, 'bold'); doc.setTextColor(salR, salG, salB);
+            doc.text(`STUNDENSALDO: ${formatHM(balances.totalSaldo)} h`, 20, finalY + 25); doc.setTextColor(30, 41, 59); doc.setFont(undefined, 'normal'); doc.text(`Urlaub Anspruch: ${db.admin[currentUser].yearlyVacation} Tage`, 110, finalY + 12); doc.text(`Urlaub Genommen: ${balances.monthVacation} Tage`, 110, finalY + 18); doc.setFont(undefined, 'bold'); doc.setTextColor(21, 128, 61); doc.text(`RESTURLAUB: ${balances.restVacation} Tage`, 110, finalY + 25);
+        }
+        doc.save(`Zeitnachweis_${currentUser}_${MONTH_NAMES[m]}_${y}.pdf`); 
+    } catch (e) { alert("PDF Export fehlgeschlagen: " + e.message); }
+}
+
+function exportExcel() {
+    const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value);
+    const rows = [["ZEITNACHWEIS", currentUser], ["Monat", MONTH_NAMES[m], y], ["Datum", "Kommen", "Gehen", "Pause", "Ist", "Soll", "Saldo", "Notiz"]];
+    for(let i=1; i<=new Date(y, m+1, 0).getDate(); i++) {
+        const ds = toLocalISO(new Date(y,m,i)), log = (db.logs[currentUser]||{})[ds] || {};
+        const isH = holidaysDB[ds], isWE = new Date(y,m,i).getDay()%6==0;
+        const target = getTargetHours(new Date(y,m,i), currentUser);
+        let ist = 0, pStr = "-"; let dispOut = log.out || log.type || "";
+        if(log.in && log.out) { 
+            let calcIn = log.in;
+            const cfg = db.config[currentUser][new Date(y,m,i).getDay()] || {start: "00:00"};
+            if(target > 0) calcIn = getKulanzStart(log.in, cfg.start);
+            let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+calcIn))/3600000); 
+            if(rawIst > 6.0) { pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); dispOut = getExtendedOutTime(ds, log.in, log.out); ist = safeFloat(rawIst); } else { ist = safeFloat(rawIst); } 
+        }
+        rows.push([i+"."+(m+1)+".", log.in||"", dispOut, pStr, safeFloat(ist).toFixed(2), safeFloat(target).toFixed(2), (safeFloat(ist)-safeFloat(target)).toFixed(2), log.note || ""]);
+    }
+    const ws = XLSX.utils.aoa_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Journal"); XLSX.writeFile(wb, `ZE_${currentUser}.xlsx`);
+}
+init();
+</script>
+</body>
+</html>
