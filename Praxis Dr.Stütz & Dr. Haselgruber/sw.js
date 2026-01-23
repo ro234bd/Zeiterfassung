@@ -1,7 +1,7 @@
-const CACHE_NAME = 'zeiterfassung-v1';
+const CACHE_NAME = 'ze-cache-sh-v1';
 const ASSETS = [
   './',
-  './Zeiterfassung3.50.html',
+  './index.html',
   './manifest.json'
 ];
 
