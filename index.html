@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeiterfassung | v4.05 Stütz & Haselgruber</title>
+    <title>Zeiterfassung | Praxis System</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -96,7 +96,7 @@
              <img id="loginLogoImg" src="" class="h-16 mx-auto object-contain">
         </div>
         <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800 text-center" id="loginTitleMain">Login</h2>
-        <p class="text-[10px] font-bold text-slate-400 uppercase mb-4 tracking-widest text-center" id="loginTitleSub">Zeiterfassung v4.05</p>
+        <p class="text-[10px] font-bold text-slate-400 uppercase mb-4 tracking-widest text-center" id="loginTitleSub">Zeiterfassung</p>
         
         <div id="loginSyncStatus" class="text-[10px] font-bold text-slate-400 uppercase text-center mb-6">● Bereit zum Start</div>
         <div class="space-y-4">
@@ -381,26 +381,38 @@
 
     </section>
 </div>
-
 <script>
-// --- CLOUD & STORAGE CONFIG ---
+// ==========================================
+// *** KUNDEN KONFIGURATION (HIER ÄNDERN) ***
+// ==========================================
+
+// 1. Die Google Script URL für DIESEN KUNDEN hier eintragen:
 const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwg3vKEz3JHYX4baAFsL5gyutGFGswoNsXzD8YEZFYVwwMuKP7uc0rbGMyfWua1dfgA/exec";
 
-// DB KEY LOGIC (Allows White-Labeling/Multi-Tenancy)
-const DEFAULT_DB_KEY = 'ze_profi_cloud_v3.86_FINAL'; 
-let DB_KEY = localStorage.getItem('ze_custom_db_key') || DEFAULT_DB_KEY;
+// 2. Ein eindeutiger Name für die Datenbank DIESES KUNDEN (z.B. ze_praxis_huber_v1)
+// WICHTIG: Muss für jeden Kunden anders sein!
+const DB_KEY = 'ze_profi_cloud_v3.86_FINAL'; 
 
+// ==========================================
+// *** SYSTEM LOGIC (NICHT ÄNDERN) ***
+// ==========================================
+
+// KILL-SWITCH: Löscht alte "Verwirrungen" aus dem Browser-Speicher,
+// um sicherzustellen, dass NUR die oben konfigurierte DB genutzt wird.
+if(localStorage.getItem('ze_custom_db_key') || localStorage.getItem('ze_cloud_url')) {
+    console.log("🧹 Bereinige Browser-Speicher für saubere Trennung...");
+    localStorage.removeItem('ze_custom_db_key');
+    localStorage.removeItem('ze_cloud_url');
+}
+
+// Interne Konstanten
 const USER_KEY = 'ze_session_user_v1'; 
-
 const WEEKDAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
-
-// SUPERUSER
 const SU_PASS_HASH = "Hk@b154132l";
-let isSuperuser = false;
 
-// CLOUD URL LOGIC
-let currentCloudUrl = localStorage.getItem('ze_cloud_url') || CLOUD_URL;
+let currentCloudUrl = CLOUD_URL; // Wir nutzen hart die Konstante
+let isSuperuser = false;
 
 // HELPER: Decimal Hours to HH:MM string
 function formatHM(val) {
@@ -470,15 +482,12 @@ function getKulanzStart(tatsZeit, sollBeginn) {
     return tatsZeit;
 }
 
-function getVisibleUsers() {
-    return db.users; 
-}
+function getVisibleUsers() { return db.users; }
 
-// HELPER: Calculate Target Hours with KW Logic
 function getTargetHours(dateObj, uName) {
     const dayIdx = dateObj.getDay();
-    if (dayIdx === 0 || dayIdx === 6) return 0; // Weekend always 0
-    if (holidaysDB[toLocalISO(dateObj)]) return 0; // Holiday always 0
+    if (dayIdx === 0 || dayIdx === 6) return 0; 
+    if (holidaysDB[toLocalISO(dateObj)]) return 0; 
 
     const cfg = db.config[uName][dayIdx] || { target: 0, start: "00:00", weekMode: "ALL" };
     let t = safeFloat(cfg.target);
@@ -486,9 +495,8 @@ function getTargetHours(dateObj, uName) {
 
     const kw = getISOWeek(dateObj);
     const mode = cfg.weekMode || "ALL";
-
-    if (mode === 'EVEN' && kw % 2 !== 0) return 0; // Mode Even, but week is Odd -> 0
-    if (mode === 'ODD' && kw % 2 === 0) return 0;  // Mode Odd, but week is Even -> 0
+    if (mode === 'EVEN' && kw % 2 !== 0) return 0; 
+    if (mode === 'ODD' && kw % 2 === 0) return 0;  
 
     return t;
 }
@@ -516,7 +524,6 @@ function renderTeamSchedule() {
     document.getElementById('teamScheduleOverlay').classList.remove('hidden');
 }
 
-// --- SYSTEM FUNCTIONS ---
 function applyTheme() {
     try {
         const col = db.settings.primaryColor || "#2563eb";
@@ -533,7 +540,6 @@ function applyTheme() {
             document.getElementById('headerLogoImg').src = db.settings.logo;
             document.getElementById('headerLogoImg').classList.remove('hidden');
             document.getElementById('headerTitleMain').classList.add('hidden'); 
-            
             document.getElementById('loginLogoImg').src = db.settings.logo;
             document.getElementById('loginLogoContainer').classList.remove('hidden');
         } else {
@@ -546,7 +552,6 @@ function applyTheme() {
 
 function saveSystemSettings() {
     if(!isSuperuser) return;
-    
     const title = document.getElementById('sysTitle').value;
     const col = document.getElementById('sysColor').value;
     const admPw = document.getElementById('sysAdminPw').value;
@@ -557,30 +562,10 @@ function saveSystemSettings() {
     if(col) db.settings.primaryColor = col;
     if(admPw) db.settings.adminPassword = admPw;
     
-    // DB Key Logic
+    // Warnung bei Key-Änderung im System-Menü (eigentlich nicht mehr nötig durch Hardcoding, aber als Fallback)
     if(newDbKey && newDbKey !== DB_KEY) {
-        if(confirm("ACHTUNG: Wenn du den DB-Key änderst, sind die aktuellen Daten (Lokal) nicht mehr sichtbar! Fortfahren?")) {
-            localStorage.setItem('ze_custom_db_key', newDbKey);
-        }
-    } else if(!newDbKey && localStorage.getItem('ze_custom_db_key')) {
-        // Reset to default if cleared
-        if(confirm("DB-Key auf Standard zurücksetzen?")) {
-            localStorage.removeItem('ze_custom_db_key');
-        }
-    }
-    
-    // URL Logic
-    if(newUrl && newUrl !== currentCloudUrl) {
-        if(confirm("ACHTUNG: Cloud-URL wird geändert. Wenn die URL falsch ist, geht der Sync nicht mehr. Fortfahren?")) {
-            let hist = JSON.parse(localStorage.getItem('ze_url_history') || "[]");
-            if(!hist.includes(currentCloudUrl)) {
-                hist.unshift(currentCloudUrl);
-                if(hist.length > 5) hist.pop();
-                localStorage.setItem('ze_url_history', JSON.stringify(hist));
-            }
-            currentCloudUrl = newUrl;
-            localStorage.setItem('ze_cloud_url', currentCloudUrl);
-        }
+        alert("ACHTUNG: DB-Key Änderung ist in dieser Version gesperrt. Bitte ändern Sie den Key direkt in der HTML-Datei (Zeile ~560), um Konflikte zu vermeiden.");
+        return; 
     }
     
     save().then(() => {
@@ -596,7 +581,7 @@ function clearLogo() {
         document.getElementById('sysLogoInput').value = "";
     }
 }
-// Logo Resize & Base64
+
 document.getElementById('sysLogoInput').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if(!file) return;
@@ -608,13 +593,12 @@ document.getElementById('sysLogoInput').addEventListener('change', function(e) {
         img.onload = function() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            const maxHeight = 100; // Limit height
+            const maxHeight = 100; 
             const scale = maxHeight / img.height;
             canvas.height = maxHeight;
             canvas.width = img.width * scale;
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             const dataUrl = canvas.toDataURL('image/png', 0.8);
-            
             if(!db.settings) db.settings = {};
             db.settings.logo = dataUrl;
             document.getElementById('sysLogoPreview').src = dataUrl;
@@ -625,24 +609,19 @@ document.getElementById('sysLogoInput').addEventListener('change', function(e) {
     reader.readAsDataURL(file);
 });
 
-
 function performLogin() {
     const user = document.getElementById('loginUserSelect').value;
     const pass = document.getElementById('loginPassInput').value;
     
-    // SUPERUSER CHECK
     if(pass === SU_PASS_HASH) {
         loggedInUser = "Admin"; 
         isSuperuser = true;
         sessionStorage.setItem(USER_KEY, loggedInUser);
         localStorage.setItem('ze_last_user', user);
-        
-        // Show System UI logic handled in startup block below
         startApp();
         return;
     }
 
-    // Normal Login
     let storedPass = "1234";
     if (user === "Admin") {
         storedPass = (db.settings && db.settings.adminPassword) ? db.settings.adminPassword : "Va19tti!";
@@ -655,7 +634,6 @@ function performLogin() {
         isSuperuser = false;
         sessionStorage.setItem(USER_KEY, loggedInUser); 
         localStorage.setItem('ze_last_user', loggedInUser);
-        
         startApp();
     } else {
         document.getElementById('loginErrorMsg').classList.remove('hidden');
@@ -693,35 +671,26 @@ function startApp() {
         
         if(isSuperuser) {
              document.getElementById('btn-system').classList.remove('hidden');
-             document.getElementById('suHeaderTools').classList.remove('hidden'); // SHOW WARP
+             document.getElementById('suHeaderTools').classList.remove('hidden'); 
              
-             // Load System Values
              document.getElementById('sysTitle').value = db.settings.companyName || "";
              document.getElementById('sysColor').value = db.settings.primaryColor || "#2563eb";
              document.getElementById('sysColorVal').innerText = db.settings.primaryColor || "#2563eb";
              document.getElementById('sysAdminPw').value = db.settings.adminPassword || "";
-             document.getElementById('sysCloudUrl').value = currentCloudUrl;
-             document.getElementById('sysDbKey').value = DB_KEY; // Show current key
+             document.getElementById('sysCloudUrl').value = CLOUD_URL; // Read-Only
+             document.getElementById('sysDbKey').value = DB_KEY; // Read-Only
 
              if(db.settings.logo) {
                 document.getElementById('sysLogoPreview').src = db.settings.logo;
                 document.getElementById('sysLogoPreview').classList.remove('hidden');
              }
-             // History
-             const hist = JSON.parse(localStorage.getItem('ze_url_history') || "[]");
-             const hDiv = document.getElementById('urlHistory'); hDiv.innerHTML = "";
-             hist.forEach(url => {
-                hDiv.innerHTML += `<span onclick="document.getElementById('sysCloudUrl').value='${url}'" class="cursor-pointer bg-slate-800 text-slate-400 text-[9px] px-2 py-1 rounded border border-slate-600 hover:text-white truncate max-w-[150px]">${url}</span>`;
-             });
-             
-             renderSystemMessages(); // Load inbox
+             renderSystemMessages(); 
         } else {
              document.getElementById('btn-system').classList.add('hidden');
              document.getElementById('suHeaderTools').classList.add('hidden');
         }
         
         currentUser = db.users[0]; 
-
         const cl = document.getElementById('cleanUserSelect'); cl.innerHTML = "<option value='ALL'>ALLE MITARBEITER</option>";
         getVisibleUsers().forEach(u => { if(u!=='Admin') { let o = document.createElement('option'); o.value = u; o.innerText = u; cl.appendChild(o); } });
 
@@ -733,7 +702,6 @@ function startApp() {
         document.getElementById('suHeaderTools').classList.add('hidden');
         currentUser = loggedInUser;
     }
-    
     renderUserSelect();
     document.getElementById('userSelect').value = currentUser;
     renderAll();
@@ -748,8 +716,6 @@ function doLogout() {
     document.getElementById('loginPassInput').value = "";
     document.getElementById('btn-system').classList.add('hidden');
     document.getElementById('suHeaderTools').classList.add('hidden');
-    
-    // Dropdown wieder auf letzten User setzen für Komfort
     const lastUser = localStorage.getItem('ze_last_user');
     if(lastUser) document.getElementById('loginUserSelect').value = lastUser;
 }
@@ -788,7 +754,7 @@ async function init() {
         if(!db.users.includes("Admin")) db.users.push("Admin");
         if(!db.passwords) db.passwords = {};
         if(!db.messages) db.messages = []; 
-        if(!db.settings) db.settings = {}; // Settings Init
+        if(!db.settings) db.settings = {}; 
         
         db.users.forEach(u => {
             if (!db.config[u]) { db.config[u] = {}; }
@@ -815,7 +781,6 @@ async function init() {
              let o = document.createElement('option'); o.value = "Admin"; o.innerText = "Admin"; ls.appendChild(o);
         }
         
-        // LAST LOGIN MEMORY
         const lastUser = localStorage.getItem('ze_last_user');
         if(lastUser && db.users.includes(lastUser)) {
             ls.value = lastUser;
@@ -831,17 +796,12 @@ async function init() {
 
         fetchHolidays();
         fetchSchoolHolidays();
-        applyTheme(); // INITIAL THEME APPLY
+        applyTheme(); 
         
-        // AUTO LOGIN CHECK - Now using sessionStorage
         const savedUser = sessionStorage.getItem(USER_KEY);
         if(savedUser && db.users.includes(savedUser)) {
              document.getElementById('loginUserSelect').value = savedUser;
              loggedInUser = savedUser;
-             
-             // Check if Admin/Superuser
-             // This simple auto-login doesn't persist Superuser state well across refreshes without storing it unsafe
-             // So we re-check standard login.
              startApp();
              syncFromCloud(); 
         } else {
@@ -857,8 +817,8 @@ async function syncFromCloud() {
     const statusDiv = document.getElementById('syncStatus');
     const loginSync = document.getElementById('loginSyncStatus');
     
-    // USE STORED URL OR DEFAULT
-    const targetUrl = currentCloudUrl || CLOUD_URL;
+    // Always use hardcoded CLOUD_URL
+    const targetUrl = CLOUD_URL;
 
     try {
         const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 5000); 
@@ -870,7 +830,7 @@ async function syncFromCloud() {
             const cloudDb = await r.json();
             if(cloudDb && cloudDb.users && Array.isArray(cloudDb.users)) {
                 db = cloudDb;
-                if(!db.settings) db.settings = {}; // Fix for cloud data missing settings
+                if(!db.settings) db.settings = {}; 
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
                 statusDiv.innerText = "● Daten geladen"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
                 if(loginSync) { loginSync.innerText = "● Online (Daten da!)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
@@ -884,13 +844,12 @@ async function syncFromCloud() {
                      if(db.users.includes("Admin") && !getVisibleUsers().includes("Admin")) {
                         let o = document.createElement('option'); o.value = "Admin"; o.innerText = "Admin"; ls.appendChild(o);
                     }
-                    // RE-APPLY MEMORY AFTER SYNC
                     const lastUser = localStorage.getItem('ze_last_user');
                     if(lastUser && db.users.includes(lastUser)) {
                         ls.value = lastUser;
                     }
                 }
-                applyTheme(); // Re-apply theme after sync
+                applyTheme(); 
             } 
         }
     } catch(e) { 
@@ -938,10 +897,8 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
     let endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
     while (iter <= endIter) {
         const dStr = toLocalISO(iter); const log = logs[dStr] || {};
-        
-        // Use new helper for target calculation
         const target = getTargetHours(iter, userName);
-        const isH = holidaysDB[dStr], isWE = iter.getDay()%6==0; // Still need these for row coloring logic inside loop, but target is handled.
+        const isH = holidaysDB[dStr], isWE = iter.getDay()%6==0; 
         
         let ist = 0;
         
@@ -958,10 +915,10 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
             
             let calcIn = log.in;
             const cfg = db.config[userName][iter.getDay()] || {start: "00:00"};
-            if(target > 0) calcIn = getKulanzStart(log.in, cfg.start); // Kulanz only if target > 0
+            if(target > 0) calcIn = getKulanzStart(log.in, cfg.start); 
             
             let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
-            if(target === 0) ist = safeFloat(rawDiff); // Full time counts if target 0
+            if(target === 0) ist = safeFloat(rawDiff); 
             else ist = safeFloat(rawDiff); 
         }
         totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
@@ -986,14 +943,12 @@ function renderLogs() {
     for (let i = 1; i <= new Date(y, m+1, 0).getDate(); i++) {
         const d = new Date(y, m, i), dStr = toLocalISO(d), log = (db.logs[currentUser]||{})[dStr] || {};
         const isH = holidaysDB[dStr], isWE = d.getDay()%6==0;
-        
-        // Use new helper
         const target = getTargetHours(d, currentUser);
         
         let ist = 0, pauseDisplay = "-", dispOut = log.out || "-";
         let rowClass = ''; 
-        
         let isFree = false;
+        
         if (target === 0 && !log.type && !log.in && !log.note && !isH && !isWE) {
             dispOut = "Frei";
             rowClass = 'row-free';
@@ -1002,12 +957,8 @@ function renderLogs() {
 
         if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
             ist = target; 
-            if(target === 0) {
-                 // Free day due to odd/even week, but marked as vacation -> display but 0 hours
-                 dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
-            } else {
-                 dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type; 
-            }
+            if(target === 0) dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
+            else dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type; 
         }
         else if (log.type === 'ZA') { ist = 0; dispOut = "ZA"; }
         else if (log.type === 'Sonstiges') { 
@@ -1131,10 +1082,7 @@ async function save() {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
     const statusDiv = document.getElementById('syncStatus');
     const loginSync = document.getElementById('loginSyncStatus');
-    
-    // USE STORED URL OR DEFAULT
-    const targetUrl = currentCloudUrl || CLOUD_URL;
-    
+    const targetUrl = CLOUD_URL;
     try {
         await fetch(targetUrl, { method:'POST', mode:'no-cors', body: JSON.stringify(db) });
         statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
@@ -1158,66 +1106,43 @@ function generateMonthNode(y, m, mini = false) {
             const day = i - offset + 1, d = new Date(y, m, day), dStr = toLocalISO(d);
             const isH = holidaysDB[dStr], isF = schoolHolidays.find(f => dStr >= f.s && dStr <= f.e);
             cell.innerHTML = `<b>${day}</b>`;
-            
-            if(isH) { 
-                cell.classList.add('row-holiday'); cell.innerHTML += `<div class='text-[7px] leading-tight'>${isH}</div>`; 
-            } else if(d.getDay() === 6) { 
-                cell.classList.add('row-weekend'); 
-            } else if(d.getDay() === 0) { 
-                cell.classList.add('row-sunday'); 
-            } else if(isF && showFerien) { 
-                cell.classList.add('row-school-holiday'); if(dStr === isF.s) cell.innerHTML += `<div class='text-[7px] text-blue-500 font-black mt-1 leading-none uppercase'>${isF.n}</div>`; 
-            }
+            if(isH) { cell.classList.add('row-holiday'); cell.innerHTML += `<div class='text-[7px] leading-tight'>${isH}</div>`; }
+            else if(d.getDay() === 6) { cell.classList.add('row-weekend'); }
+            else if(d.getDay() === 0) { cell.classList.add('row-sunday'); }
+            else if(isF && showFerien) { cell.classList.add('row-school-holiday'); if(dStr === isF.s) cell.innerHTML += `<div class='text-[7px] text-blue-500 font-black mt-1 leading-none uppercase'>${isF.n}</div>`; }
             
             if(showTeamView) {
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
                     const uLog = (db.logs[u]||{})[dStr] || {};
-                    const uConfig = db.config[u][d.getDay()] || {target:0};
                     const target = getTargetHours(d, u);
-
                     if(uLog.type) {
                         if (uLog.type === 'Krank') return;
-                        
                         const typesToHide = ['Urlaub', 'Betriebsurlaub', 'ZA'];
-                        if (typesToHide.includes(uLog.type)) {
-                            if (target === 0) return;
-                        }
+                        if (typesToHide.includes(uLog.type)) { if (target === 0) return; }
                         let cl = "bg-blue-50 text-blue-700 border-blue-200"; 
                         if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') cl="bg-emerald-50 text-emerald-700 border-emerald-200"; 
                         if(uLog.type==='Schulung') cl="bg-purple-100 text-purple-700 border-purple-200";
                         if(uLog.type==='Sonstiges') cl="bg-yellow-50 text-yellow-700 border-yellow-200";
                         if(uLog.type==='ZA') cl="bg-cyan-50 text-cyan-700 border-cyan-200";
-                        
                         let label = u.split(' ')[0];
                         if(uLog.type==='Schulung' && uLog.range) label += ` (${uLog.range})`;
-                        else if(uLog.type==='Sonstiges' && uLog.title) {
-                            label += ` (${uLog.title}`;
-                            if(uLog.range) label += `, ${uLog.range}`;
-                            label += `)`;
-                        }
+                        else if(uLog.type==='Sonstiges' && uLog.title) { label += ` (${uLog.title}`; if(uLog.range) label += `, ${uLog.range}`; label += `)`; }
                         else if(uLog.type!=='Urlaub'&&uLog.type!=='Betriebsurlaub') label += `: ${uLog.type}`;
-                        
                         cell.innerHTML += `<div class='cal-entry ${cl}'>${label}</div>`;
                     }
                 });
             } else {
                 const log = (db.logs[currentUser]||{})[dStr] || {};
-                
-                // Use new helper
                 const target = getTargetHours(d, currentUser);
-
                 if(log && log.type) { 
                     let showLog = true;
                     const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
-                    if (typesToHide.includes(log.type)) {
-                         if (target === 0) showLog = false;
-                    }
-
+                    if (typesToHide.includes(log.type)) { if (target === 0) showLog = false; }
                     if(showLog) {
                         if(!isH && d.getDay() !== 6 && d.getDay() !== 0) {
                             if(log.type==='Urlaub' || log.type==='Betriebsurlaub') cell.classList.add('row-vacation'); 
-                            else if(log.type==='ZA') { /* row-za style ist nur für Tabelle definiert, wir nutzen hier custom style */ }
+                            else if(log.type==='ZA') { }
                             else if(log.type==='Schulung') cell.classList.add('row-schulung');
                             else if(log.type==='Sonstiges') cell.classList.add('row-custom');
                             else cell.classList.add('bg-amber-50'); 
@@ -1225,7 +1150,6 @@ function generateMonthNode(y, m, mini = false) {
                         let txt = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
                         if(log.type === 'Sonstiges' && log.title) txt = log.title;
                         if(log.type === 'Schulung' && log.range) txt = "Schulung (" + log.range + ")";
-                        
                         let extraClass = log.type === 'ZA' ? 'bg-cyan-50 text-cyan-800 border border-cyan-200' : '';
                         cell.innerHTML += `<div class='cal-entry ${extraClass}'>${txt}</div>`; 
                     }
@@ -1272,56 +1196,35 @@ function renderCalendar() {
                     if (u === "Admin") return;
                     const uLog = (db.logs[u]||{})[dStr] || {};
                     const target = getTargetHours(d, u);
-
                     if(uLog.type) { 
                         if (uLog.type === 'Krank') return;
-                        
                         const typesToHide = ['Urlaub', 'Betriebsurlaub', 'ZA'];
-                        if (typesToHide.includes(uLog.type)) {
-                            if (target === 0) return;
-                        }
+                        if (typesToHide.includes(uLog.type)) { if (target === 0) return; }
                         let col = "theme-text theme-dim-bg"; 
                         if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') col="text-emerald-700 bg-emerald-50"; 
                         if(uLog.type==='Schulung') col="text-purple-700 bg-purple-50";
                         if(uLog.type==='Sonstiges') col="text-yellow-700 bg-yellow-50";
                         if(uLog.type==='ZA') col="text-cyan-700 bg-cyan-50 border border-cyan-200"; 
-                        
                         let txt = u.split(' ')[0];
                         if(uLog.type==='Schulung' && uLog.range) txt += ` (${uLog.range})`;
-                        else if(uLog.type==='Sonstiges' && uLog.title) {
-                            txt += ` (${uLog.title}`;
-                            if(uLog.range) txt += `, ${uLog.range}`;
-                            txt += `)`;
-                        }
+                        else if(uLog.type==='Sonstiges' && uLog.title) { txt += ` (${uLog.title}`; if(uLog.range) txt += `, ${uLog.range}`; txt += `)`; }
                         else if(uLog.type!=='Urlaub'&&uLog.type!=='Betriebsurlaub') txt += `: ${uLog.type}`;
-                        
                         content += `<div class='text-[8px] font-bold ${col} p-1 rounded mt-1 border truncate'>${txt}</div>`; 
                     }
                 });
             } else {
                 const log = (db.logs[currentUser]||{})[dStr] || {};
                 let dt = (log.in ? log.in + ' - ' + (getExtendedOutTime(dStr, log.in, log.out) || '') : '');
-                
-                // Use new helper
                 const target = getTargetHours(d, currentUser);
-                
                 let typeDisplay = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
                 if(log.type === 'Sonstiges' && log.title) typeDisplay = log.title;
                 if(log.type === 'Schulung' && log.range) typeDisplay = "Schulung (" + log.range + ")";
-
                 const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
-                if (typesToHide.includes(log.type)) {
-                     if (target === 0) typeDisplay = "";
-                }
-                
-                if (!typeDisplay && !isH && d.getDay() !== 0 && d.getDay() !== 6 && target === 0 && !log.in && !log.note) {
-                     typeDisplay = "Frei";
-                }
-                
+                if (typesToHide.includes(log.type)) { if (target === 0) typeDisplay = ""; }
+                if (!typeDisplay && !isH && d.getDay() !== 0 && d.getDay() !== 6 && target === 0 && !log.in && !log.note) { typeDisplay = "Frei"; }
                 let textColor = "theme-text";
                 if(typeDisplay === "Frei") textColor = "text-slate-400 italic";
                 if(log.type === 'ZA') textColor = "text-cyan-600 font-black"; 
-
                 content += `<p class="text-[10px] mt-2 font-bold ${textColor} truncate">${isH || typeDisplay || dt}</p>`;
             }
             grid.innerHTML += `<div class="p-4 bg-white border rounded-xl shadow-sm ${isH?'row-holiday':''}">${content}</div>`;
@@ -1335,14 +1238,12 @@ function punch(t) {
     if (currentUser === "Admin") return; 
     const n = getNow(), ds = toLocalISO(n);
     let ts = n.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
-
     const isWE = n.getDay() === 0 || n.getDay() === 6;
     const isH = holidaysDB[ds];
     if (t === 'in' && !isWE && !isH) {
         const config = (db.config[currentUser] && db.config[currentUser][n.getDay()]) ? db.config[currentUser][n.getDay()] : {start:"00:00"};
         ts = getKulanzStart(ts, config.start);
     }
-
     if(!db.logs[currentUser]) db.logs[currentUser] = {}; if(t==='in') db.logs[currentUser][ds] = {in:ts, out:null}; else if(db.logs[currentUser][ds]) db.logs[currentUser][ds].out=ts; save(); renderAll();
 }
 function switchUser() { 
@@ -1352,7 +1253,6 @@ function switchUser() {
 }
 function renderAll() { 
     document.getElementById('displayUserName').innerText = currentUser;
-
     if(currentUser === 'Admin') {
         document.getElementById('punchButtonsArea').classList.add('hidden');
         document.getElementById('adminPunchPlaceholder').classList.remove('hidden');
@@ -1362,7 +1262,6 @@ function renderAll() {
         document.getElementById('adminPunchPlaceholder').classList.add('hidden');
         renderTodayInfo();
     }
-
     renderLogs(); renderCalendar(); renderWeeklySettings(); renderAdminConfigs(); applyTheme();
 }
 function showTab(id) { document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden')); document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active')); document.getElementById('tab-'+id).classList.remove('hidden'); document.getElementById('btn-'+id).classList.add('tab-active'); renderAll(); }
@@ -1383,29 +1282,13 @@ function renderWeeklySettings() {
         const selAll = (!c.weekMode || c.weekMode === 'ALL') ? 'selected' : '';
         const selEven = (c.weekMode === 'EVEN') ? 'selected' : '';
         const selOdd = (c.weekMode === 'ODD') ? 'selected' : '';
-        
-        cont.innerHTML += `<div class="flex flex-col md:flex-row items-start md:items-center gap-2 p-3 bg-slate-50 rounded-lg border italic">
-            <span class="w-16 font-bold text-xs uppercase">${WEEKDAYS_SHORT[i]}</span>
-            <div class="flex items-center gap-2">
-                <input type="time" id="ws_${i}" value="${c.start}" class="border p-1 rounded text-xs">
-                <input type="number" id="wt_${i}" value="${c.target}" step="0.5" class="border p-1 rounded w-16 text-right text-xs font-black"> <span class="text-xs">h</span>
-            </div>
-            <select id="wm_${i}" class="text-[10px] border rounded bg-white p-1">
-                <option value="ALL" ${selAll}>Jede Woche</option>
-                <option value="EVEN" ${selEven}>Gerade KW (2,4..)</option>
-                <option value="ODD" ${selOdd}>Ungerade KW (1,3..)</option>
-            </select>
-        </div>`; 
+        cont.innerHTML += `<div class="flex flex-col md:flex-row items-start md:items-center gap-2 p-3 bg-slate-50 rounded-lg border italic"><span class="w-16 font-bold text-xs uppercase">${WEEKDAYS_SHORT[i]}</span><div class="flex items-center gap-2"><input type="time" id="ws_${i}" value="${c.start}" class="border p-1 rounded text-xs"><input type="number" id="wt_${i}" value="${c.target}" step="0.5" class="border p-1 rounded w-16 text-right text-xs font-black"> <span class="text-xs">h</span></div><select id="wm_${i}" class="text-[10px] border rounded bg-white p-1"><option value="ALL" ${selAll}>Jede Woche</option><option value="EVEN" ${selEven}>Gerade KW (2,4..)</option><option value="ODD" ${selOdd}>Ungerade KW (1,3..)</option></select></div>`; 
     }
 }
 function saveWeekly() { 
     if(currentUser==="Admin") return;
     for(let i=1; i<=5; i++) { 
-        db.config[currentUser][i] = { 
-            start: document.getElementById('ws_'+i).value, 
-            target: parseFloat(document.getElementById('wt_'+i).value) || 0,
-            weekMode: document.getElementById('wm_'+i).value 
-        }; 
+        db.config[currentUser][i] = { start: document.getElementById('ws_'+i).value, target: parseFloat(document.getElementById('wt_'+i).value) || 0, weekMode: document.getElementById('wm_'+i).value }; 
     } 
     save(); alert("Plan gespeichert!"); renderAll(); 
 }
@@ -1414,57 +1297,31 @@ function addPlanningRange() {
     const start = document.getElementById('planStart').value, end = document.getElementById('planEnd').value, type = document.getElementById('planType').value;
     if(start) {
         let current = new Date(start), finish = end ? new Date(end) : new Date(start);
-        
         let customTitle = null, customValue = null, customRange = null, schulungRange = null;
         let forAll = false;
-
         if(type === 'Sonstiges') {
-            customTitle = prompt("Titel für den Eintrag (z.B. Teamsitzung):");
-            if(!customTitle) return;
+            customTitle = prompt("Titel für den Eintrag (z.B. Teamsitzung):"); if(!customTitle) return;
             customRange = prompt("Zeitraum (z.B. 12:00 - 14:00) - Optional:", "");
             customValue = prompt("Stundenanzahl (Optional - leer lassen für Tagessoll):", "");
-            if(confirm("Soll dieser Eintrag für ALLE Mitarbeiter gelten?\nOK = Ja, für alle\nAbbrechen = Nein, nur für " + currentUser)) {
-                forAll = true;
-            }
+            if(confirm("Soll dieser Eintrag für ALLE Mitarbeiter gelten?\nOK = Ja, für alle\nAbbrechen = Nein, nur für " + currentUser)) { forAll = true; }
         }
         if(type === 'Schulung') {
-            schulungRange = prompt("Zeitraum (z.B. 09:00 - 12:00):");
-            if(!schulungRange) return;
-            if(confirm("Soll diese Schulung für ALLE Mitarbeiter gelten?\nOK = Ja, für alle\nAbbrechen = Nein, nur für " + currentUser)) {
-                forAll = true;
-            }
+            schulungRange = prompt("Zeitraum (z.B. 09:00 - 12:00):"); if(!schulungRange) return;
+            if(confirm("Soll diese Schulung für ALLE Mitarbeiter gelten?\nOK = Ja, für alle\nAbbrechen = Nein, nur für " + currentUser)) { forAll = true; }
         }
-
         let targets = [currentUser];
-        if(type === 'Betriebsurlaub' || type === 'DELETE_BU' || type === 'DELETE_ALL' || forAll) {
-            targets = getVisibleUsers().filter(u => u !== 'Admin');
-        } else if (currentUser === 'Admin' && !forAll) {
-            alert("Admin hat keine Urlaubsfunktion."); return;
-        }
-
+        if(type === 'Betriebsurlaub' || type === 'DELETE_BU' || type === 'DELETE_ALL' || forAll) { targets = getVisibleUsers().filter(u => u !== 'Admin'); } else if (currentUser === 'Admin' && !forAll) { alert("Admin hat keine Urlaubsfunktion."); return; }
         while(current <= finish) { 
             const dIso = toLocalISO(current);
             targets.forEach(u => {
                 if(!db.logs[u]) db.logs[u] = {}; 
-                
-                if(type === 'DELETE_BU') {
-                    if(db.logs[u][dIso]?.type === 'Betriebsurlaub') delete db.logs[u][dIso];
-                } else if(type === "DELETE") {
-                    delete db.logs[u][dIso]; 
-                } else if(type === "DELETE_ALL") {
-                     if(db.logs[u][dIso]) delete db.logs[u][dIso];
-                } else {
-                    let entry = db.logs[u][dIso] || {};
-                    entry.type = type;
-                    
-                    if(type === 'Sonstiges') {
-                        entry.title = customTitle;
-                        if(customValue !== "") entry.value = customValue;
-                        if(customRange !== "") entry.range = customRange;
-                    }
-                    if(type === 'Schulung') {
-                        entry.range = schulungRange;
-                    }
+                if(type === 'DELETE_BU') { if(db.logs[u][dIso]?.type === 'Betriebsurlaub') delete db.logs[u][dIso]; } 
+                else if(type === "DELETE") { delete db.logs[u][dIso]; } 
+                else if(type === "DELETE_ALL") { if(db.logs[u][dIso]) delete db.logs[u][dIso]; } 
+                else {
+                    let entry = db.logs[u][dIso] || {}; entry.type = type;
+                    if(type === 'Sonstiges') { entry.title = customTitle; if(customValue !== "") entry.value = customValue; if(customRange !== "") entry.range = customRange; }
+                    if(type === 'Schulung') { entry.range = schulungRange; }
                     db.logs[u][dIso] = entry; 
                 }
             });
@@ -1486,68 +1343,39 @@ function renderTodayInfo() {
 
 function editEntry(d) {
     if(currentUser === "Admin") return alert("Admin kann nicht stempeln/bearbeiten.");
-    
-    // Check Signature Lock
-    const dObj = new Date(d);
-    const key = dObj.getFullYear() + "-" + dObj.getMonth();
+    const dObj = new Date(d); const key = dObj.getFullYear() + "-" + dObj.getMonth();
     const sigData = (db.config[currentUser]?.signatures || {})[key];
-    if(sigData && sigData.signed) {
-        return alert("⛔ Monat ist abgeschlossen/signiert! Änderungen nicht mehr möglich.");
-    }
-
+    if(sigData && sigData.signed) { return alert("⛔ Monat ist abgeschlossen/signiert! Änderungen nicht mehr möglich."); }
     editingDateStr = d;
     const log = (db.logs[currentUser]||{})[d] || {in:'', out:'', note:'', type:''};
-    
     document.getElementById('editorDateDisplay').innerText = new Date(d).toLocaleDateString('de-DE', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
     document.getElementById('editIn').value = log.in || '';
     document.getElementById('editOut').value = log.out || '';
     document.getElementById('editNote').value = log.note || '';
     document.getElementById('editType').value = log.type || '';
-    
     document.getElementById('dayEditorOverlay').classList.remove('hidden');
 }
 
-function closeDayEditor() {
-    document.getElementById('dayEditorOverlay').classList.add('hidden');
-    editingDateStr = null;
-}
-
+function closeDayEditor() { document.getElementById('dayEditorOverlay').classList.add('hidden'); editingDateStr = null; }
 function saveDayEditor() {
     if(!editingDateStr) return;
-    const i = document.getElementById('editIn').value;
-    const o = document.getElementById('editOut').value;
-    const n = document.getElementById('editNote').value.trim();
-    const t = document.getElementById('editType').value;
-
+    const i = document.getElementById('editIn').value; const o = document.getElementById('editOut').value;
+    const n = document.getElementById('editNote').value.trim(); const t = document.getElementById('editType').value;
     if(!db.logs[currentUser]) db.logs[currentUser] = {};
-
-    if(!i && !o && !n && !t) {
-        delete db.logs[currentUser][editingDateStr];
-    } else {
+    if(!i && !o && !n && !t) { delete db.logs[currentUser][editingDateStr]; } 
+    else {
         let entry = db.logs[currentUser][editingDateStr] || {};
-        entry.in = i;
-        entry.out = o;
-        entry.note = n;
-        entry.type = t;
-        
-        if(!entry.in) delete entry.in;
-        if(!entry.out) delete entry.out;
-        if(!entry.note) delete entry.note;
-        if(!entry.type) delete entry.type;
-        
+        entry.in = i; entry.out = o; entry.note = n; entry.type = t;
+        if(!entry.in) delete entry.in; if(!entry.out) delete entry.out; if(!entry.note) delete entry.note; if(!entry.type) delete entry.type;
         db.logs[currentUser][editingDateStr] = entry;
     }
-    
     save(); renderAll(); closeDayEditor();
 }
 
 function deleteDayEntry() {
     if(!editingDateStr) return;
     if(confirm("Eintrag für diesen Tag wirklich komplett löschen?")) {
-        if(db.logs[currentUser] && db.logs[currentUser][editingDateStr]) {
-            delete db.logs[currentUser][editingDateStr];
-            save(); renderAll();
-        }
+        if(db.logs[currentUser] && db.logs[currentUser][editingDateStr]) { delete db.logs[currentUser][editingDateStr]; save(); renderAll(); }
         closeDayEditor();
     }
 }
@@ -1555,31 +1383,21 @@ function deleteDayEntry() {
 function adminClearData() {
     if(loggedInUser !== "Admin") return;
     const targetUser = document.getElementById('cleanUserSelect').value;
-    const sStr = document.getElementById('cleanStart').value;
-    const eStr = document.getElementById('cleanEnd').value;
-    
+    const sStr = document.getElementById('cleanStart').value; const eStr = document.getElementById('cleanEnd').value;
     if(!sStr || !eStr) return alert("Bitte Start- und Enddatum wählen.");
     if(!confirm(`ACHTUNG: Wirklich alle Daten für ${targetUser === 'ALL' ? 'ALLE Mitarbeiter' : targetUser} im Zeitraum ${sStr} bis ${eStr} unwiderruflich löschen?`)) return;
-    
-    let start = new Date(sStr);
-    let end = new Date(eStr);
-    let count = 0;
+    let start = new Date(sStr); let end = new Date(eStr); let count = 0;
     const usersToClean = targetUser === 'ALL' ? db.users : [targetUser];
-    
     usersToClean.forEach(u => {
         if(db.logs[u]) {
             let loop = new Date(start);
             while(loop <= end) {
                 const dIso = toLocalISO(loop);
-                if(db.logs[u][dIso]) {
-                    delete db.logs[u][dIso];
-                    count++;
-                }
+                if(db.logs[u][dIso]) { delete db.logs[u][dIso]; count++; }
                 loop.setDate(loop.getDate() + 1);
             }
         }
     });
-    
     save(); renderAll(); alert(`${count} Einträge gelöscht.`);
 }
 
@@ -1593,10 +1411,7 @@ function performSignature(key) {
 }
 function resetSignature(key) {
     if(!confirm("Signatur wirklich entfernen? Der Monat ist dann wieder offen.")) return;
-    if(db.config[currentUser]?.signatures?.[key]) {
-        delete db.config[currentUser].signatures[key];
-        save(); renderLogs();
-    }
+    if(db.config[currentUser]?.signatures?.[key]) { delete db.config[currentUser].signatures[key]; save(); renderLogs(); }
 }
 
 function changePassword() {
@@ -1606,28 +1421,29 @@ function changePassword() {
     if(newPw.length < 4) return alert("Passwort muss mindestens 4 Zeichen haben!");
     if(newPw !== confirmPw) return alert("Passwörter stimmen nicht überein!");
     
-    if(!db.passwords) db.passwords = {}; db.passwords[currentUser] = newPw; save(); 
+    // FIX: Unterscheidung zwischen Admin und normalem User
+    if(currentUser === "Admin") {
+        if(!db.settings) db.settings = {};
+        db.settings.adminPassword = newPw;
+    } else {
+        if(!db.passwords) db.passwords = {}; 
+        db.passwords[currentUser] = newPw; 
+    }
+    
+    save(); 
     alert("Passwort erfolgreich geändert!");
-    document.getElementById('newPwInput').value = "";
+    document.getElementById('newPwInput').value = ""; 
     document.getElementById('newPwConfirm').value = "";
 }
-
 function sendDevMessage() {
     const txt = document.getElementById('devMsgText').value; if(!txt) return;
-    if(!db.messages) db.messages = []; 
-    db.messages.push({from: currentUser, date: new Date().toISOString(), text: txt}); 
-    save(); 
-    document.getElementById('devMsgText').value = ""; 
-    alert("Nachricht gesendet!");
+    if(!db.messages) db.messages = []; db.messages.push({from: currentUser, date: new Date().toISOString(), text: txt}); save(); 
+    document.getElementById('devMsgText').value = ""; alert("Nachricht gesendet!");
 }
 
 function deleteMessage(index) {
     if(!confirm("Nachricht löschen?")) return;
-    db.messages.splice(index, 1);
-    save();
-    
-    // Refresh both inboxes
-    renderAdminConfigs();
+    db.messages.splice(index, 1); save(); renderAdminConfigs();
     if(isSuperuser) renderSystemMessages();
 }
 
@@ -1637,75 +1453,46 @@ function adminAddUser() {
     if(name && name.trim() !== "") {
         if(db.users.includes(name)) return alert("User existiert bereits!");
         db.users.push(name);
-        
-        // Init defaults for new user
         db.config[name] = {};
         for(let d=1; d<=5; d++) db.config[name][d] = { start: "08:00", target: 8, weekMode: "ALL" };
-        db.config[name][0] = { start: "00:00", target: 0 };
-        db.config[name][6] = { start: "00:00", target: 0 };
+        db.config[name][0] = { start: "00:00", target: 0 }; db.config[name][6] = { start: "00:00", target: 0 };
         db.admin[name] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
         db.passwords[name] = "1234";
-
-        save();
-        alert(`Mitarbeiter ${name} angelegt.`);
-        window.location.reload();
+        save(); alert(`Mitarbeiter ${name} angelegt.`); window.location.reload();
     }
 }
 
 function adminDeleteUser(name) {
     if(loggedInUser !== "Admin") return;
     if(name === "Admin") return alert("Der Administrator kann nicht gelöscht werden."); 
-    
     if(!confirm(`Benutzer "${name}" wirklich LÖSCHEN?\nAlle Daten gehen verloren!`)) return;
     if(!confirm(`Sicher? Das kann nicht rückgängig gemacht werden.`)) return;
-    
     const idx = db.users.indexOf(name);
     if(idx > -1) {
         db.users.splice(idx, 1);
-        delete db.logs[name];
-        delete db.config[name];
-        delete db.passwords[name];
-        delete db.admin[name];
-        
-        save();
-        alert("Benutzer gelöscht.");
-        window.location.reload();
+        delete db.logs[name]; delete db.config[name]; delete db.passwords[name]; delete db.admin[name];
+        save(); alert("Benutzer gelöscht."); window.location.reload();
     }
 }
 
 function testFillMonth() {
     if(!loggedInUser === 'Admin') return;
     if(!confirm(`ACHTUNG: Füllt den aktuellen Monat (${MONTH_NAMES[parseInt(document.getElementById('viewMonth').value)]}) für ${currentUser} mit Standard-Arbeitszeiten! Vorhandene Einträge werden überschrieben.`)) return;
-    
-    const y = parseInt(document.getElementById('viewYear').value);
-    const m = parseInt(document.getElementById('viewMonth').value);
-    const daysInMonth = new Date(y, m + 1, 0).getDate();
-    const user = currentUser;
-
+    const y = parseInt(document.getElementById('viewYear').value); const m = parseInt(document.getElementById('viewMonth').value);
+    const daysInMonth = new Date(y, m + 1, 0).getDate(); const user = currentUser;
     if(!db.logs[user]) db.logs[user] = {};
-
     for(let i=1; i<=daysInMonth; i++) {
-        const d = new Date(y, m, i);
-        const dStr = toLocalISO(d);
+        const d = new Date(y, m, i); const dStr = toLocalISO(d);
         if(holidaysDB[dStr]) continue; 
-        
         const target = getTargetHours(d, user);
-        
-        // If target is 0 due to even/odd week logic, do NOT autofill
         if(target > 0) {
             const dayCfg = db.config[user][d.getDay()];
             let [h, min] = dayCfg.start.split(':').map(Number);
-            let minutesIn = h * 60 + min;
-            let workMinutes = dayCfg.target * 60;
+            let minutesIn = h * 60 + min; let workMinutes = dayCfg.target * 60;
             if(dayCfg.target > 6) workMinutes += 30; 
-
             let totalMinutes = minutesIn + workMinutes;
-            let endH = Math.floor(totalMinutes / 60);
-            let endM = totalMinutes % 60;
-
-            let sIn = dayCfg.start;
-            let sOut = String(endH).padStart(2,'0') + ":" + String(endM).padStart(2,'0');
-
+            let endH = Math.floor(totalMinutes / 60); let endM = totalMinutes % 60;
+            let sIn = dayCfg.start; let sOut = String(endH).padStart(2,'0') + ":" + String(endM).padStart(2,'0');
             db.logs[user][dStr] = { in: sIn, out: sOut, type: "" };
         }
     }
@@ -1714,193 +1501,116 @@ function testFillMonth() {
 
 function renderAdminConfigs() {
     if(loggedInUser !== "Admin") { document.getElementById('adminUserConfig').innerHTML = "<p>Zugriff verweigert.</p>"; return; }
-    
-    const selectedEditUser = currentUser;
-    if(!selectedEditUser) return;
-
-    const cont = document.getElementById('adminUserConfig'); 
-    cont.innerHTML = "";
-    
+    const selectedEditUser = currentUser; if(!selectedEditUser) return;
+    const cont = document.getElementById('adminUserConfig'); cont.innerHTML = "";
     const idx = db.users.indexOf(selectedEditUser); 
     const a = db.admin[selectedEditUser] || {startDate: "2024-01-01", startBalance:0, yearlyVacation:25, startVacation: 0};
-    
     let deleteBtnHtml = "";
-    if(selectedEditUser === 'Admin') {
-        deleteBtnHtml = `<span class="text-xs font-bold text-slate-400 bg-slate-200 px-2 py-1 rounded">🔒 System-Admin</span>`;
-    } else {
-        deleteBtnHtml = `<button onclick="adminDeleteUser('${selectedEditUser}')" class="bg-red-100 hover:bg-red-200 text-red-600 border border-red-200 rounded px-2 py-1 text-[10px] font-bold uppercase whitespace-nowrap h-8">🗑️ User Löschen</button>`;
-    }
+    if(selectedEditUser === 'Admin') { deleteBtnHtml = `<span class="text-xs font-bold text-slate-400 bg-slate-200 px-2 py-1 rounded">🔒 System-Admin</span>`; } 
+    else { deleteBtnHtml = `<button onclick="adminDeleteUser('${selectedEditUser}')" class="bg-red-100 hover:bg-red-200 text-red-600 border border-red-200 rounded px-2 py-1 text-[10px] font-bold uppercase whitespace-nowrap h-8">🗑️ User Löschen</button>`; }
 
     cont.innerHTML = `<div class="p-4 bg-slate-50 rounded-xl border mb-2 border-blue-200 shadow-inner">
         <div class="flex justify-between items-end mb-2">
-            <div class="w-full mr-2">
-                ${testModeActive ? `<label class="text-[9px] font-bold text-slate-400 uppercase">Name bearbeiten:</label><input type="text" id="nameEdit_SINGLE" value="${selectedEditUser}" class="w-full p-1 border rounded font-black theme-text uppercase text-xs italic">` : `<p class="font-black theme-text text-xs uppercase italic">${selectedEditUser}</p>`}
-            </div>
+            <div class="w-full mr-2">${testModeActive ? `<label class="text-[9px] font-bold text-slate-400 uppercase">Name bearbeiten:</label><input type="text" id="nameEdit_SINGLE" value="${selectedEditUser}" class="w-full p-1 border rounded font-black theme-text uppercase text-xs italic">` : `<p class="font-black theme-text text-xs uppercase italic">${selectedEditUser}</p>`}</div>
             ${deleteBtnHtml}
         </div>
-        
         <div class="grid grid-cols-2 gap-2 text-[8px] font-bold text-slate-400 uppercase mb-1"><span>Start-Datum</span><span>Zeitsaldo Alt (h)</span></div>
         <div class="grid grid-cols-2 gap-2 mb-2"><input type="date" id="admDate_SINGLE" value="${a.startDate}" class="p-2 border rounded text-xs font-bold"><input type="number" step="0.01" id="admBal_SINGLE" value="${a.startBalance}" class="p-2 border rounded text-xs font-bold"></div>
-        
         <div class="grid grid-cols-2 gap-2 text-[8px] font-bold text-slate-400 uppercase mb-1"><span>Urlaub Alt (Tage)</span><span>Urlaub / Jahr</span></div>
         <div class="grid grid-cols-2 gap-2"><input type="number" id="admVacAlt_SINGLE" value="${a.startVacation || 0}" class="p-2 border rounded text-xs font-bold"><input type="number" id="admVacJ_SINGLE" value="${a.yearlyVacation}" class="p-2 border rounded text-xs font-bold"></div>
-        
         <div class="mt-4 pt-4 border-t border-slate-200">
             <div class="text-[8px] font-bold text-slate-400 uppercase">PIN Reset</div>
             <button onclick="db.passwords['${selectedEditUser}']='1234';save();alert('PIN für ${selectedEditUser} auf 1234 gesetzt.');" class="bg-red-100 text-red-500 hover:bg-red-200 px-3 py-2 rounded text-[9px] mt-1 font-bold w-full">PIN auf 1234 zurücksetzen</button>
         </div>
     </div>`;
 
-    const inbox = document.getElementById('adminInbox');
-    inbox.innerHTML = "";
+    const inbox = document.getElementById('adminInbox'); inbox.innerHTML = "";
     if(db.messages && db.messages.length > 0) {
         db.messages.forEach((msg, idx) => {
             inbox.innerHTML += `<div class="bg-white p-3 rounded-lg border border-purple-100 shadow-sm flex flex-col gap-1">
-                <div class="flex justify-between items-start">
-                    <span class="font-bold text-[10px] uppercase text-purple-600">${msg.from}</span>
-                    <span class="text-[9px] text-slate-400">${new Date(msg.date).toLocaleString()}</span>
-                </div>
-                <p class="text-xs text-slate-700 italic">"${msg.text}"</p>
-                <button onclick="deleteMessage(${idx})" class="self-end text-[9px] text-red-400 hover:text-red-600 font-bold uppercase mt-1">Erledigt / Löschen</button>
+                <div class="flex justify-between items-start"><span class="font-bold text-[10px] uppercase text-purple-600">${msg.from}</span><span class="text-[9px] text-slate-400">${new Date(msg.date).toLocaleString()}</span></div>
+                <p class="text-xs text-slate-700 italic">"${msg.text}"</p><button onclick="deleteMessage(${idx})" class="self-end text-[9px] text-red-400 hover:text-red-600 font-bold uppercase mt-1">Erledigt / Löschen</button>
             </div>`;
         });
-    } else {
-        inbox.innerHTML = `<p class="text-xs text-slate-400 text-center italic">Keine neuen Nachrichten.</p>`;
-    }
+    } else { inbox.innerHTML = `<p class="text-xs text-slate-400 text-center italic">Keine neuen Nachrichten.</p>`; }
 }
 
 function saveAdminConfigs() {
-    const selectedEditUser = currentUser; 
-    if(!selectedEditUser) return;
-    
+    const selectedEditUser = currentUser; if(!selectedEditUser) return;
     let newName = testModeActive ? document.getElementById(`nameEdit_SINGLE`).value.trim() : selectedEditUser;
-    
     if(newName !== selectedEditUser) {
         const idx = db.users.indexOf(selectedEditUser);
         if(idx !== -1) db.users[idx] = newName;
         db.logs[newName] = db.logs[selectedEditUser]; delete db.logs[selectedEditUser];
         db.config[newName] = db.config[selectedEditUser]; delete db.config[selectedEditUser];
         db.passwords[newName] = db.passwords[selectedEditUser]; delete db.passwords[selectedEditUser];
-        
         db.admin[newName] = { startDate: document.getElementById(`admDate_SINGLE`).value, startBalance: parseFloat(document.getElementById(`admBal_SINGLE`).value) || 0, startVacation: parseFloat(document.getElementById(`admVacAlt_SINGLE`).value) || 0, yearlyVacation: parseInt(document.getElementById(`admVacJ_SINGLE`).value) || 25 };
         delete db.admin[selectedEditUser];
-        
         currentUser = newName;
-        sessionStorage.setItem(USER_KEY, newName);
-        localStorage.setItem('ze_last_user', newName); // Auch hier updaten
-        
-        save();
-        alert(`Benutzer umbenannt in ${newName}. Seite wird neu geladen.`);
-        window.location.reload(); 
+        sessionStorage.setItem(USER_KEY, newName); localStorage.setItem('ze_last_user', newName); 
+        save(); alert(`Benutzer umbenannt in ${newName}. Seite wird neu geladen.`); window.location.reload(); 
     } else {
         db.admin[selectedEditUser] = { startDate: document.getElementById(`admDate_SINGLE`).value, startBalance: parseFloat(document.getElementById(`admBal_SINGLE`).value) || 0, startVacation: parseFloat(document.getElementById(`admVacAlt_SINGLE`).value) || 0, yearlyVacation: parseInt(document.getElementById(`admVacJ_SINGLE`).value) || 25 };
-        save(); 
-        alert("Daten gespeichert!"); 
-        renderAll();
+        save(); alert("Daten gespeichert!"); renderAll();
     }
 }
 
 async function exportPDF() { 
     try {
-        const { jsPDF } = window.jspdf; 
-        const doc = new jsPDF('p', 'mm', 'a4'); 
-        const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value); 
-        const balances = calculateBalances(currentUser, y, m, false);
+        const { jsPDF } = window.jspdf; const doc = new jsPDF('p', 'mm', 'a4'); const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value); const balances = calculateBalances(currentUser, y, m, false);
         const col = db.settings.primaryColor || "#2563eb"; 
         
-        doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text("Zeitnachweis", 14, 15); 
-        doc.setFontSize(8); doc.setTextColor(col); doc.text(db.settings.companyName || "Teamordination Dr. Stütz & Dr. Haselgruber", 14, 20); 
-        doc.setTextColor(148, 163, 184); doc.setFontSize(7); doc.text("MITARBEITER", 196, 15, { align: "right" }); 
-        doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text(currentUser.toUpperCase(), 196, 20, { align: "right" }); 
-        doc.setFontSize(7); doc.setTextColor(148, 163, 184); doc.text("ZEITRAUM", 196, 26, { align: "right" }); 
-        doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.text(`${MONTH_NAMES[m]} ${y}`, 196, 31, { align: "right" });
-
-        doc.autoTable({ 
-            html: '#mainTable', 
-            startY: 38, 
-            theme: 'striped', 
-            alternateRowStyles: { fillColor: [240, 247, 255] }, 
-            headStyles: { fillColor: col, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' }, 
-            styles: { fontSize: 7.5, cellPadding: 1.2, textColor: [51, 65, 85], valign: 'middle' }, 
-            columnStyles: { 0: { cellWidth: 22, fontStyle: 'bold' }, 1: { cellWidth: 16, halign: 'right' }, 2: { cellWidth: 16, halign: 'right' }, 3: { cellWidth: 24, halign: 'center'}, 4: { cellWidth: 14, halign: 'right', fontStyle: 'bold' }, 5: { cellWidth: 14, halign: 'right' }, 6: { cellWidth: 16, halign: 'right', fontStyle: 'bold' }, 7: { halign: 'left' } }, 
-            columns: [0, 1, 2, 3, 4, 5, 6, 7],
+        doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text("Zeitnachweis", 14, 15); doc.setFontSize(8); doc.setTextColor(col); doc.text(db.settings.companyName || "Teamordination Dr. Stütz & Dr. Haselgruber", 14, 20); doc.setTextColor(148, 163, 184); doc.setFontSize(7); doc.text("MITARBEITER", 196, 15, { align: "right" }); doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text(currentUser.toUpperCase(), 196, 20, { align: "right" }); doc.setFontSize(7); doc.setTextColor(148, 163, 184); doc.text("ZEITRAUM", 196, 26, { align: "right" }); doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.text(`${MONTH_NAMES[m]} ${y}`, 196, 31, { align: "right" });
+        doc.autoTable({ html: '#mainTable', startY: 38, theme: 'striped', alternateRowStyles: { fillColor: [240, 247, 255] }, headStyles: { fillColor: col, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' }, styles: { fontSize: 7.5, cellPadding: 1.2, textColor: [51, 65, 85], valign: 'middle' }, columnStyles: { 0: { cellWidth: 22, fontStyle: 'bold' }, 1: { cellWidth: 16, halign: 'right' }, 2: { cellWidth: 16, halign: 'right' }, 3: { cellWidth: 24, halign: 'center'}, 4: { cellWidth: 14, halign: 'right', fontStyle: 'bold' }, 5: { cellWidth: 14, halign: 'right' }, 6: { cellWidth: 16, halign: 'right', fontStyle: 'bold' }, 7: { halign: 'left' } }, columns: [0, 1, 2, 3, 4, 5, 6, 7],
             didParseCell: function(data) { 
                 if (data.section === 'body') { 
-                    // Hier holen wir uns den Text sicher aus dem HTML Element
-                    const text = data.cell.raw.innerText || ""; 
-                    const row = data.row.index + 1; 
-                    const dStr = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(row).padStart(2, '0');
-                    
-                    // Ferien / Wochenende Farben
+                    const raw = data.cell.raw;
+                    const text = (raw.innerText || raw || "").toString().trim();
+                    const row = data.row.index + 1; const dStr = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(row).padStart(2, '0');
                     if (holidaysDB[dStr]) { data.cell.styles.fillColor = [254, 242, 242]; data.cell.styles.textColor = [153, 27, 27]; }
                     else if (new Date(y, m, row).getDay() === 0) { data.cell.styles.fillColor = [255, 247, 237]; }
-                    
-                    // Typ Farben
                     if (text.includes("Urlaub") || text.includes("Betriebsurlaub")) { data.cell.styles.fillColor = [209, 250, 229]; data.cell.styles.textColor = [6, 78, 59]; } 
                     else if (text.includes("Krank")) { data.cell.styles.fillColor = [254, 243, 199]; } 
                     else if (text.includes("ZA")) { data.cell.styles.fillColor = [236, 254, 255]; data.cell.styles.textColor = [14, 116, 144]; } 
                     
-                    // FIX: Wir nutzen jetzt die Variable 'text' statt 'data.cell.raw' für die Prüfung
                     if(data.column.index === 6) {
-                        if(text.trim().startsWith('-')) data.cell.styles.textColor = [220, 38, 38]; // Rot
-                        else if(text.trim() === '0:00') data.cell.styles.textColor = [37, 99, 235]; // Blau
-                        else data.cell.styles.textColor = [22, 163, 74]; // Grün
+                        if(text.startsWith('-')) data.cell.styles.textColor = [220, 38, 38]; 
+                        else if(text === '0:00') data.cell.styles.textColor = [37, 99, 235]; 
+                        else data.cell.styles.textColor = [22, 163, 74]; 
                     }
                 } 
             }
         }); 
         
         if(currentUser !== 'Admin') {
-            let finalY = doc.lastAutoTable.finalY + 10; if (finalY > 240) { doc.addPage(); finalY = 20; } 
-            doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.roundedRect(14, finalY - 4, 182, 32, 2, 2, 'FD'); 
-            doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(col); doc.text("KONTOSTAND MONATSENDE", 20, finalY + 4); 
-            doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.setFont(undefined, 'normal');
-            doc.text(`Monat Soll: ${document.getElementById('sumMonthSoll').innerText} h`, 20, finalY + 12); 
-            doc.text(`Monat Ist: ${document.getElementById('sumMonthIst').innerText} h`, 20, finalY + 18); 
+            let finalY = doc.lastAutoTable.finalY + 10; if (finalY > 240) { doc.addPage(); finalY = 20; } doc.setFillColor(248, 250, 252); doc.setDrawColor(226, 232, 240); doc.roundedRect(14, finalY - 4, 182, 32, 2, 2, 'FD'); doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(col); doc.text("KONTOSTAND MONATSENDE", 20, finalY + 4); doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.setFont(undefined, 'normal');
+            doc.text(`Monat Soll: ${document.getElementById('sumMonthSoll').innerText} h`, 20, finalY + 12); doc.text(`Monat Ist: ${document.getElementById('sumMonthIst').innerText} h`, 20, finalY + 18); 
             
-            // Statistik Farben im Footer
             const saldoVal = balances.totalSaldo;
             let salR = 30, salG = 41, salB = 59; 
-            if(saldoVal < 0) { salR=220; salG=38; salB=38; } 
-            else if(saldoVal > 0) { salR=22; salG=163; salB=74; } 
-            else { salR=37; salG=99; salB=235; } 
+            if(saldoVal < 0) { salR=220; salG=38; salB=38; } else if(saldoVal > 0) { salR=22; salG=163; salB=74; } else { salR=37; salG=99; salB=235; } 
             
             doc.setFont(undefined, 'bold'); doc.setTextColor(salR, salG, salB);
-            doc.text(`STUNDENSALDO: ${formatHM(balances.totalSaldo)} h`, 20, finalY + 25); 
-            
-            doc.setTextColor(30, 41, 59); 
-            doc.setFont(undefined, 'normal'); doc.text(`Urlaub Anspruch: ${db.admin[currentUser].yearlyVacation} Tage`, 110, finalY + 12); 
-            doc.text(`Urlaub Genommen: ${balances.monthVacation} Tage`, 110, finalY + 18); 
-            doc.setFont(undefined, 'bold'); doc.setTextColor(21, 128, 61); doc.text(`RESTURLAUB: ${balances.restVacation} Tage`, 110, finalY + 25);
+            doc.text(`STUNDENSALDO: ${formatHM(balances.totalSaldo)} h`, 20, finalY + 25); doc.setTextColor(30, 41, 59); doc.setFont(undefined, 'normal'); doc.text(`Urlaub Anspruch: ${db.admin[currentUser].yearlyVacation} Tage`, 110, finalY + 12); doc.text(`Urlaub Genommen: ${balances.monthVacation} Tage`, 110, finalY + 18); doc.setFont(undefined, 'bold'); doc.setTextColor(21, 128, 61); doc.text(`RESTURLAUB: ${balances.restVacation} Tage`, 110, finalY + 25);
         }
         doc.save(`Zeitnachweis_${currentUser}_${MONTH_NAMES[m]}_${y}.pdf`); 
     } catch (e) { alert("PDF Export fehlgeschlagen: " + e.message); }
 }
+
 function exportExcel() {
     const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value);
     const rows = [["ZEITNACHWEIS", currentUser], ["Monat", MONTH_NAMES[m], y], ["Datum", "Kommen", "Gehen", "Pause", "Ist", "Soll", "Saldo", "Notiz"]];
     for(let i=1; i<=new Date(y, m+1, 0).getDate(); i++) {
         const ds = toLocalISO(new Date(y,m,i)), log = (db.logs[currentUser]||{})[ds] || {};
         const isH = holidaysDB[ds], isWE = new Date(y,m,i).getDay()%6==0;
-        
-        // Use new helper
         const target = getTargetHours(new Date(y,m,i), currentUser);
-        
         let ist = 0, pStr = "-"; let dispOut = log.out || log.type || "";
         if(log.in && log.out) { 
             let calcIn = log.in;
             const cfg = db.config[currentUser][new Date(y,m,i).getDay()] || {start: "00:00"};
             if(target > 0) calcIn = getKulanzStart(log.in, cfg.start);
-            
             let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+calcIn))/3600000); 
-            
-            if(rawIst > 6.0) { 
-                pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); 
-                dispOut = getExtendedOutTime(ds, log.in, log.out);
-                ist = safeFloat(rawIst); 
-            } else { 
-                ist = safeFloat(rawIst); 
-            } 
+            if(rawIst > 6.0) { pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); dispOut = getExtendedOutTime(ds, log.in, log.out); ist = safeFloat(rawIst); } else { ist = safeFloat(rawIst); } 
         }
         rows.push([i+"."+(m+1)+".", log.in||"", dispOut, pStr, safeFloat(ist).toFixed(2), safeFloat(target).toFixed(2), (safeFloat(ist)-safeFloat(target)).toFixed(2), log.note || ""]);
     }
