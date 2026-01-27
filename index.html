@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeiterfassung | Praxis System</title>
+    <title>Zeiterfassung | TO Stütz & Haselgruber</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -53,12 +53,15 @@
         .year-grid .cal-entry { font-size: 0.5rem !important; line-height: 1.0 !important; padding: 1px 2px !important; }
         .year-grid .cal-day { min-height: 60px !important; }
         .year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
-        #mainTable { table-layout: fixed; width: 100%; }
+        #mainTable { table-layout: fixed; width: 100%; min-width: 600px; /* Erzwingt Breite damit Scrollen nötig wird */ }
         * { font-style: normal; } 
 
         .sig-box { margin-top: 20px; padding: 20px; border: 2px dashed #cbd5e1; border-radius: 12px; text-align: center; background: #f8fafc; }
         .sig-badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-weight: bold; font-size: 0.75rem; text-transform: uppercase; }
         .sig-badge.ok { background-color: #22c55e; color: white; }
+        
+        /* Zoom Modus Klasse */
+        body.zoom-out { zoom: 0.85; -moz-transform: scale(0.85); -moz-transform-origin: top center; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen text-slate-800">
@@ -138,6 +141,8 @@
                 <button onclick="resetWarp()" class="bg-white text-slate-400 text-[9px] px-2 py-1 rounded font-bold uppercase border hover:text-slate-600">X</button>
             </div>
 
+            <button onclick="toggleZoom()" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold uppercase border border-blue-200 shadow-sm whitespace-nowrap">🔍 Zoom</button>
+
             <div id="liveClock" class="text-2xl font-mono font-bold">00:00:00</div>
             <select id="userSelect" onchange="switchUser()" class="bg-slate-100 p-2 rounded font-bold outline-none border-2 border-transparent focus:border-blue-400 hidden max-w-[120px] md:max-w-xs"></select>
             <button onclick="doLogout()" class="text-xs text-red-500 font-bold uppercase underline ml-2">Abmelden</button>
@@ -159,8 +164,8 @@
                 <p class="text-sm text-slate-400 mb-6" id="displayTodayDate"></p>
                 <div id="punchButtonsArea">
                     <div class="flex justify-center gap-6 mb-8">
-                        <button onclick="punch('in')" class="w-32 h-32 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase">Kommen</button>
-                        <button onclick="punch('out')" class="w-32 h-32 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase">Gehen</button>
+                        <button onclick="punch('in')" class="w-24 h-24 md:w-32 md:h-32 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-xs md:text-base">Kommen</button>
+                        <button onclick="punch('out')" class="w-24 h-24 md:w-32 md:h-32 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-xs md:text-base">Gehen</button>
                     </div>
                     <div id="todayDetails" class="space-y-2 max-w-xs mx-auto"></div>
                 </div>
@@ -227,10 +232,10 @@
     </section>
 
     <section id="tab-uebersicht" class="tab-content hidden">
-        <div class="bg-white shadow rounded-xl border overflow-hidden">
+        <div class="bg-white shadow rounded-xl border overflow-x-auto">
             <div class="p-6 border-b">
                 <div class="flex justify-between items-start mb-4">
-                    <div><h2 class="text-xl font-black uppercase italic" id="billTitle">Zeitnachweis</h2><p class="text-xs theme-text font-bold uppercase tracking-tight" id="billSub">v4.05</p></div>
+                    <div><h2 class="text-xl font-black uppercase italic" id="billTitle">Zeitnachweis</h2><p class="text-xs theme-text font-bold uppercase tracking-tight" id="billSub">v4.06</p></div>
                     <div class="text-right"><p class="text-[9px] font-bold text-slate-300 uppercase">Mitarbeiter:</p><p id="billUser" class="text-lg font-black uppercase italic leading-none mb-1">--</p><p class="text-[9px] font-bold text-slate-300 uppercase">Zeitraum:</p><p id="billPeriod" class="text-xs font-bold text-slate-400 uppercase leading-none">--</p></div>
                 </div>
                 <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
@@ -391,28 +396,36 @@ const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwg3vKEz3JHYX4baAFsL5
 
 // 2. Ein eindeutiger Name für die Datenbank DIESES KUNDEN (z.B. ze_praxis_huber_v1)
 // WICHTIG: Muss für jeden Kunden anders sein!
-const DB_KEY = 'ze_profi_cloud_v3.86_FINAL'; 
+const DB_KEY = 'ze_profi_cloud_v3.86_FINAL';  
 
 // ==========================================
 // *** SYSTEM LOGIC (NICHT ÄNDERN) ***
 // ==========================================
 
-// KILL-SWITCH: Löscht alte "Verwirrungen" aus dem Browser-Speicher,
-// um sicherzustellen, dass NUR die oben konfigurierte DB genutzt wird.
+// KILL-SWITCH
 if(localStorage.getItem('ze_custom_db_key') || localStorage.getItem('ze_cloud_url')) {
-    console.log("🧹 Bereinige Browser-Speicher für saubere Trennung...");
+    console.log("🧹 Bereinige Browser-Speicher...");
     localStorage.removeItem('ze_custom_db_key');
     localStorage.removeItem('ze_cloud_url');
 }
 
-// Interne Konstanten
 const USER_KEY = 'ze_session_user_v1'; 
 const WEEKDAYS_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 const SU_PASS_HASH = "Hk@b154132l";
 
-let currentCloudUrl = CLOUD_URL; // Wir nutzen hart die Konstante
+let currentCloudUrl = CLOUD_URL; 
 let isSuperuser = false;
+
+// ZOOM LOGIC INITIALISIERUNG
+if(localStorage.getItem('ze_zoom_pref') === 'true') {
+    document.body.classList.add('zoom-out');
+}
+
+function toggleZoom() {
+    document.body.classList.toggle('zoom-out');
+    localStorage.setItem('ze_zoom_pref', document.body.classList.contains('zoom-out'));
+}
 
 // HELPER: Decimal Hours to HH:MM string
 function formatHM(val) {
@@ -424,7 +437,20 @@ function formatHM(val) {
     return `${sign}${h}:${m.toString().padStart(2, '0')}`;
 }
 
-// HELPER: Get ISO Week Number
+// HELPER: Round to Quarter (Kaufmännisch)
+function roundToQuarter(timeStr) {
+    if(!timeStr) return timeStr;
+    let [h, m] = timeStr.split(':').map(Number);
+    let totalMins = h * 60 + m;
+    // Runden auf nächste 15 Minuten
+    let rounded = Math.round(totalMins / 15) * 15;
+    
+    let newH = Math.floor(rounded / 60);
+    let newM = rounded % 60;
+    if(newH === 24) { newH = 0; } 
+    return String(newH).padStart(2,'0') + ':' + String(newM).padStart(2,'0');
+}
+
 function getISOWeek(d) {
     d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
@@ -443,7 +469,6 @@ if (!db || !db.users || !Array.isArray(db.users) || db.users.length === 0) {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
 }
 
-// Ensure settings exist (Upgrade logic)
 if (!db.settings) db.settings = {};
 
 let currentUser = db.users[0];
@@ -555,16 +580,14 @@ function saveSystemSettings() {
     const title = document.getElementById('sysTitle').value;
     const col = document.getElementById('sysColor').value;
     const admPw = document.getElementById('sysAdminPw').value;
-    const newUrl = document.getElementById('sysCloudUrl').value.trim();
     const newDbKey = document.getElementById('sysDbKey').value.trim();
 
     if(title) db.settings.companyName = title;
     if(col) db.settings.primaryColor = col;
     if(admPw) db.settings.adminPassword = admPw;
     
-    // Warnung bei Key-Änderung im System-Menü (eigentlich nicht mehr nötig durch Hardcoding, aber als Fallback)
     if(newDbKey && newDbKey !== DB_KEY) {
-        alert("ACHTUNG: DB-Key Änderung ist in dieser Version gesperrt. Bitte ändern Sie den Key direkt in der HTML-Datei (Zeile ~560), um Konflikte zu vermeiden.");
+        alert("ACHTUNG: DB-Key Änderung ist in dieser Version gesperrt. Bitte ändern Sie den Key direkt in der HTML-Datei.");
         return; 
     }
     
@@ -816,8 +839,6 @@ async function init() {
 async function syncFromCloud() {
     const statusDiv = document.getElementById('syncStatus');
     const loginSync = document.getElementById('loginSyncStatus');
-    
-    // Always use hardcoded CLOUD_URL
     const targetUrl = CLOUD_URL;
 
     try {
@@ -1234,18 +1255,32 @@ function renderCalendar() {
 }
 
 function updateClock() { const n = getNow(); document.getElementById('liveClock').innerText = n.toLocaleTimeString('de-DE'); document.getElementById('displayTodayDate').innerText = n.toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'long'}); }
+
 function punch(t) {
     if (currentUser === "Admin") return; 
     const n = getNow(), ds = toLocalISO(n);
     let ts = n.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+
     const isWE = n.getDay() === 0 || n.getDay() === 6;
     const isH = holidaysDB[ds];
+
+    // KOMMEN: Kulanz-Start (wie bisher)
     if (t === 'in' && !isWE && !isH) {
         const config = (db.config[currentUser] && db.config[currentUser][n.getDay()]) ? db.config[currentUser][n.getDay()] : {start:"00:00"};
         ts = getKulanzStart(ts, config.start);
     }
-    if(!db.logs[currentUser]) db.logs[currentUser] = {}; if(t==='in') db.logs[currentUser][ds] = {in:ts, out:null}; else if(db.logs[currentUser][ds]) db.logs[currentUser][ds].out=ts; save(); renderAll();
+
+    // GEHEN: Neu mit Rundung auf 15 Min
+    if (t === 'out') {
+        ts = roundToQuarter(ts);
+    }
+
+    if(!db.logs[currentUser]) db.logs[currentUser] = {}; 
+    if(t==='in') db.logs[currentUser][ds] = {in:ts, out:null}; 
+    else if(db.logs[currentUser][ds]) db.logs[currentUser][ds].out=ts; 
+    save(); renderAll();
 }
+
 function switchUser() { 
     if(loggedInUser !== "Admin") return; 
     currentUser = document.getElementById('userSelect').value; 
@@ -1421,7 +1456,6 @@ function changePassword() {
     if(newPw.length < 4) return alert("Passwort muss mindestens 4 Zeichen haben!");
     if(newPw !== confirmPw) return alert("Passwörter stimmen nicht überein!");
     
-    // FIX: Unterscheidung zwischen Admin und normalem User
     if(currentUser === "Admin") {
         if(!db.settings) db.settings = {};
         db.settings.adminPassword = newPw;
@@ -1435,6 +1469,7 @@ function changePassword() {
     document.getElementById('newPwInput').value = ""; 
     document.getElementById('newPwConfirm').value = "";
 }
+
 function sendDevMessage() {
     const txt = document.getElementById('devMsgText').value; if(!txt) return;
     if(!db.messages) db.messages = []; db.messages.push({from: currentUser, date: new Date().toISOString(), text: txt}); save(); 
