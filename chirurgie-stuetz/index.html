@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeiterfassung | Chirurgie Dr. Stütz</title>
+    <title>Zeiterfassung | Chirurgie Dr. Stütz V4.06</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -31,7 +31,9 @@
         .tab-active { border-bottom: 4px solid var(--main-color) !important; color: var(--main-color) !important; font-weight: 800; }
         
         /* Zeilen-Styles */
+        /* row-holiday wird jetzt auch für manuelle Feiertage genutzt */
         .row-holiday { background-color: #fef2f2 !important; color: #991b1b !important; }
+        
         .row-vacation { background-color: #ecfdf5 !important; color: #064e3b !important; }
         .row-schulung { background-color: #f3e8ff !important; color: #6b21a8 !important; } 
         .row-custom { background-color: #fffbeb !important; color: #92400e !important; } 
@@ -53,7 +55,7 @@
         .year-grid .cal-entry { font-size: 0.5rem !important; line-height: 1.0 !important; padding: 1px 2px !important; }
         .year-grid .cal-day { min-height: 60px !important; }
         .year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
-        #mainTable { table-layout: fixed; width: 100%; min-width: 600px; /* Erzwingt Breite damit Scrollen nötig wird */ }
+        #mainTable { table-layout: fixed; width: 100%; min-width: 600px; }
         * { font-style: normal; } 
 
         .sig-box { margin-top: 20px; padding: 20px; border: 2px dashed #cbd5e1; border-radius: 12px; text-align: center; background: #f8fafc; }
@@ -79,7 +81,14 @@
             <div>
                 <label class="text-[9px] font-bold uppercase text-slate-400">Typ / Status</label>
                 <select id="editType" class="w-full p-2 border rounded font-bold text-xs bg-slate-50">
-                    <option value="">(Standard: Arbeitszeit)</option><option value="Urlaub">🌴 Urlaub</option><option value="ZA">⏳ Zeitausgleich (ZA)</option><option value="Krank">🤒 Krank</option><option value="Schulung">🎓 Schulung</option><option value="Sonstiges">✏️ Sonstiges</option><option value="Betriebsurlaub">🏢 Betriebsurlaub</option>
+                    <option value="">(Standard: Arbeitszeit)</option>
+                    <option value="Urlaub">🌴 Urlaub</option>
+                    <option value="Feiertag">🎄 Feiertag (Sonderfrei)</option>
+                    <option value="ZA">⏳ Zeitausgleich (ZA)</option>
+                    <option value="Krank">🤒 Krank</option>
+                    <option value="Schulung">🎓 Schulung</option>
+                    <option value="Sonstiges">✏️ Sonstiges</option>
+                    <option value="Betriebsurlaub">🏢 Betriebsurlaub</option>
                 </select>
             </div>
             <div><label class="text-[9px] font-bold uppercase text-slate-400">Notiz</label><textarea id="editNote" rows="3" class="w-full p-2 border rounded text-xs" placeholder="Notiz hier eingeben..."></textarea></div>
@@ -208,7 +217,15 @@
                         </div>
                         <div class="flex-[1.5] border-r">
                              <select id="planType" class="w-full h-full p-2 bg-white text-xs font-bold outline-none cursor-pointer">
-                                <option value="Urlaub">🌴 Urlaub</option><option value="Betriebsurlaub">🏢 Betriebsurlaub (Alle)</option><option value="Schulung">🎓 Schulung (Info)</option><option value="ZA">⏳ Zeitausgleich (ZA)</option><option value="Krank">🤒 Krank</option><option value="Sonstiges">✏️ Freitext / Zeit</option><option value="DELETE">🗑️ Eintrag löschen (Einzel)</option><option value="DELETE_ALL" class="text-red-600 font-black">🗑️ Alle Termine löschen</option>
+                                <option value="Urlaub">🌴 Urlaub</option>
+                                <option value="Feiertag">🎄 Feiertag (Sonderfrei)</option>
+                                <option value="Betriebsurlaub">🏢 Betriebsurlaub (Alle)</option>
+                                <option value="Schulung">🎓 Schulung (Info)</option>
+                                <option value="ZA">⏳ Zeitausgleich (ZA)</option>
+                                <option value="Krank">🤒 Krank</option>
+                                <option value="Sonstiges">✏️ Freitext / Zeit</option>
+                                <option value="DELETE">🗑️ Eintrag löschen (Einzel)</option>
+                                <option value="DELETE_ALL" class="text-red-600 font-black">🗑️ Alle Termine löschen</option>
                             </select>
                         </div>
                         <button onclick="addPlanningRange()" class="theme-bg text-white px-6 py-3 font-bold uppercase text-[10px] tracking-wide transition-colors hover:opacity-90">Übernehmen</button>
@@ -442,9 +459,7 @@ function roundToQuarter(timeStr) {
     if(!timeStr) return timeStr;
     let [h, m] = timeStr.split(':').map(Number);
     let totalMins = h * 60 + m;
-    // Runden auf nächste 15 Minuten
     let rounded = Math.round(totalMins / 15) * 15;
-    
     let newH = Math.floor(rounded / 60);
     let newM = rounded % 60;
     if(newH === 24) { newH = 0; } 
@@ -512,7 +527,15 @@ function getVisibleUsers() { return db.users; }
 function getTargetHours(dateObj, uName) {
     const dayIdx = dateObj.getDay();
     if (dayIdx === 0 || dayIdx === 6) return 0; 
-    if (holidaysDB[toLocalISO(dateObj)]) return 0; 
+    
+    const dStr = toLocalISO(dateObj);
+    
+    // 1. Check: Gesetzlicher Feiertag?
+    if (holidaysDB[dStr]) return 0; 
+
+    // 2. Check (NEU): Manueller Feiertag? -> Soll = 0
+    const log = (db.logs[uName] || {})[dStr];
+    if (log && log.type === 'Feiertag') return 0;
 
     const cfg = db.config[uName][dayIdx] || { target: 0, start: "00:00", weekMode: "ALL" };
     let t = safeFloat(cfg.target);
@@ -930,6 +953,7 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
                 if (iter.getMonth() === targetMonth) usedVacMonth++; 
             } 
         } else if (log.type === 'ZA') { ist = 0; }
+        else if (log.type === 'Feiertag') { ist = 0; }
         else if (log.type === 'Sonstiges') { ist = log.value !== undefined ? safeFloat(log.value) : target; }
         else if (log.in && log.out) {
             if (target === 0) { ist = 0; } 
@@ -968,12 +992,10 @@ function renderLogs() {
         
         let ist = 0, pauseDisplay = "-", dispOut = log.out || "-";
         let rowClass = ''; 
-        let isFree = false;
         
         if (target === 0 && !log.type && !log.in && !log.note && !isH && !isWE) {
             dispOut = "Frei";
             rowClass = 'row-free';
-            isFree = true;
         }
 
         if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
@@ -982,6 +1004,7 @@ function renderLogs() {
             else dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type; 
         }
         else if (log.type === 'ZA') { ist = 0; dispOut = "ZA"; }
+        else if (log.type === 'Feiertag') { ist = 0; dispOut = "Feiertag"; }
         else if (log.type === 'Sonstiges') { 
             ist = log.value !== undefined ? safeFloat(log.value) : target;
             dispOut = log.title || "Sonstiges";
@@ -1009,6 +1032,7 @@ function renderLogs() {
         
         if (log.type==='Urlaub' || log.type==='Betriebsurlaub') rowClass = 'row-vacation';
         else if (log.type==='ZA') rowClass = 'row-za';
+        else if (log.type==='Feiertag') rowClass = 'row-custom-holiday';
         else if (log.type==='Schulung') rowClass = 'row-schulung';
         else if (log.type==='Sonstiges') rowClass = 'row-custom';
 
@@ -1146,6 +1170,8 @@ function generateMonthNode(y, m, mini = false) {
                         if(uLog.type==='Schulung') cl="bg-purple-100 text-purple-700 border-purple-200";
                         if(uLog.type==='Sonstiges') cl="bg-yellow-50 text-yellow-700 border-yellow-200";
                         if(uLog.type==='ZA') cl="bg-cyan-50 text-cyan-700 border-cyan-200";
+                        if(uLog.type==='Feiertag') cl="bg-rose-100 text-rose-700 border-rose-200"; 
+                        
                         let label = u.split(' ')[0];
                         if(uLog.type==='Schulung' && uLog.range) label += ` (${uLog.range})`;
                         else if(uLog.type==='Sonstiges' && uLog.title) { label += ` (${uLog.title}`; if(uLog.range) label += `, ${uLog.range}`; label += `)`; }
@@ -1160,10 +1186,14 @@ function generateMonthNode(y, m, mini = false) {
                     let showLog = true;
                     const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
                     if (typesToHide.includes(log.type)) { if (target === 0) showLog = false; }
+                    
+                    if (log.type === 'Feiertag') showLog = true;
+
                     if(showLog) {
                         if(!isH && d.getDay() !== 6 && d.getDay() !== 0) {
                             if(log.type==='Urlaub' || log.type==='Betriebsurlaub') cell.classList.add('row-vacation'); 
                             else if(log.type==='ZA') { }
+                            else if(log.type==='Feiertag') cell.classList.add('row-custom-holiday'); 
                             else if(log.type==='Schulung') cell.classList.add('row-schulung');
                             else if(log.type==='Sonstiges') cell.classList.add('row-custom');
                             else cell.classList.add('bg-amber-50'); 
@@ -1172,6 +1202,8 @@ function generateMonthNode(y, m, mini = false) {
                         if(log.type === 'Sonstiges' && log.title) txt = log.title;
                         if(log.type === 'Schulung' && log.range) txt = "Schulung (" + log.range + ")";
                         let extraClass = log.type === 'ZA' ? 'bg-cyan-50 text-cyan-800 border border-cyan-200' : '';
+                        if(log.type === 'Feiertag') extraClass = 'text-rose-700'; 
+                        
                         cell.innerHTML += `<div class='cal-entry ${extraClass}'>${txt}</div>`; 
                     }
                 } 
@@ -1226,6 +1258,8 @@ function renderCalendar() {
                         if(uLog.type==='Schulung') col="text-purple-700 bg-purple-50";
                         if(uLog.type==='Sonstiges') col="text-yellow-700 bg-yellow-50";
                         if(uLog.type==='ZA') col="text-cyan-700 bg-cyan-50 border border-cyan-200"; 
+                        if(uLog.type==='Feiertag') col="text-rose-700 bg-rose-50 border border-rose-200"; 
+                        
                         let txt = u.split(' ')[0];
                         if(uLog.type==='Schulung' && uLog.range) txt += ` (${uLog.range})`;
                         else if(uLog.type==='Sonstiges' && uLog.title) { txt += ` (${uLog.title}`; if(uLog.range) txt += `, ${uLog.range}`; txt += `)`; }
@@ -1242,10 +1276,15 @@ function renderCalendar() {
                 if(log.type === 'Schulung' && log.range) typeDisplay = "Schulung (" + log.range + ")";
                 const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
                 if (typesToHide.includes(log.type)) { if (target === 0) typeDisplay = ""; }
+                
+                if (log.type === 'Feiertag') typeDisplay = "Feiertag";
+                
                 if (!typeDisplay && !isH && d.getDay() !== 0 && d.getDay() !== 6 && target === 0 && !log.in && !log.note) { typeDisplay = "Frei"; }
                 let textColor = "theme-text";
                 if(typeDisplay === "Frei") textColor = "text-slate-400 italic";
                 if(log.type === 'ZA') textColor = "text-cyan-600 font-black"; 
+                if(log.type === 'Feiertag') textColor = "text-rose-700 font-bold";
+                
                 content += `<p class="text-[10px] mt-2 font-bold ${textColor} truncate">${isH || typeDisplay || dt}</p>`;
             }
             grid.innerHTML += `<div class="p-4 bg-white border rounded-xl shadow-sm ${isH?'row-holiday':''}">${content}</div>`;
