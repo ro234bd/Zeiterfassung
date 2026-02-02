@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeiterfassung | Chirurgie Dr. Stütz V4.06</title>
+    <title>Zeiterfassung | Praxis System V4.07</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -31,9 +31,7 @@
         .tab-active { border-bottom: 4px solid var(--main-color) !important; color: var(--main-color) !important; font-weight: 800; }
         
         /* Zeilen-Styles */
-        /* row-holiday wird jetzt auch für manuelle Feiertage genutzt */
         .row-holiday { background-color: #fef2f2 !important; color: #991b1b !important; }
-        
         .row-vacation { background-color: #ecfdf5 !important; color: #064e3b !important; }
         .row-schulung { background-color: #f3e8ff !important; color: #6b21a8 !important; } 
         .row-custom { background-color: #fffbeb !important; color: #92400e !important; } 
@@ -670,7 +668,7 @@ function performLogin() {
 
     let storedPass = "1234";
     if (user === "Admin") {
-        storedPass = (db.settings && db.settings.adminPassword) ? db.settings.adminPassword : "Va19tti!";
+        storedPass = (db.settings && db.settings.adminPassword) ? db.settings.adminPassword : "W3rn3rStütz";
     } else {
         storedPass = (db.passwords && db.passwords[user]) ? db.passwords[user] : "1234";
     }
@@ -965,6 +963,22 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
             let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
             if(target === 0) ist = safeFloat(rawDiff); 
             else ist = safeFloat(rawDiff); 
+            
+            // --- NEW TUESDAY FIX ---
+            if (iter.getDay() === 2 && !isH && target > 0) { // 2 = Tuesday
+                 let [hI, mI] = calcIn.split(':').map(Number);
+                 let [hO, mO] = log.out.split(':').map(Number);
+                 let minIn = hI * 60 + mI;
+                 let minOut = hO * 60 + mO;
+                 let bStart = 765; // 12:45
+                 let bEnd = 825;   // 13:45
+                 let start = Math.max(minIn, bStart);
+                 let end = Math.min(minOut, bEnd);
+                 if(end > start) {
+                     ist -= (end - start) / 60;
+                 }
+            }
+            // -----------------------
         }
         totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
     }
@@ -1020,12 +1034,39 @@ function renderLogs() {
 
             const rawIst = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
             
-            if (rawIst > 6.0) { 
-                pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
-                dispOut = getExtendedOutTime(dStr, log.in, log.out); 
-                ist = safeFloat(rawIst); 
-            } else { 
-                ist = safeFloat(rawIst); 
+            // *** SPEZIAL-LOGIK DIENSTAG ***
+            if (d.getDay() === 2 && !isH && target > 0) {
+                 let [hI, mI] = calcIn.split(':').map(Number);
+                 let [hO, mO] = log.out.split(':').map(Number);
+                 let minIn = hI * 60 + mI;
+                 let minOut = hO * 60 + mO;
+                 
+                 // Fixe Pause 12:45 bis 13:45
+                 let bStart = 765; 
+                 let bEnd = 825;   
+                 
+                 let start = Math.max(minIn, bStart);
+                 let end = Math.min(minOut, bEnd);
+                 let deduction = 0;
+                 
+                 if(end > start) {
+                     deduction = (end - start) / 60;
+                     pauseDisplay = "12:45 - 13:45";
+                     if(deduction < 1.0) pauseDisplay += " (anteilig)";
+                 }
+                 
+                 ist = safeFloat(rawIst) - deduction;
+                 dispOut = log.out; // Originale Geh-Zeit lassen!
+            } 
+            // *** STANDARD LOGIK (Andere Tage) ***
+            else {
+                if (rawIst > 6.0) { 
+                    pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
+                    dispOut = getExtendedOutTime(dStr, log.in, log.out); 
+                    ist = safeFloat(rawIst); 
+                } else { 
+                    ist = safeFloat(rawIst); 
+                }
             }
         }
         mIst += ist; mSoll += target;
@@ -1269,7 +1310,20 @@ function renderCalendar() {
                 });
             } else {
                 const log = (db.logs[currentUser]||{})[dStr] || {};
-                let dt = (log.in ? log.in + ' - ' + (getExtendedOutTime(dStr, log.in, log.out) || '') : '');
+                
+                // *** ANZEIGE FIX FÜR DIENSTAG ***
+                // Wenn Dienstag & Kein Feiertag -> Zeige ECHTE Out-Zeit (log.out)
+                // Sonst -> Zeige erweiterte Zeit (getExtendedOutTime)
+                let displayOutTime = '';
+                if(log.out) {
+                    if(d.getDay() === 2 && !isH) {
+                        displayOutTime = log.out; 
+                    } else {
+                        displayOutTime = getExtendedOutTime(dStr, log.in, log.out);
+                    }
+                }
+                
+                let dt = (log.in ? log.in + ' - ' + (displayOutTime || '') : '');
                 const target = getTargetHours(d, currentUser);
                 let typeDisplay = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
                 if(log.type === 'Sonstiges' && log.title) typeDisplay = log.title;
@@ -1410,8 +1464,23 @@ function addPlanningRange() {
 
 function renderTodayInfo() { 
     if(currentUser === 'Admin') return;
-    const ds = toLocalISO(getNow()), log = (db.logs[currentUser]||{})[ds] || {in:'--', out:null}; 
-    let dispOut = log.out ? getExtendedOutTime(ds, log.in, log.out) : '--:--';
+    const n = getNow();
+    const ds = toLocalISO(n);
+    const log = (db.logs[currentUser]||{})[ds] || {in:'--', out:null}; 
+    const isH = holidaysDB[ds];
+
+    // *** KORREKTUR FÜR DIE ANZEIGE ***
+    let dispOut = '--:--';
+    if(log.out) {
+        if (n.getDay() === 2 && !isH) {
+             // Dienstag (kein Feiertag) -> Echte Zeit (NICHT verlängert)
+             dispOut = log.out;
+        } else {
+             // Andere Tage -> Zeit mit Pause (verlängert)
+             dispOut = getExtendedOutTime(ds, log.in, log.out);
+        }
+    }
+    
     document.getElementById('todayDetails').innerHTML = `<div class="flex justify-between p-2 bg-green-50 rounded border text-xs italic"><span>KOMMEN:</span><span class="font-black">${log.in || '--:--'}</span></div><div class="flex justify-between p-2 bg-red-50 rounded border text-xs italic"><span>GEHEN:</span><span class="font-black">${dispOut}</span></div>`; 
 }
 
@@ -1684,7 +1753,33 @@ function exportExcel() {
             const cfg = db.config[currentUser][new Date(y,m,i).getDay()] || {start: "00:00"};
             if(target > 0) calcIn = getKulanzStart(log.in, cfg.start);
             let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+calcIn))/3600000); 
-            if(rawIst > 6.0) { pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); dispOut = getExtendedOutTime(ds, log.in, log.out); ist = safeFloat(rawIst); } else { ist = safeFloat(rawIst); } 
+            
+            // *** EXCEL LOGIK: DIENSTAG vs STANDARD ***
+            if (new Date(y,m,i).getDay() === 2 && !isH && target > 0) {
+                 let [hI, mI] = calcIn.split(':').map(Number);
+                 let [hO, mO] = log.out.split(':').map(Number);
+                 let minIn = hI * 60 + mI;
+                 let minOut = hO * 60 + mO;
+                 let bStart = 765; // 12:45
+                 let bEnd = 825;   // 13:45
+                 let start = Math.max(minIn, bStart);
+                 let end = Math.min(minOut, bEnd);
+                 let deduction = 0;
+                 if(end > start) {
+                     deduction = (end - start) / 60;
+                     pStr = "12:45 - 13:45";
+                 }
+                 ist = safeFloat(rawIst) - deduction;
+                 dispOut = log.out; // Original
+            } else {
+                if(rawIst > 6.0) { 
+                    pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); 
+                    dispOut = getExtendedOutTime(ds, log.in, log.out); 
+                    ist = safeFloat(rawIst); 
+                } else { 
+                    ist = safeFloat(rawIst); 
+                } 
+            }
         }
         rows.push([i+"."+(m+1)+".", log.in||"", dispOut, pStr, safeFloat(ist).toFixed(2), safeFloat(target).toFixed(2), (safeFloat(ist)-safeFloat(target)).toFixed(2), log.note || ""]);
     }
