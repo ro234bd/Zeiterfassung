@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeiterfassung | Praxis System V4.07</title>
+    <title>Zeiterfassung | Praxis System V4.08</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -106,7 +106,10 @@
              <img id="loginLogoImg" src="" class="h-16 mx-auto object-contain">
         </div>
         <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800 text-center" id="loginTitleMain">Login</h2>
-        <p class="text-[10px] font-bold text-slate-400 uppercase mb-4 tracking-widest text-center" id="loginTitleSub">Zeiterfassung</p>
+        <div class="text-center mb-4">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest" id="loginTitleSub">Zeiterfassung</p>
+            <span class="text-[9px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">v4.08</span>
+        </div>
         
         <div id="loginSyncStatus" class="text-[10px] font-bold text-slate-400 uppercase text-center mb-6">● Bereit zum Start</div>
         <div class="space-y-4">
@@ -135,7 +138,10 @@
         <div class="flex items-center gap-4 w-full md:w-auto justify-center md:justify-start">
              <img id="headerLogoImg" src="" class="h-12 hidden object-contain">
              <div class="text-center md:text-left">
-                <h1 id="headerTitleMain" class="text-xl font-black italic uppercase tracking-tight leading-tight">Zeiterfassung</h1>
+                <div class="flex items-baseline gap-2 justify-center md:justify-start">
+                    <h1 id="headerTitleMain" class="text-xl font-black italic uppercase tracking-tight leading-tight">Zeiterfassung</h1>
+                    <span class="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 rounded">v4.08</span>
+                </div>
                 <div id="syncStatus" class="text-[10px] font-bold text-slate-400 uppercase mt-1">● Sync wird initialisiert...</div>
             </div>
         </div>
@@ -250,7 +256,7 @@
         <div class="bg-white shadow rounded-xl border overflow-x-auto">
             <div class="p-6 border-b">
                 <div class="flex justify-between items-start mb-4">
-                    <div><h2 class="text-xl font-black uppercase italic" id="billTitle">Zeitnachweis</h2><p class="text-xs theme-text font-bold uppercase tracking-tight" id="billSub">v4.06</p></div>
+                    <div><h2 class="text-xl font-black uppercase italic" id="billTitle">Zeitnachweis</h2><p class="text-xs theme-text font-bold uppercase tracking-tight" id="billSub">v4.08</p></div>
                     <div class="text-right"><p class="text-[9px] font-bold text-slate-300 uppercase">Mitarbeiter:</p><p id="billUser" class="text-lg font-black uppercase italic leading-none mb-1">--</p><p class="text-[9px] font-bold text-slate-300 uppercase">Zeitraum:</p><p id="billPeriod" class="text-xs font-bold text-slate-400 uppercase leading-none">--</p></div>
                 </div>
                 <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
@@ -767,11 +773,44 @@ function doLogout() {
 function getExtendedOutTime(dStr, inStr, outStr) {
     if(!inStr || !outStr) return outStr;
     let calcIn = inStr;
+    let configBreak = null;
+
     if(currentUser !== 'Admin') {
          const d = new Date(dStr);
          const cfg = db.config[currentUser][d.getDay()] || {start: "00:00"};
          calcIn = getKulanzStart(inStr, cfg.start);
+         
+         // Prüfe auf konfigurierte Pause
+         if(cfg.breakStart && cfg.breakEnd) {
+             configBreak = {
+                 start: cfg.breakStart,
+                 end: cfg.breakEnd,
+                 isReal: cfg.breakIsReal 
+             };
+         }
     }
+    
+    // Fall A: Es gibt eine konfigurierte Pause
+    if (configBreak) {
+        if (configBreak.isReal) {
+            // Echte Pause: Zeit NICHT verlängern (User war weg)
+            return outStr;
+        } else {
+            // Keine echte Pause (Auto-Mittagspause): Zeit verlängern um Pausenlänge
+            // Berechne Pausenlänge
+            const bS = new Date(`2000-01-01T${configBreak.start}`);
+            const bE = new Date(`2000-01-01T${configBreak.end}`);
+            const durationMs = bE - bS;
+            
+            if (durationMs > 0) {
+                 const outDate = new Date(`2000-01-01T${outStr}`);
+                 const extDate = new Date(outDate.getTime() + durationMs);
+                 return extDate.getHours().toString().padStart(2, '0') + ":" + extDate.getMinutes().toString().padStart(2, '0');
+            }
+        }
+    }
+
+    // Fall B: Keine konfigurierte Pause -> Standard >6h Regel
     const rawIst = (new Date(`${dStr}T${outStr}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
     if (rawIst > 6.0) {
         let [h, min] = outStr.split(':').map(Number);
@@ -783,6 +822,15 @@ function getExtendedOutTime(dStr, inStr, outStr) {
 
 function getBreakTimeRange(dStr, inStr, outStr, uName) {
     if(!inStr || !outStr) return "-";
+    
+    // Check config first
+    const dObj = new Date(dStr);
+    const cfg = db.config[uName] && db.config[uName][dObj.getDay()];
+    if(cfg && cfg.breakStart && cfg.breakEnd) {
+        return cfg.breakStart + " - " + cfg.breakEnd + (cfg.breakIsReal ? "" : " (auto)");
+    }
+
+    // Fallback Random Break
     const startD = new Date(`${dStr}T${inStr}`); const endD = new Date(`${dStr}T${outStr}`); const totalHours = (endD - startD) / 3600000;
     let seed = 0; const sStr = dStr + uName; for (let i = 0; i < sStr.length; i++) seed += sStr.charCodeAt(i);
     const randomMinutes = seed % 16;
@@ -961,24 +1009,34 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
             if(target > 0) calcIn = getKulanzStart(log.in, cfg.start); 
             
             let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
-            if(target === 0) ist = safeFloat(rawDiff); 
-            else ist = safeFloat(rawDiff); 
+            ist = safeFloat(rawDiff); 
             
-            // --- NEW TUESDAY FIX ---
-            if (iter.getDay() === 2 && !isH && target > 0) { // 2 = Tuesday
-                 let [hI, mI] = calcIn.split(':').map(Number);
-                 let [hO, mO] = log.out.split(':').map(Number);
-                 let minIn = hI * 60 + mI;
-                 let minOut = hO * 60 + mO;
-                 let bStart = 765; // 12:45
-                 let bEnd = 825;   // 13:45
-                 let start = Math.max(minIn, bStart);
-                 let end = Math.min(minOut, bEnd);
-                 if(end > start) {
-                     ist -= (end - start) / 60;
+            // --- NEW FLEXIBLE BREAK LOGIC (v4.08) ---
+            // Replaces hardcoded Tuesday logic
+            if (!isH && target > 0) {
+                 const breakStartStr = cfg.breakStart;
+                 const breakEndStr = cfg.breakEnd;
+                 
+                 if (breakStartStr && breakEndStr) {
+                     let [hI, mI] = calcIn.split(':').map(Number);
+                     let [hO, mO] = log.out.split(':').map(Number);
+                     let [hbS, mbS] = breakStartStr.split(':').map(Number);
+                     let [hbE, mbE] = breakEndStr.split(':').map(Number);
+
+                     let minIn = hI * 60 + mI;
+                     let minOut = hO * 60 + mO;
+                     let bStart = hbS * 60 + mbS;
+                     let bEnd = hbE * 60 + mbE;
+
+                     let start = Math.max(minIn, bStart);
+                     let end = Math.min(minOut, bEnd);
+                     
+                     if(end > start) {
+                         ist -= (end - start) / 60;
+                     }
                  }
             }
-            // -----------------------
+            // ----------------------------------------
         }
         totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
     }
@@ -1034,32 +1092,50 @@ function renderLogs() {
 
             const rawIst = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
             
-            // *** SPEZIAL-LOGIK DIENSTAG ***
-            if (d.getDay() === 2 && !isH && target > 0) {
+            // *** FLEXIBLE BREAK LOGIC v4.08 ***
+            let deduction = 0;
+            let customBreakFound = false;
+            
+            if (!isH && target > 0 && cfg.breakStart && cfg.breakEnd) {
+                 customBreakFound = true;
                  let [hI, mI] = calcIn.split(':').map(Number);
                  let [hO, mO] = log.out.split(':').map(Number);
+                 let [hbS, mbS] = cfg.breakStart.split(':').map(Number);
+                 let [hbE, mbE] = cfg.breakEnd.split(':').map(Number);
+                 
                  let minIn = hI * 60 + mI;
                  let minOut = hO * 60 + mO;
-                 
-                 // Fixe Pause 12:45 bis 13:45
-                 let bStart = 765; 
-                 let bEnd = 825;   
+                 let bStart = hbS * 60 + mbS;
+                 let bEnd = hbE * 60 + mbE;
                  
                  let start = Math.max(minIn, bStart);
                  let end = Math.min(minOut, bEnd);
-                 let deduction = 0;
                  
                  if(end > start) {
                      deduction = (end - start) / 60;
-                     pauseDisplay = "12:45 - 13:45";
-                     if(deduction < 1.0) pauseDisplay += " (anteilig)";
+                     pauseDisplay = `${cfg.breakStart} - ${cfg.breakEnd}`;
+                     if(deduction < ((bEnd-bStart)/60)) pauseDisplay += " (anteilig)";
+                     if(!cfg.breakIsReal) pauseDisplay += " (auto)";
                  }
                  
                  ist = safeFloat(rawIst) - deduction;
-                 dispOut = log.out; // Originale Geh-Zeit lassen!
+                 
+                 // Anzeige Logik: 
+                 // Wenn "Echt" (Häkchen) -> Originale Zeit
+                 // Wenn "Nicht Echt" -> Verlängern
+                 if (!cfg.breakIsReal) {
+                     // Verlängern um die Länge der Pause (z.B. 30min)
+                     const durationMs = (new Date(`2000-01-01T${cfg.breakEnd}`) - new Date(`2000-01-01T${cfg.breakStart}`));
+                     const outDate = new Date(`2000-01-01T${log.out}`);
+                     const extDate = new Date(outDate.getTime() + durationMs);
+                     dispOut = extDate.getHours().toString().padStart(2, '0') + ":" + extDate.getMinutes().toString().padStart(2, '0');
+                 } else {
+                     dispOut = log.out;
+                 }
             } 
-            // *** STANDARD LOGIK (Andere Tage) ***
-            else {
+            
+            // Standard > 6h Regel (nur wenn KEINE Custom Pause definiert ist)
+            if (!customBreakFound) {
                 if (rawIst > 6.0) { 
                     pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
                     dispOut = getExtendedOutTime(dStr, log.in, log.out); 
@@ -1311,16 +1387,10 @@ function renderCalendar() {
             } else {
                 const log = (db.logs[currentUser]||{})[dStr] || {};
                 
-                // *** ANZEIGE FIX FÜR DIENSTAG ***
-                // Wenn Dienstag & Kein Feiertag -> Zeige ECHTE Out-Zeit (log.out)
-                // Sonst -> Zeige erweiterte Zeit (getExtendedOutTime)
+                // *** ANZEIGE FIX FÜR v4.08 Flexible Pause ***
                 let displayOutTime = '';
                 if(log.out) {
-                    if(d.getDay() === 2 && !isH) {
-                        displayOutTime = log.out; 
-                    } else {
-                        displayOutTime = getExtendedOutTime(dStr, log.in, log.out);
-                    }
+                    displayOutTime = getExtendedOutTime(dStr, log.in, log.out);
                 }
                 
                 let dt = (log.in ? log.in + ' - ' + (displayOutTime || '') : '');
@@ -1410,13 +1480,47 @@ function renderWeeklySettings() {
         const selAll = (!c.weekMode || c.weekMode === 'ALL') ? 'selected' : '';
         const selEven = (c.weekMode === 'EVEN') ? 'selected' : '';
         const selOdd = (c.weekMode === 'ODD') ? 'selected' : '';
-        cont.innerHTML += `<div class="flex flex-col md:flex-row items-start md:items-center gap-2 p-3 bg-slate-50 rounded-lg border italic"><span class="w-16 font-bold text-xs uppercase">${WEEKDAYS_SHORT[i]}</span><div class="flex items-center gap-2"><input type="time" id="ws_${i}" value="${c.start}" class="border p-1 rounded text-xs"><input type="number" id="wt_${i}" value="${c.target}" step="0.5" class="border p-1 rounded w-16 text-right text-xs font-black"> <span class="text-xs">h</span></div><select id="wm_${i}" class="text-[10px] border rounded bg-white p-1"><option value="ALL" ${selAll}>Jede Woche</option><option value="EVEN" ${selEven}>Gerade KW (2,4..)</option><option value="ODD" ${selOdd}>Ungerade KW (1,3..)</option></select></div>`; 
+        
+        // v4.08 New Config Fields
+        const bStart = c.breakStart || "";
+        const bEnd = c.breakEnd || "";
+        const bFix = c.breakIsReal ? "checked" : "";
+        
+        cont.innerHTML += `<div class="flex flex-col gap-2 p-3 bg-slate-50 rounded-lg border italic">
+            <div class="flex items-center gap-2">
+                <span class="w-16 font-bold text-xs uppercase text-slate-700">${WEEKDAYS_SHORT[i]}</span>
+                <input type="time" id="ws_${i}" value="${c.start}" class="border p-1 rounded text-xs bg-white">
+                <div class="flex items-center gap-1 bg-white border rounded p-1">
+                    <input type="number" id="wt_${i}" value="${c.target}" step="0.5" class="w-10 text-right text-xs font-black outline-none">
+                    <span class="text-[9px] font-bold text-slate-400">h</span>
+                </div>
+                <select id="wm_${i}" class="text-[9px] border rounded bg-white p-1"><option value="ALL" ${selAll}>Jede KW</option><option value="EVEN" ${selEven}>Gerade KW</option><option value="ODD" ${selOdd}>Ungerade</option></select>
+            </div>
+            <div class="flex items-center gap-2 border-t pt-2 border-slate-200">
+                <span class="text-[9px] font-bold text-slate-400 uppercase w-16">Pause:</span>
+                <input type="time" id="wb_start_${i}" value="${bStart}" class="border p-1 rounded text-[10px] bg-white w-20">
+                <span class="text-[9px]">-</span>
+                <input type="time" id="wb_end_${i}" value="${bEnd}" class="border p-1 rounded text-[10px] bg-white w-20">
+                <label class="flex items-center gap-1 cursor-pointer ml-2">
+                    <input type="checkbox" id="wb_fix_${i}" ${bFix} class="w-3 h-3 accent-blue-600">
+                    <span class="text-[9px] font-bold text-blue-600 uppercase" title="Angehakt = Echte Pause (Gehen-Zeit bleibt) / Leer = Auto-Pause (Gehen-Zeit wird verlängert)">Fix?</span>
+                </label>
+            </div>
+        </div>`; 
     }
 }
 function saveWeekly() { 
     if(currentUser==="Admin") return;
     for(let i=1; i<=5; i++) { 
-        db.config[currentUser][i] = { start: document.getElementById('ws_'+i).value, target: parseFloat(document.getElementById('wt_'+i).value) || 0, weekMode: document.getElementById('wm_'+i).value }; 
+        db.config[currentUser][i] = { 
+            start: document.getElementById('ws_'+i).value, 
+            target: parseFloat(document.getElementById('wt_'+i).value) || 0, 
+            weekMode: document.getElementById('wm_'+i).value,
+            // v4.08 Fields
+            breakStart: document.getElementById('wb_start_'+i).value,
+            breakEnd: document.getElementById('wb_end_'+i).value,
+            breakIsReal: document.getElementById('wb_fix_'+i).checked
+        }; 
     } 
     save(); alert("Plan gespeichert!"); renderAll(); 
 }
@@ -1467,18 +1571,11 @@ function renderTodayInfo() {
     const n = getNow();
     const ds = toLocalISO(n);
     const log = (db.logs[currentUser]||{})[ds] || {in:'--', out:null}; 
-    const isH = holidaysDB[ds];
-
+    
     // *** KORREKTUR FÜR DIE ANZEIGE ***
     let dispOut = '--:--';
     if(log.out) {
-        if (n.getDay() === 2 && !isH) {
-             // Dienstag (kein Feiertag) -> Echte Zeit (NICHT verlängert)
-             dispOut = log.out;
-        } else {
-             // Andere Tage -> Zeit mit Pause (verlängert)
-             dispOut = getExtendedOutTime(ds, log.in, log.out);
-        }
+         dispOut = getExtendedOutTime(ds, log.in, log.out);
     }
     
     document.getElementById('todayDetails').innerHTML = `<div class="flex justify-between p-2 bg-green-50 rounded border text-xs italic"><span>KOMMEN:</span><span class="font-black">${log.in || '--:--'}</span></div><div class="flex justify-between p-2 bg-red-50 rounded border text-xs italic"><span>GEHEN:</span><span class="font-black">${dispOut}</span></div>`; 
@@ -1754,24 +1851,44 @@ function exportExcel() {
             if(target > 0) calcIn = getKulanzStart(log.in, cfg.start);
             let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+calcIn))/3600000); 
             
-            // *** EXCEL LOGIK: DIENSTAG vs STANDARD ***
-            if (new Date(y,m,i).getDay() === 2 && !isH && target > 0) {
+            // *** EXCEL LOGIK v4.08 Flexible Pause ***
+            let deduction = 0;
+            let customBreakFound = false;
+
+            if (!isH && target > 0 && cfg.breakStart && cfg.breakEnd) {
+                 customBreakFound = true;
                  let [hI, mI] = calcIn.split(':').map(Number);
                  let [hO, mO] = log.out.split(':').map(Number);
+                 let [hbS, mbS] = cfg.breakStart.split(':').map(Number);
+                 let [hbE, mbE] = cfg.breakEnd.split(':').map(Number);
+
                  let minIn = hI * 60 + mI;
                  let minOut = hO * 60 + mO;
-                 let bStart = 765; // 12:45
-                 let bEnd = 825;   // 13:45
+                 let bStart = hbS * 60 + mbS;
+                 let bEnd = hbE * 60 + mbE;
+
                  let start = Math.max(minIn, bStart);
                  let end = Math.min(minOut, bEnd);
-                 let deduction = 0;
+                 
                  if(end > start) {
                      deduction = (end - start) / 60;
-                     pStr = "12:45 - 13:45";
+                     pStr = `${cfg.breakStart} - ${cfg.breakEnd}`;
                  }
+                 
                  ist = safeFloat(rawIst) - deduction;
-                 dispOut = log.out; // Original
-            } else {
+                 
+                 // Excel Anzeige Logik
+                 if (!cfg.breakIsReal) {
+                     const durationMs = (new Date(`2000-01-01T${cfg.breakEnd}`) - new Date(`2000-01-01T${cfg.breakStart}`));
+                     const outDate = new Date(`2000-01-01T${log.out}`);
+                     const extDate = new Date(outDate.getTime() + durationMs);
+                     dispOut = extDate.getHours().toString().padStart(2, '0') + ":" + extDate.getMinutes().toString().padStart(2, '0');
+                 } else {
+                     dispOut = log.out;
+                 }
+            } 
+            
+            if (!customBreakFound) {
                 if(rawIst > 6.0) { 
                     pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); 
                     dispOut = getExtendedOutTime(ds, log.in, log.out); 
