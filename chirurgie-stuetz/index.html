@@ -4,7 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zeiterfassung | Praxis System V4.08</title>
-    
+
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script>
+        // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
+        const CURRENT_APP_VERSION = "4.08"; 
+        
+        const savedAppVersion = localStorage.getItem("ze_system_version");
+        if (savedAppVersion !== CURRENT_APP_VERSION) {
+            console.log("Neue Version erkannt! Cache wird geleert...");
+            localStorage.setItem("ze_system_version", CURRENT_APP_VERSION);
+            
+            // Alten Service Worker löschen (wichtig für Handys!)
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) { 
+                        registration.unregister(); 
+                    }
+                });
+            }
+            
+            // Hard-Reload erzwingen (hängt einen Zeitstempel an die URL an)
+            if (window.location.search.indexOf('v=' + CURRENT_APP_VERSION) === -1) {
+                window.location.href = window.location.pathname + '?v=' + CURRENT_APP_VERSION + '&ts=' + Date.now();
+            }
+        }
+    </script>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
