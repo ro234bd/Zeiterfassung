@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeiterfassung | TO Dr. Stütz & Dr. Haselgruber V4.06</title>
+    <title>Zeiterfassung | TO Dr. Stütz & Dr. Haselgruber V4.07</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -670,7 +670,7 @@ function performLogin() {
 
     let storedPass = "1234";
     if (user === "Admin") {
-        storedPass = (db.settings && db.settings.adminPassword) ? db.settings.adminPassword : "Va19tti!";
+        storedPass = (db.settings && db.settings.adminPassword) ? db.settings.adminPassword : "Admin";
     } else {
         storedPass = (db.passwords && db.passwords[user]) ? db.passwords[user] : "1234";
     }
@@ -1128,11 +1128,30 @@ async function save() {
     const statusDiv = document.getElementById('syncStatus');
     const loginSync = document.getElementById('loginSyncStatus');
     const targetUrl = CLOUD_URL;
+
+    // NEU: Der strukturierte Payload (Zettel) für den Smart Merge in der Cloud
+    const payload = {
+        sender: currentUser,
+        db: db
+    };
+
     try {
-        await fetch(targetUrl, { method:'POST', mode:'no-cors', body: JSON.stringify(db) });
-        statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
-        if(loginSync) { loginSync.innerText = "● Online (Verbunden)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
+        // NEU: 'mode: no-cors' ist weg! Wir warten jetzt auf eine echte Antwort vom Server.
+        const response = await fetch(targetUrl, { 
+            method: 'POST', 
+            body: JSON.stringify(payload) 
+        });
+        
+        const result = await response.json();
+
+        if (result.status === "success") {
+            statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
+            if(loginSync) { loginSync.innerText = "● Online (Verbunden)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
+        } else {
+            throw new Error(result.message);
+        }
     } catch(e) { 
+        console.error("Cloud-Sync Fehler:", e);
         statusDiv.innerText = "● Nur lokal (Offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; 
         if(loginSync) { loginSync.innerText = "● Offline (Nur lokal)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
     }
