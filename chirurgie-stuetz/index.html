@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeiterfassung | Praxis System V4.08</title>
+    <title>Zeiterfassung | Chirurgie Dr. Stütz V4.09</title>
 
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.08"; 
+        const CURRENT_APP_VERSION = "4.09"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -1272,13 +1272,82 @@ async function save() {
     const statusDiv = document.getElementById('syncStatus');
     const loginSync = document.getElementById('loginSyncStatus');
     const targetUrl = CLOUD_URL;
+    
+    // Optisches Feedback
+    if(statusDiv) { statusDiv.innerText = "⏳ Synchronisiere..."; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
+
+    // Delta-Sync: Wir sagen dem Server, dass hier ALLES überschrieben wird (z.B. Admin-Settings)
+    const dataToSend = {
+        action: "full_sync",
+        payload: db
+    };
+
     try {
-        await fetch(targetUrl, { method:'POST', mode:'no-cors', body: JSON.stringify(db) });
-        statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
-        if(loginSync) { loginSync.innerText = "● Online (Verbunden)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
+        // HINWEIS: mode: 'no-cors' wurde entfernt, damit wir die Server-Antwort lesen können!
+        const response = await fetch(targetUrl, { 
+            method:'POST', 
+            body: JSON.stringify(dataToSend) 
+        });
+        
+        if(response.ok) {
+            const updatedDb = await response.json();
+            // Wenn der Server eine gültige DB zurückschickt, übernehmen wir sie sofort
+            if(updatedDb && updatedDb.users) {
+                db = updatedDb;
+                localStorage.setItem(DB_KEY, JSON.stringify(db));
+            }
+            if(statusDiv) { statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; }
+            if(loginSync) { loginSync.innerText = "● Online (Verbunden)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
+        }
     } catch(e) { 
-        statusDiv.innerText = "● Nur lokal (Offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; 
+        console.error("Cloud Sync Fehler:", e);
+        if(statusDiv) { statusDiv.innerText = "● Nur lokal (Offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
         if(loginSync) { loginSync.innerText = "● Offline (Nur lokal)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
+    }
+}
+// NEU: Diese Funktion schickt nur EINEN bestimmten Tag eines bestimmten Users an die Cloud
+async function saveLogEntry(userName, dateStr, payload) {
+    // 1. Zuerst sofort lokal speichern (damit die App schnell reagiert)
+    if (payload === null) {
+        if (db.logs[userName] && db.logs[userName][dateStr]) {
+            delete db.logs[userName][dateStr];
+        }
+    } else {
+        if (!db.logs[userName]) db.logs[userName] = {};
+        db.logs[userName][dateStr] = payload;
+    }
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+    renderAll(); // UI sofort aktualisieren
+
+    const statusDiv = document.getElementById('syncStatus');
+    if(statusDiv) { statusDiv.innerText = "⏳ Synchronisiere..."; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
+
+    // 2. Gezielten Befehl an den Server schicken
+    const dataToSend = {
+        action: "update_log",
+        user: userName,
+        date: dateStr,
+        payload: payload
+    };
+
+    try {
+        const response = await fetch(CLOUD_URL, {
+            method: 'POST',
+            body: JSON.stringify(dataToSend)
+        });
+        
+        if(response.ok) {
+            const updatedDb = await response.json();
+            if(updatedDb && updatedDb.users) {
+                db = updatedDb; // Wir übernehmen den aktuellsten, vom Server zusammengeführten Stand
+                localStorage.setItem(DB_KEY, JSON.stringify(db));
+                if(statusDiv) { statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; }
+                renderAll(); // Nochmal rendern, falls Kollegen in der Zwischenzeit gestempelt haben
+            }
+        }
+    } catch(e) {
+        console.error("Sync error:", e);
+        if(statusDiv) { statusDiv.innerText = "● Nur lokal (Offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
     }
 }
 
@@ -1465,10 +1534,18 @@ function punch(t) {
         ts = roundToQuarter(ts);
     }
 
-    if(!db.logs[currentUser]) db.logs[currentUser] = {}; 
-    if(t==='in') db.logs[currentUser][ds] = {in:ts, out:null}; 
-    else if(db.logs[currentUser][ds]) db.logs[currentUser][ds].out=ts; 
-    save(); renderAll();
+    // Aktuellen Log laden oder neu erstellen
+    let currentLog = (db.logs[currentUser] && db.logs[currentUser][ds]) ? {...db.logs[currentUser][ds]} : {};
+    
+    if(t === 'in') {
+        currentLog.in = ts;
+        if(currentLog.out === undefined) currentLog.out = null; 
+    } else {
+        currentLog.out = ts; 
+    }
+    
+    // NEU: Einzelnen Eintrag per Delta-Sync speichern
+    saveLogEntry(currentUser, ds, currentLog);
 }
 
 function switchUser() { 
@@ -1628,21 +1705,26 @@ function saveDayEditor() {
     if(!editingDateStr) return;
     const i = document.getElementById('editIn').value; const o = document.getElementById('editOut').value;
     const n = document.getElementById('editNote').value.trim(); const t = document.getElementById('editType').value;
-    if(!db.logs[currentUser]) db.logs[currentUser] = {};
-    if(!i && !o && !n && !t) { delete db.logs[currentUser][editingDateStr]; } 
-    else {
-        let entry = db.logs[currentUser][editingDateStr] || {};
+    
+    if(!i && !o && !n && !t) { 
+        // Wenn alles leer ist, senden wir "null", damit der Server den Eintrag löscht
+        saveLogEntry(currentUser, editingDateStr, null);
+    } else {
+        let entry = (db.logs[currentUser] && db.logs[currentUser][editingDateStr]) ? {...db.logs[currentUser][editingDateStr]} : {};
         entry.in = i; entry.out = o; entry.note = n; entry.type = t;
         if(!entry.in) delete entry.in; if(!entry.out) delete entry.out; if(!entry.note) delete entry.note; if(!entry.type) delete entry.type;
-        db.logs[currentUser][editingDateStr] = entry;
+        
+        // Gezielt speichern
+        saveLogEntry(currentUser, editingDateStr, entry);
     }
-    save(); renderAll(); closeDayEditor();
+    closeDayEditor();
 }
 
 function deleteDayEntry() {
     if(!editingDateStr) return;
     if(confirm("Eintrag für diesen Tag wirklich komplett löschen?")) {
-        if(db.logs[currentUser] && db.logs[currentUser][editingDateStr]) { delete db.logs[currentUser][editingDateStr]; save(); renderAll(); }
+        // Sendet "null" als payload -> Server löscht den Eintrag
+        saveLogEntry(currentUser, editingDateStr, null);
         closeDayEditor();
     }
 }
