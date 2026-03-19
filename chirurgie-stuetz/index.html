@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeiterfassung | Chirurgie Dr. Stütz V4.09</title>
+    <title id="appTitle">Zeiterfassung | Chirurgie Dr. Stütz</title>
 
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -135,7 +135,7 @@
         <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800 text-center" id="loginTitleMain">Login</h2>
         <div class="text-center mb-4">
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest" id="loginTitleSub">Zeiterfassung</p>
-            <span class="text-[9px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">v4.08</span>
+            <span id="verLogin" class="text-[9px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full"></span>
         </div>
         
         <div id="loginSyncStatus" class="text-[10px] font-bold text-slate-400 uppercase text-center mb-6">● Bereit zum Start</div>
@@ -167,7 +167,7 @@
              <div class="text-center md:text-left">
                 <div class="flex items-baseline gap-2 justify-center md:justify-start">
                     <h1 id="headerTitleMain" class="text-xl font-black italic uppercase tracking-tight leading-tight">Zeiterfassung</h1>
-                    <span class="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 rounded">v4.08</span>
+                    <span id="verHeader" class="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 rounded"></span>
                 </div>
                 <div id="syncStatus" class="text-[10px] font-bold text-slate-400 uppercase mt-1">● Sync wird initialisiert...</div>
             </div>
@@ -283,7 +283,7 @@
         <div class="bg-white shadow rounded-xl border overflow-x-auto">
             <div class="p-6 border-b">
                 <div class="flex justify-between items-start mb-4">
-                    <div><h2 class="text-xl font-black uppercase italic" id="billTitle">Zeitnachweis</h2><p class="text-xs theme-text font-bold uppercase tracking-tight" id="billSub">v4.08</p></div>
+                    <div><h2 class="text-xl font-black uppercase italic" id="billTitle">Zeitnachweis</h2><p class="text-xs theme-text font-bold uppercase tracking-tight" id="verBill"></p></div>
                     <div class="text-right"><p class="text-[9px] font-bold text-slate-300 uppercase">Mitarbeiter:</p><p id="billUser" class="text-lg font-black uppercase italic leading-none mb-1">--</p><p class="text-[9px] font-bold text-slate-300 uppercase">Zeitraum:</p><p id="billPeriod" class="text-xs font-bold text-slate-400 uppercase leading-none">--</p></div>
                 </div>
                 <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
@@ -613,7 +613,6 @@ function applyTheme() {
         const title = db.settings.companyName || "Teamordination Dr. Stütz & Dr. Haselgruber";
         document.getElementById('headerTitleMain').innerText = title;
         document.getElementById('loginTitleSub').innerText = title;
-        document.getElementById('billSub').innerText = title;
 
         if(db.settings.logo) {
             document.getElementById('headerLogoImg').src = db.settings.logo;
@@ -701,7 +700,7 @@ function performLogin() {
 
     let storedPass = "1234";
     if (user === "Admin") {
-        storedPass = (db.settings && db.settings.adminPassword) ? db.settings.adminPassword : "W3rn3rStütz";
+        storedPass = (db.settings && db.settings.adminPassword) ? db.settings.adminPassword : "Admin";
     } else {
         storedPass = (db.passwords && db.passwords[user]) ? db.passwords[user] : "1234";
     }
@@ -870,6 +869,18 @@ function getBreakTimeRange(dStr, inStr, outStr, uName) {
 
 async function init() {
     try {
+        // UI Versionsnummern updaten
+        const versionString = "v" + CURRENT_APP_VERSION;
+        const domTitle = document.getElementById('appTitle');
+        const domVerLogin = document.getElementById('verLogin');
+        const domVerHeader = document.getElementById('verHeader');
+        const domVerBill = document.getElementById('verBill');
+        
+        if(domTitle) domTitle.innerText = "Zeiterfassung | Chirurgie Dr. Stütz V" + CURRENT_APP_VERSION;
+        if(domVerLogin) domVerLogin.innerText = versionString;
+        if(domVerHeader) domVerHeader.innerText = versionString;
+        if(domVerBill) domVerBill.innerText = versionString;
+        
         if(!db.users.includes("Admin")) db.users.push("Admin");
         if(!db.passwords) db.passwords = {};
         if(!db.messages) db.messages = []; 
@@ -886,7 +897,7 @@ async function init() {
             if(!db.config[u][6]) db.config[u][6] = { start: "00:00", target: 0 };
 
             if (!db.admin[u]) db.admin[u] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
-            if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "1234" : "1234"; }
+            if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "Admin" : "1234"; }
         });
         
         schoolHolidays = [...fallbackHolidays];
