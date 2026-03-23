@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.08"; 
+        const CURRENT_APP_VERSION = "4.10"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -57,10 +57,7 @@
         
         .tab-active { border-bottom: 4px solid var(--main-color) !important; color: var(--main-color) !important; font-weight: 800; }
         
-        /* Zeilen-Styles */
-        /* row-holiday wird jetzt auch für manuelle Feiertage genutzt */
         .row-holiday { background-color: #fef2f2 !important; color: #991b1b !important; }
-        
         .row-vacation { background-color: #ecfdf5 !important; color: #064e3b !important; }
         .row-schulung { background-color: #f3e8ff !important; color: #6b21a8 !important; } 
         .row-custom { background-color: #fffbeb !important; color: #92400e !important; } 
@@ -71,14 +68,11 @@
         .row-sunday { background-color: #fff7ed !important; color: #c2410c !important; border-left: 4px solid #ea580c !important; font-weight: bold !important; }
         .row-school-holiday { background-color: #f0f9ff !important; border-left: 4px solid #0ea5e9 !important; border-bottom: 1px solid #bae6fd !important; }
         
-        /* Kalender Grid */
         .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background-color: #e2e8f0; border: 1px solid #e2e8f0; }
         .cal-day { background: white; min-height: 85px; padding: 4px; font-size: 0.75rem; position: relative; display: flex; flex-direction: column; gap: 2px; }
         .cal-header { background: #f8fafc; font-weight: bold; padding: 8px; text-align: center; font-size: 0.7rem; text-transform: uppercase; }
         
-        .cal-entry {
-            white-space: normal; word-wrap: break-word; line-height: 1.1; font-size: 0.65rem; padding: 2px 3px; border-radius: 3px; border: 1px solid transparent; font-weight: 600;          
-        }
+        .cal-entry { white-space: normal; word-wrap: break-word; line-height: 1.1; font-size: 0.65rem; padding: 2px 3px; border-radius: 3px; border: 1px solid transparent; font-weight: 600; }
         .year-grid .cal-entry { font-size: 0.5rem !important; line-height: 1.0 !important; padding: 1px 2px !important; }
         .year-grid .cal-day { min-height: 60px !important; }
         .year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
@@ -89,7 +83,6 @@
         .sig-badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-weight: bold; font-size: 0.75rem; text-transform: uppercase; }
         .sig-badge.ok { background-color: #22c55e; color: white; }
         
-        /* Zoom Modus Klasse */
         body.zoom-out { zoom: 0.85; -moz-transform: scale(0.85); -moz-transform-origin: top center; }
     </style>
 </head>
@@ -105,7 +98,13 @@
                 <div><label class="text-[9px] font-bold uppercase text-slate-400">Kommen</label><input type="time" id="editIn" class="w-full p-2 border rounded font-bold bg-slate-50"></div>
                 <div><label class="text-[9px] font-bold uppercase text-slate-400">Gehen</label><input type="time" id="editOut" class="w-full p-2 border rounded font-bold bg-slate-50"></div>
             </div>
-            <div>
+            
+            <div class="grid grid-cols-2 gap-2 mt-1">
+                <div><label class="text-[9px] font-bold uppercase text-amber-500">Pause Start</label><input type="time" id="editBreakIn" class="w-full p-2 border border-amber-200 rounded font-bold bg-amber-50 text-amber-800"></div>
+                <div><label class="text-[9px] font-bold uppercase text-amber-500">Pause Ende</label><input type="time" id="editBreakOut" class="w-full p-2 border border-amber-200 rounded font-bold bg-amber-50 text-amber-800"></div>
+            </div>
+
+            <div class="pt-2">
                 <label class="text-[9px] font-bold uppercase text-slate-400">Typ / Status</label>
                 <select id="editType" class="w-full p-2 border rounded font-bold text-xs bg-slate-50">
                     <option value="">(Standard: Arbeitszeit)</option>
@@ -205,11 +204,15 @@
                 <h2 id="displayUserName" class="text-2xl font-black text-slate-700 mb-1">--</h2>
                 <p class="text-sm text-slate-400 mb-6" id="displayTodayDate"></p>
                 <div id="punchButtonsArea">
-                    <div class="flex justify-center gap-6 mb-8">
-                        <button onclick="punch('in')" class="w-24 h-24 md:w-32 md:h-32 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-xs md:text-base">Kommen</button>
-                        <button onclick="punch('out')" class="w-24 h-24 md:w-32 md:h-32 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-xs md:text-base">Gehen</button>
+                    <div class="flex justify-center items-center gap-3 mb-8">
+                        <button onclick="punch('in')" class="w-20 h-20 md:w-28 md:h-28 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm">Kommen</button>
+                        <div class="flex flex-col gap-2">
+                            <button onclick="punch('break_in')" class="w-16 h-10 md:w-24 md:h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow font-bold flex items-center justify-center transition-all active:scale-90 uppercase text-[8px] md:text-xs">Pause Start</button>
+                            <button onclick="punch('break_out')" class="w-16 h-10 md:w-24 md:h-12 bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow font-bold flex items-center justify-center transition-all active:scale-90 uppercase text-[8px] md:text-xs">Pause Ende</button>
+                        </div>
+                        <button onclick="punch('out')" class="w-20 h-20 md:w-28 md:h-28 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm">Gehen</button>
                     </div>
-                    <div id="todayDetails" class="space-y-2 max-w-xs mx-auto"></div>
+                    <div id="todayDetails" class="space-y-1 max-w-xs mx-auto"></div>
                 </div>
                 <div id="adminPunchPlaceholder" class="hidden text-slate-400 font-bold italic border-2 border-dashed border-slate-200 p-8 rounded-xl bg-slate-50">
                     <p>Admin Modus aktiv</p><p class="text-xs font-normal mt-2">Mitarbeiter oben rechts auswählen.</p>
@@ -487,12 +490,12 @@ function formatHM(val) {
     return `${sign}${h}:${m.toString().padStart(2, '0')}`;
 }
 
-// HELPER: Round to Quarter (Kaufmännisch)
-function roundToQuarter(timeStr) {
+// HELPER: Flexible Rundung (Kaufmännisch)
+function roundTime(timeStr, minutes) {
     if(!timeStr) return timeStr;
     let [h, m] = timeStr.split(':').map(Number);
     let totalMins = h * 60 + m;
-    let rounded = Math.round(totalMins / 15) * 15;
+    let rounded = Math.round(totalMins / minutes) * minutes;
     let newH = Math.floor(rounded / 60);
     let newM = rounded % 60;
     if(newH === 24) { newH = 0; } 
@@ -568,7 +571,7 @@ function getTargetHours(dateObj, uName) {
     // 1. Check: Gesetzlicher Feiertag?
     if (holidaysDB[dStr]) return 0; 
 
-    // 2. Check (NEU): Manueller Feiertag? -> Soll = 0
+    // 2. Check: Manueller Feiertag?
     const log = (db.logs[uName] || {})[dStr];
     if (log && log.type === 'Feiertag') return 0;
 
@@ -582,6 +585,12 @@ function getTargetHours(dateObj, uName) {
     if (mode === 'ODD' && kw % 2 === 0) return 0;  
 
     return t;
+}
+
+function getManualBreakHours(bIn, bOut) {
+    if(!bIn || !bOut) return 0;
+    const ms = new Date(`2000-01-01T${bOut}`) - new Date(`2000-01-01T${bIn}`);
+    return ms > 0 ? ms / 3600000 : 0;
 }
 
 function renderTeamSchedule() {
@@ -756,9 +765,9 @@ function startApp() {
              document.getElementById('sysTitle').value = db.settings.companyName || "";
              document.getElementById('sysColor').value = db.settings.primaryColor || "#2563eb";
              document.getElementById('sysColorVal').innerText = db.settings.primaryColor || "#2563eb";
-             document.getElementById('sysAdminPw').value = db.settings.adminPassword || "";
-             document.getElementById('sysCloudUrl').value = CLOUD_URL; // Read-Only
-             document.getElementById('sysDbKey').value = DB_KEY; // Read-Only
+             document.getElementById('sysAdminPw').value = db.settings.adminPassword || "Admin";
+             document.getElementById('sysCloudUrl').value = CLOUD_URL; 
+             document.getElementById('sysDbKey').value = DB_KEY; 
 
              if(db.settings.logo) {
                 document.getElementById('sysLogoPreview').src = db.settings.logo;
@@ -831,7 +840,6 @@ function getBreakTimeRange(dStr, inStr, outStr, uName) {
 
 async function init() {
     try {
-        // UI Versionsnummern updaten
         const versionString = "v" + CURRENT_APP_VERSION;
         const domTitle = document.getElementById('appTitle');
         const domVerLogin = document.getElementById('verLogin');
@@ -859,7 +867,7 @@ async function init() {
             if(!db.config[u][6]) db.config[u][6] = { start: "00:00", target: 0 };
 
             if (!db.admin[u]) db.admin[u] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
-            if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "1234" : "1234"; }
+            if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "Admin" : "1234"; }
         });
         
         schoolHolidays = [...fallbackHolidays];
@@ -985,6 +993,7 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
     let usedVacYear = 0, usedVacMonth = 0;
     let iter = new Date(admin.startDate); if(isNaN(iter.getTime())) iter = new Date(targetYear, 0, 1);
     let endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
+    
     while (iter <= endIter) {
         const dStr = toLocalISO(iter); const log = logs[dStr] || {};
         const target = getTargetHours(iter, userName);
@@ -1009,8 +1018,13 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
             if(target > 0) calcIn = getKulanzStart(log.in, cfg.start); 
             
             let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
-            if(target === 0) ist = safeFloat(rawDiff); 
-            else ist = safeFloat(rawDiff); 
+            let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
+            
+            if(manualBreakHours > 0) {
+                ist = safeFloat(rawDiff - manualBreakHours);
+            } else {
+                ist = safeFloat(rawDiff);
+            }
         }
         totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
     }
@@ -1065,15 +1079,25 @@ function renderLogs() {
             if(target > 0) calcIn = getKulanzStart(log.in, cfg.start);
 
             const rawIst = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
+            let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
             
-            if (rawIst > 6.0) { 
-                pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
-                dispOut = getExtendedOutTime(dStr, log.in, log.out); 
-                ist = safeFloat(rawIst); 
-            } else { 
-                ist = safeFloat(rawIst); 
+            if (manualBreakHours > 0) {
+                // Echte, gestempelte Pause
+                ist = Math.max(0, safeFloat(rawIst - manualBreakHours));
+                pauseDisplay = `${log.break_in} - ${log.break_out}`;
+                dispOut = log.out; // Out Zeit bleibt absolut unangetastet!
+            } else {
+                // Automatik-Pause (wenn keine echte Pause gestempelt wurde)
+                if (rawIst > 6.0) { 
+                    pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
+                    dispOut = getExtendedOutTime(dStr, log.in, log.out); 
+                    ist = safeFloat(rawIst); 
+                } else { 
+                    ist = safeFloat(rawIst); 
+                }
             }
         }
+        
         mIst += ist; mSoll += target;
         
         if (log.type==='Urlaub' || log.type==='Betriebsurlaub') rowClass = 'row-vacation';
@@ -1175,14 +1199,12 @@ async function save() {
     const loginSync = document.getElementById('loginSyncStatus');
     const targetUrl = CLOUD_URL;
 
-    // NEU: Der strukturierte Payload (Zettel) für den Smart Merge in der Cloud
     const payload = {
         sender: currentUser,
         db: db
     };
 
     try {
-        // NEU: 'mode: no-cors' ist weg! Wir warten jetzt auf eine echte Antwort vom Server.
         const response = await fetch(targetUrl, { 
             method: 'POST', 
             body: JSON.stringify(payload) 
@@ -1374,14 +1396,23 @@ function punch(t) {
         ts = getKulanzStart(ts, config.start);
     }
 
-    // GEHEN: Neu mit Rundung auf 15 Min
+    // Gehen: Rundung auf 15 Min
     if (t === 'out') {
-        ts = roundToQuarter(ts);
+        ts = roundTime(ts, 15);
+    }
+    // Pausen: Rundung auf 5 Min
+    if (t === 'break_in' || t === 'break_out') {
+        ts = roundTime(ts, 5);
     }
 
     if(!db.logs[currentUser]) db.logs[currentUser] = {}; 
-    if(t==='in') db.logs[currentUser][ds] = {in:ts, out:null}; 
-    else if(db.logs[currentUser][ds]) db.logs[currentUser][ds].out=ts; 
+    if(!db.logs[currentUser][ds]) db.logs[currentUser][ds] = {};
+    
+    if(t==='in') db.logs[currentUser][ds].in = ts; 
+    else if(t==='out') db.logs[currentUser][ds].out = ts; 
+    else if(t==='break_in') db.logs[currentUser][ds].break_in = ts;
+    else if(t==='break_out') db.logs[currentUser][ds].break_out = ts;
+
     save(); renderAll();
 }
 
@@ -1477,7 +1508,19 @@ function renderTodayInfo() {
     if(currentUser === 'Admin') return;
     const ds = toLocalISO(getNow()), log = (db.logs[currentUser]||{})[ds] || {in:'--', out:null}; 
     let dispOut = log.out ? getExtendedOutTime(ds, log.in, log.out) : '--:--';
-    document.getElementById('todayDetails').innerHTML = `<div class="flex justify-between p-2 bg-green-50 rounded border text-xs italic"><span>KOMMEN:</span><span class="font-black">${log.in || '--:--'}</span></div><div class="flex justify-between p-2 bg-red-50 rounded border text-xs italic"><span>GEHEN:</span><span class="font-black">${dispOut}</span></div>`; 
+    
+    // Check ob wir im Pause-Automatik-Modus sind oder echte Pause haben
+    if (log.break_in && log.break_out) dispOut = log.out; // Bei echter Pause wird out nicht geschoben
+    
+    let html = `<div class="flex justify-between p-2 bg-green-50 rounded border text-xs italic"><span>KOMMEN:</span><span class="font-black">${log.in || '--:--'}</span></div>`;
+    
+    if (log.break_in) {
+        html += `<div class="flex justify-between p-2 bg-amber-50 rounded border text-xs italic"><span>PAUSE:</span><span class="font-black text-amber-600">${log.break_in} - ${log.break_out || '...'}</span></div>`;
+    }
+    
+    html += `<div class="flex justify-between p-2 bg-red-50 rounded border text-xs italic"><span>GEHEN:</span><span class="font-black">${dispOut}</span></div>`; 
+    
+    document.getElementById('todayDetails').innerHTML = html;
 }
 
 function editEntry(d) {
@@ -1486,26 +1529,39 @@ function editEntry(d) {
     const sigData = (db.config[currentUser]?.signatures || {})[key];
     if(sigData && sigData.signed) { return alert("⛔ Monat ist abgeschlossen/signiert! Änderungen nicht mehr möglich."); }
     editingDateStr = d;
-    const log = (db.logs[currentUser]||{})[d] || {in:'', out:'', note:'', type:''};
+    const log = (db.logs[currentUser]||{})[d] || {in:'', out:'', break_in:'', break_out:'', note:'', type:''};
     document.getElementById('editorDateDisplay').innerText = new Date(d).toLocaleDateString('de-DE', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
     document.getElementById('editIn').value = log.in || '';
     document.getElementById('editOut').value = log.out || '';
+    document.getElementById('editBreakIn').value = log.break_in || '';
+    document.getElementById('editBreakOut').value = log.break_out || '';
     document.getElementById('editNote').value = log.note || '';
     document.getElementById('editType').value = log.type || '';
     document.getElementById('dayEditorOverlay').classList.remove('hidden');
 }
 
 function closeDayEditor() { document.getElementById('dayEditorOverlay').classList.add('hidden'); editingDateStr = null; }
+
 function saveDayEditor() {
     if(!editingDateStr) return;
-    const i = document.getElementById('editIn').value; const o = document.getElementById('editOut').value;
-    const n = document.getElementById('editNote').value.trim(); const t = document.getElementById('editType').value;
+    const i = document.getElementById('editIn').value; 
+    const o = document.getElementById('editOut').value;
+    const bi = document.getElementById('editBreakIn').value;
+    const bo = document.getElementById('editBreakOut').value;
+    const n = document.getElementById('editNote').value.trim(); 
+    const t = document.getElementById('editType').value;
+    
     if(!db.logs[currentUser]) db.logs[currentUser] = {};
-    if(!i && !o && !n && !t) { delete db.logs[currentUser][editingDateStr]; } 
+    if(!i && !o && !bi && !bo && !n && !t) { delete db.logs[currentUser][editingDateStr]; } 
     else {
         let entry = db.logs[currentUser][editingDateStr] || {};
-        entry.in = i; entry.out = o; entry.note = n; entry.type = t;
-        if(!entry.in) delete entry.in; if(!entry.out) delete entry.out; if(!entry.note) delete entry.note; if(!entry.type) delete entry.type;
+        entry.in = i; entry.out = o; entry.break_in = bi; entry.break_out = bo; entry.note = n; entry.type = t;
+        if(!entry.in) delete entry.in; 
+        if(!entry.out) delete entry.out; 
+        if(!entry.break_in) delete entry.break_in;
+        if(!entry.break_out) delete entry.break_out;
+        if(!entry.note) delete entry.note; 
+        if(!entry.type) delete entry.type;
         db.logs[currentUser][editingDateStr] = entry;
     }
     save(); renderAll(); closeDayEditor();
@@ -1741,15 +1797,30 @@ function exportExcel() {
     const rows = [["ZEITNACHWEIS", currentUser], ["Monat", MONTH_NAMES[m], y], ["Datum", "Kommen", "Gehen", "Pause", "Ist", "Soll", "Saldo", "Notiz"]];
     for(let i=1; i<=new Date(y, m+1, 0).getDate(); i++) {
         const ds = toLocalISO(new Date(y,m,i)), log = (db.logs[currentUser]||{})[ds] || {};
-        const isH = holidaysDB[ds], isWE = new Date(y,m,i).getDay()%6==0;
         const target = getTargetHours(new Date(y,m,i), currentUser);
         let ist = 0, pStr = "-"; let dispOut = log.out || log.type || "";
+        
         if(log.in && log.out) { 
             let calcIn = log.in;
             const cfg = db.config[currentUser][new Date(y,m,i).getDay()] || {start: "00:00"};
             if(target > 0) calcIn = getKulanzStart(log.in, cfg.start);
+            
             let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+calcIn))/3600000); 
-            if(rawIst > 6.0) { pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); dispOut = getExtendedOutTime(ds, log.in, log.out); ist = safeFloat(rawIst); } else { ist = safeFloat(rawIst); } 
+            let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
+            
+            if (manualBreakHours > 0) {
+                pStr = `${log.break_in} - ${log.break_out}`;
+                dispOut = log.out;
+                ist = safeFloat(rawIst - manualBreakHours);
+            } else {
+                if(rawIst > 6.0) { 
+                    pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); 
+                    dispOut = getExtendedOutTime(ds, log.in, log.out); 
+                    ist = safeFloat(rawIst); 
+                } else { 
+                    ist = safeFloat(rawIst); 
+                } 
+            }
         }
         rows.push([i+"."+(m+1)+".", log.in||"", dispOut, pStr, safeFloat(ist).toFixed(2), safeFloat(target).toFixed(2), (safeFloat(ist)-safeFloat(target)).toFixed(2), log.note || ""]);
     }
