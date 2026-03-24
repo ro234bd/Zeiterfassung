@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.10"; 
+        const CURRENT_APP_VERSION = "4.12"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -216,6 +216,11 @@
                 </div>
                 <div id="adminPunchPlaceholder" class="hidden text-slate-400 font-bold italic border-2 border-dashed border-slate-200 p-8 rounded-xl bg-slate-50">
                     <p>Admin Modus aktiv</p><p class="text-xs font-normal mt-2">Mitarbeiter oben rechts auswählen.</p>
+                </div>
+                
+                <div id="dashboardReleaseNotes" class="mt-8 p-4 bg-slate-50 text-slate-700 rounded-xl border border-slate-200 text-xs text-left shadow-sm hidden">
+                    <h4 class="font-black uppercase mb-2 text-blue-600 flex items-center gap-1"><span>📢</span> Aktuelle Infos</h4>
+                    <div id="dashboardReleaseNotesContent" class="whitespace-pre-wrap font-medium"></div>
                 </div>
             </div>
             <div class="bg-white p-6 rounded-2xl shadow border flex flex-col">
@@ -425,10 +430,21 @@
                              <label class="text-[10px] font-bold uppercase text-slate-400">Standard Admin-Passwort ändern</label>
                              <input type="text" id="sysAdminPw" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs font-bold" placeholder="Aktuell: Va19tti!">
                         </div>
+
+                        <div class="pt-2 border-t border-slate-600">
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Admin E-Mail (für Hintergrund-Benachrichtigung)</label>
+                            <input type="email" id="sysDevEmail" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-[9px] font-mono" placeholder="admin@beispiel.at">
+                        </div>
                     </div>
                 </div>
             </div>
             
+            <div class="bg-slate-700 p-4 rounded-xl border border-slate-600 mt-6">
+                <h3 class="font-bold uppercase text-slate-300 border-b border-slate-600 pb-2 mb-4">📢 Update Informationen (Release Notes)</h3>
+                <label class="text-[10px] font-bold uppercase text-slate-400">Aktuelle Update-Infos für Mitarbeiter (Dashboard)</label>
+                <textarea id="sysReleaseNotes" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs h-32 mt-1" placeholder="Schreibe hier, was im neuen Update geändert wurde..."></textarea>
+            </div>
+
             <button onclick="saveSystemSettings()" class="w-full mt-6 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold uppercase shadow-lg transition-transform active:scale-95">💾 Systemeinstellungen Speichern & Neustart</button>
         </div>
 
@@ -555,7 +571,6 @@ function getKulanzStart(tatsZeit, sollBeginn) {
     const sollMins = sH * 60 + sM;
     const tatsMins = tH * 60 + tM;
     
-    // KULANZZEIT BLEIBT BEI 10 MINUTEN
     if (Math.abs(tatsMins - sollMins) <= 10) return sollBeginn;
     return tatsZeit;
 }
@@ -568,10 +583,8 @@ function getTargetHours(dateObj, uName) {
     
     const dStr = toLocalISO(dateObj);
     
-    // 1. Check: Gesetzlicher Feiertag?
     if (holidaysDB[dStr]) return 0; 
 
-    // 2. Check: Manueller Feiertag?
     const log = (db.logs[uName] || {})[dStr];
     if (log && log.type === 'Feiertag') return 0;
 
@@ -647,10 +660,17 @@ function saveSystemSettings() {
     const col = document.getElementById('sysColor').value;
     const admPw = document.getElementById('sysAdminPw').value;
     const newDbKey = document.getElementById('sysDbKey').value.trim();
+    
+    // NEU: Zusätzliche Werte speichern
+    const devEmail = document.getElementById('sysDevEmail')?.value.trim();
+    const relNotes = document.getElementById('sysReleaseNotes')?.value;
 
     if(title) db.settings.companyName = title;
     if(col) db.settings.primaryColor = col;
     if(admPw) db.settings.adminPassword = admPw;
+    
+    if(devEmail !== undefined) db.settings.devEmail = devEmail;
+    if(relNotes !== undefined) db.settings.releaseNotes = relNotes;
     
     if(newDbKey && newDbKey !== DB_KEY) {
         alert("ACHTUNG: DB-Key Änderung ist in dieser Version gesperrt. Bitte ändern Sie den Key direkt in der HTML-Datei.");
@@ -768,6 +788,14 @@ function startApp() {
              document.getElementById('sysAdminPw').value = db.settings.adminPassword || "Admin";
              document.getElementById('sysCloudUrl').value = CLOUD_URL; 
              document.getElementById('sysDbKey').value = DB_KEY; 
+
+             // NEU: Werte laden
+             if(document.getElementById('sysDevEmail')) {
+                 document.getElementById('sysDevEmail').value = db.settings.devEmail || "";
+             }
+             if(document.getElementById('sysReleaseNotes')) {
+                 document.getElementById('sysReleaseNotes').value = db.settings.releaseNotes || "";
+             }
 
              if(db.settings.logo) {
                 document.getElementById('sysLogoPreview').src = db.settings.logo;
@@ -1082,12 +1110,10 @@ function renderLogs() {
             let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
             
             if (manualBreakHours > 0) {
-                // Echte, gestempelte Pause
                 ist = Math.max(0, safeFloat(rawIst - manualBreakHours));
                 pauseDisplay = `${log.break_in} - ${log.break_out}`;
-                dispOut = log.out; // Out Zeit bleibt absolut unangetastet!
+                dispOut = log.out; 
             } else {
-                // Automatik-Pause (wenn keine echte Pause gestempelt wurde)
                 if (rawIst > 6.0) { 
                     pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
                     dispOut = getExtendedOutTime(dStr, log.in, log.out); 
@@ -1432,6 +1458,21 @@ function renderAll() {
         document.getElementById('adminPunchPlaceholder').classList.add('hidden');
         renderTodayInfo();
     }
+    
+    // --- NEU: Release Notes im Dashboard anzeigen ---
+    const notesEl = document.getElementById('dashboardReleaseNotes');
+    const notesContent = document.getElementById('dashboardReleaseNotesContent');
+    if (notesEl && notesContent) {
+        const notes = db.settings.releaseNotes || "";
+        if (notes.trim() !== "") {
+            notesContent.innerText = notes;
+            notesEl.classList.remove('hidden');
+        } else {
+            notesEl.classList.add('hidden');
+        }
+    }
+    // ------------------------------------------------
+    
     renderLogs(); renderCalendar(); renderWeeklySettings(); renderAdminConfigs(); applyTheme();
 }
 function showTab(id) { document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden')); document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active')); document.getElementById('tab-'+id).classList.remove('hidden'); document.getElementById('btn-'+id).classList.add('tab-active'); renderAll(); }
@@ -1633,6 +1674,23 @@ function changePassword() {
 function sendDevMessage() {
     const txt = document.getElementById('devMsgText').value; if(!txt) return;
     if(!db.messages) db.messages = []; db.messages.push({from: currentUser, date: new Date().toISOString(), text: txt}); save(); 
+    
+    // --- NEU: Lautlose E-Mail Benachrichtigung im Hintergrund ---
+    const targetEmail = db.settings.devEmail || "";
+    if (targetEmail) {
+        fetch(CLOUD_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: "send_email",
+                sender: currentUser,
+                message: txt,
+                targetEmail: targetEmail
+            }),
+            mode: 'no-cors'
+        }).catch(e => console.log("Email-Sync Fehler:", e));
+    }
+    // -----------------------------------------------------------
+
     document.getElementById('devMsgText').value = ""; alert("Nachricht gesendet!");
 }
 
@@ -1828,5 +1886,3 @@ function exportExcel() {
 }
 init();
 </script>
-</body>
-</html>
