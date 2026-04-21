@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.09"; 
+        const CURRENT_APP_VERSION = "4.11"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -197,22 +197,31 @@
         <button onclick="showTab('system')" id="btn-system" class="flex-1 py-3 text-xs md:text-sm font-bold uppercase hidden bg-slate-800 text-slate-200">⚙️ System</button>
     </nav>
 
-    <section id="tab-stempeln" class="tab-content">
+   <section id="tab-stempeln" class="tab-content">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-white p-8 rounded-2xl shadow-lg text-center border">
                 <h2 id="displayUserName" class="text-2xl font-black text-slate-700 mb-1">--</h2>
                 <p class="text-sm text-slate-400 mb-6" id="displayTodayDate"></p>
+                
                 <div id="punchButtonsArea">
                     <div class="flex justify-center gap-6 mb-8">
                         <button onclick="punch('in')" class="w-24 h-24 md:w-32 md:h-32 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-xs md:text-base">Kommen</button>
                         <button onclick="punch('out')" class="w-24 h-24 md:w-32 md:h-32 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-xs md:text-base">Gehen</button>
                     </div>
-                    <div id="todayDetails" class="space-y-2 max-w-xs mx-auto"></div>
+                    
+                    <div id="todayDetails" class="space-y-2 max-w-xs mx-auto mb-6"></div>
+
+                    <div id="dashboardReleaseNotes" class="hidden text-left bg-slate-50 p-6 rounded-2xl border border-slate-200 mt-6 shadow-sm">
+                        <h3 class="text-sm font-black uppercase text-blue-600 mb-4 flex items-center gap-2">📢 Aktuelle Infos</h3>
+                        <p id="dashboardReleaseNotesContent" class="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed font-medium"></p>
+                    </div>
                 </div>
+
                 <div id="adminPunchPlaceholder" class="hidden text-slate-400 font-bold italic border-2 border-dashed border-slate-200 p-8 rounded-xl bg-slate-50">
                     <p>Admin Modus aktiv</p><p class="text-xs font-normal mt-2">Mitarbeiter oben rechts auswählen.</p>
                 </div>
             </div>
+
             <div class="bg-white p-6 rounded-2xl shadow border flex flex-col">
                  <h3 class="text-xs font-bold uppercase text-slate-400 mb-4 text-center border-b pb-2">Status & Einstellungen</h3>
                  <div id="punchStatus" class="text-center italic text-slate-500 font-bold mb-4">Bereit...</div>
@@ -256,6 +265,7 @@
                                 <option value="Krank">🤒 Krank</option>
                                 <option value="Sonstiges">✏️ Freitext / Zeit</option>
                                 <option value="DELETE">🗑️ Eintrag löschen (Einzel)</option>
+                                <option value="DELETE_BU">🗑️ Betriebsurlaub löschen</option>
                                 <option value="DELETE_ALL" class="text-red-600 font-black">🗑️ Alle Termine löschen</option>
                             </select>
                         </div>
@@ -388,6 +398,14 @@
                             </div>
                         </div>
                         <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Entwickler E-Mail (für Bugs)</label>
+                            <input type="email" id="sysDevEmail" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs font-bold" placeholder="dev@beispiel.de">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Release Notes / Infotext für Dashboard</label>
+                            <textarea id="sysReleaseNotes" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs" rows="3" placeholder="Was gibt es Neues?"></textarea>
+                        </div>
+                        <div>
                             <label class="text-[10px] font-bold uppercase text-slate-400">Logo Upload (max. 100kb)</label>
                             <input type="file" id="sysLogoInput" accept="image/*" class="w-full text-xs text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-slate-600 file:text-white hover:file:bg-slate-500">
                             <div class="mt-2 flex gap-2">
@@ -442,8 +460,7 @@
 // 1. Die Google Script URL für DIESEN KUNDEN hier eintragen:
 const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwoAuJ-6b86q7dFTzZlHbetsrCiQOH_ZcN7rLoWfJc3jqkEVTBngdMlmGOdtRcFtAgV1A/exec";
 
-// 2. Ein eindeutiger Name für die Datenbank DIESES KUNDEN (z.B. ze_praxis_huber_v1)
-// WICHTIG: Muss für jeden Kunden anders sein!
+// 2. Ein eindeutiger Name für die Datenbank DIESES KUNDEN
 const DB_KEY = 'ze_chirurgie_stütz_v1';  
 
 // ==========================================
@@ -485,12 +502,13 @@ function formatHM(val) {
     return `${sign}${h}:${m.toString().padStart(2, '0')}`;
 }
 
-// HELPER: Round to Quarter (Kaufmännisch)
-function roundToQuarter(timeStr) {
-    if(!timeStr) return timeStr;
+// HELPER: Flexible Rundung (Kaufmännisch)
+function roundTime(timeStr, minutes) {
+    if(!timeStr || !timeStr.includes(':')) return timeStr;
     let [h, m] = timeStr.split(':').map(Number);
+    if(isNaN(h) || isNaN(m)) return timeStr;
     let totalMins = h * 60 + m;
-    let rounded = Math.round(totalMins / 15) * 15;
+    let rounded = Math.round(totalMins / minutes) * minutes;
     let newH = Math.floor(rounded / 60);
     let newM = rounded % 60;
     if(newH === 24) { newH = 0; } 
@@ -543,16 +561,6 @@ function toLocalISO(date) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); 
 }
 
-function getKulanzStart(tatsZeit, sollBeginn) {
-    if(!tatsZeit || !sollBeginn) return tatsZeit;
-    const [sH, sM] = sollBeginn.split(':').map(Number);
-    const [tH, tM] = tatsZeit.split(':').map(Number);
-    const sollMins = sH * 60 + sM;
-    const tatsMins = tH * 60 + tM;
-    if (Math.abs(tatsMins - sollMins) <= 10) return sollBeginn;
-    return tatsZeit;
-}
-
 function getVisibleUsers() { return db.users; }
 
 function getTargetHours(dateObj, uName) {
@@ -561,10 +569,8 @@ function getTargetHours(dateObj, uName) {
     
     const dStr = toLocalISO(dateObj);
     
-    // 1. Check: Gesetzlicher Feiertag?
     if (holidaysDB[dStr]) return 0; 
 
-    // 2. Check (NEU): Manueller Feiertag? -> Soll = 0
     const log = (db.logs[uName] || {})[dStr];
     if (log && log.type === 'Feiertag') return 0;
 
@@ -634,10 +640,17 @@ function saveSystemSettings() {
     const col = document.getElementById('sysColor').value;
     const admPw = document.getElementById('sysAdminPw').value;
     const newDbKey = document.getElementById('sysDbKey').value.trim();
+    
+    // Release Notes und E-Mail sichern
+    const devEmail = document.getElementById('sysDevEmail')?.value.trim();
+    const relNotes = document.getElementById('sysReleaseNotes')?.value;
 
     if(title) db.settings.companyName = title;
     if(col) db.settings.primaryColor = col;
     if(admPw) db.settings.adminPassword = admPw;
+    
+    if(devEmail !== undefined) db.settings.devEmail = devEmail;
+    if(relNotes !== undefined) db.settings.releaseNotes = relNotes;
     
     if(newDbKey && newDbKey !== DB_KEY) {
         alert("ACHTUNG: DB-Key Änderung ist in dieser Version gesperrt. Bitte ändern Sie den Key direkt in der HTML-Datei.");
@@ -755,6 +768,13 @@ function startApp() {
              document.getElementById('sysAdminPw').value = db.settings.adminPassword || "";
              document.getElementById('sysCloudUrl').value = CLOUD_URL; // Read-Only
              document.getElementById('sysDbKey').value = DB_KEY; // Read-Only
+             
+             if(document.getElementById('sysDevEmail')) {
+                 document.getElementById('sysDevEmail').value = db.settings.devEmail || "";
+             }
+             if(document.getElementById('sysReleaseNotes')) {
+                 document.getElementById('sysReleaseNotes').value = db.settings.releaseNotes || "";
+             }
 
              if(db.settings.logo) {
                 document.getElementById('sysLogoPreview').src = db.settings.logo;
@@ -804,9 +824,7 @@ function getExtendedOutTime(dStr, inStr, outStr) {
     if(currentUser !== 'Admin') {
          const d = new Date(dStr);
          const cfg = db.config[currentUser][d.getDay()] || {start: "00:00"};
-         calcIn = getKulanzStart(inStr, cfg.start);
          
-         // Prüfe auf konfigurierte Pause
          if(cfg.breakStart && cfg.breakEnd) {
              configBreak = {
                  start: cfg.breakStart,
@@ -816,14 +834,10 @@ function getExtendedOutTime(dStr, inStr, outStr) {
          }
     }
     
-    // Fall A: Es gibt eine konfigurierte Pause
     if (configBreak) {
         if (configBreak.isReal) {
-            // Echte Pause: Zeit NICHT verlängern (User war weg)
             return outStr;
         } else {
-            // Keine echte Pause (Auto-Mittagspause): Zeit verlängern um Pausenlänge
-            // Berechne Pausenlänge
             const bS = new Date(`2000-01-01T${configBreak.start}`);
             const bE = new Date(`2000-01-01T${configBreak.end}`);
             const durationMs = bE - bS;
@@ -836,7 +850,6 @@ function getExtendedOutTime(dStr, inStr, outStr) {
         }
     }
 
-    // Fall B: Keine konfigurierte Pause -> Standard >6h Regel
     const rawIst = (new Date(`${dStr}T${outStr}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
     if (rawIst > 6.0) {
         let [h, min] = outStr.split(':').map(Number);
@@ -849,14 +862,12 @@ function getExtendedOutTime(dStr, inStr, outStr) {
 function getBreakTimeRange(dStr, inStr, outStr, uName) {
     if(!inStr || !outStr) return "-";
     
-    // Check config first
     const dObj = new Date(dStr);
     const cfg = db.config[uName] && db.config[uName][dObj.getDay()];
     if(cfg && cfg.breakStart && cfg.breakEnd) {
         return cfg.breakStart + " - " + cfg.breakEnd + (cfg.breakIsReal ? "" : " (auto)");
     }
 
-    // Fallback Random Break
     const startD = new Date(`${dStr}T${inStr}`); const endD = new Date(`${dStr}T${outStr}`); const totalHours = (endD - startD) / 3600000;
     let seed = 0; const sStr = dStr + uName; for (let i = 0; i < sStr.length; i++) seed += sStr.charCodeAt(i);
     const randomMinutes = seed % 16;
@@ -869,7 +880,6 @@ function getBreakTimeRange(dStr, inStr, outStr, uName) {
 
 async function init() {
     try {
-        // UI Versionsnummern updaten
         const versionString = "v" + CURRENT_APP_VERSION;
         const domTitle = document.getElementById('appTitle');
         const domVerLogin = document.getElementById('verLogin');
@@ -1044,13 +1054,10 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
             
             let calcIn = log.in;
             const cfg = db.config[userName][iter.getDay()] || {start: "00:00"};
-            if(target > 0) calcIn = getKulanzStart(log.in, cfg.start); 
             
             let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
             ist = safeFloat(rawDiff); 
             
-            // --- NEW FLEXIBLE BREAK LOGIC (v4.08) ---
-            // Replaces hardcoded Tuesday logic
             if (!isH && target > 0) {
                  const breakStartStr = cfg.breakStart;
                  const breakEndStr = cfg.breakEnd;
@@ -1074,7 +1081,6 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
                      }
                  }
             }
-            // ----------------------------------------
         }
         totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
     }
@@ -1126,11 +1132,9 @@ function renderLogs() {
         if (log.in && log.out) {
             let calcIn = log.in;
             const cfg = db.config[currentUser][d.getDay()] || {start: "00:00"};
-            if(target > 0) calcIn = getKulanzStart(log.in, cfg.start);
 
             const rawIst = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
             
-            // *** FLEXIBLE BREAK LOGIC v4.08 ***
             let deduction = 0;
             let customBreakFound = false;
             
@@ -1158,11 +1162,7 @@ function renderLogs() {
                  
                  ist = safeFloat(rawIst) - deduction;
                  
-                 // Anzeige Logik: 
-                 // Wenn "Echt" (Häkchen) -> Originale Zeit
-                 // Wenn "Nicht Echt" -> Verlängern
                  if (!cfg.breakIsReal) {
-                     // Verlängern um die Länge der Pause (z.B. 30min)
                      const durationMs = (new Date(`2000-01-01T${cfg.breakEnd}`) - new Date(`2000-01-01T${cfg.breakStart}`));
                      const outDate = new Date(`2000-01-01T${log.out}`);
                      const extDate = new Date(outDate.getTime() + durationMs);
@@ -1172,7 +1172,6 @@ function renderLogs() {
                  }
             } 
             
-            // Standard > 6h Regel (nur wenn KEINE Custom Pause definiert ist)
             if (!customBreakFound) {
                 if (rawIst > 6.0) { 
                     pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
@@ -1284,25 +1283,14 @@ async function save() {
     const loginSync = document.getElementById('loginSyncStatus');
     const targetUrl = CLOUD_URL;
     
-    // Optisches Feedback
     if(statusDiv) { statusDiv.innerText = "⏳ Synchronisiere..."; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
 
-    // Delta-Sync: Wir sagen dem Server, dass hier ALLES überschrieben wird (z.B. Admin-Settings)
-    const dataToSend = {
-        action: "full_sync",
-        payload: db
-    };
+    const dataToSend = { action: "full_sync", payload: db };
 
     try {
-        // HINWEIS: mode: 'no-cors' wurde entfernt, damit wir die Server-Antwort lesen können!
-        const response = await fetch(targetUrl, { 
-            method:'POST', 
-            body: JSON.stringify(dataToSend) 
-        });
-        
+        const response = await fetch(targetUrl, { method:'POST', body: JSON.stringify(dataToSend) });
         if(response.ok) {
             const updatedDb = await response.json();
-            // Wenn der Server eine gültige DB zurückschickt, übernehmen wir sie sofort
             if(updatedDb && updatedDb.users) {
                 db = updatedDb;
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
@@ -1316,9 +1304,8 @@ async function save() {
         if(loginSync) { loginSync.innerText = "● Offline (Nur lokal)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
     }
 }
-// NEU: Diese Funktion schickt nur EINEN bestimmten Tag eines bestimmten Users an die Cloud
+
 async function saveLogEntry(userName, dateStr, payload) {
-    // 1. Zuerst sofort lokal speichern (damit die App schnell reagiert)
     if (payload === null) {
         if (db.logs[userName] && db.logs[userName][dateStr]) {
             delete db.logs[userName][dateStr];
@@ -1328,32 +1315,22 @@ async function saveLogEntry(userName, dateStr, payload) {
         db.logs[userName][dateStr] = payload;
     }
     localStorage.setItem(DB_KEY, JSON.stringify(db));
-    renderAll(); // UI sofort aktualisieren
+    renderAll(); 
 
     const statusDiv = document.getElementById('syncStatus');
     if(statusDiv) { statusDiv.innerText = "⏳ Synchronisiere..."; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
 
-    // 2. Gezielten Befehl an den Server schicken
-    const dataToSend = {
-        action: "update_log",
-        user: userName,
-        date: dateStr,
-        payload: payload
-    };
+    const dataToSend = { action: "update_log", user: userName, date: dateStr, payload: payload };
 
     try {
-        const response = await fetch(CLOUD_URL, {
-            method: 'POST',
-            body: JSON.stringify(dataToSend)
-        });
-        
+        const response = await fetch(CLOUD_URL, { method: 'POST', body: JSON.stringify(dataToSend) });
         if(response.ok) {
             const updatedDb = await response.json();
             if(updatedDb && updatedDb.users) {
-                db = updatedDb; // Wir übernehmen den aktuellsten, vom Server zusammengeführten Stand
+                db = updatedDb; 
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
                 if(statusDiv) { statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; }
-                renderAll(); // Nochmal rendern, falls Kollegen in der Zwischenzeit gestempelt haben
+                renderAll(); 
             }
         }
     } catch(e) {
@@ -1381,16 +1358,27 @@ function generateMonthNode(y, m, mini = false) {
             else if(isF && showFerien) { cell.classList.add('row-school-holiday'); if(dStr === isF.s) cell.innerHTML += `<div class='text-[7px] text-blue-500 font-black mt-1 leading-none uppercase'>${isF.n}</div>`; }
             
             if(showTeamView) {
+                let hasBetriebsurlaub = false;
+                getVisibleUsers().forEach(u => {
+                    if (u === "Admin") return;
+                    if ((db.logs[u]||{})[dStr]?.type === 'Betriebsurlaub') hasBetriebsurlaub = true;
+                });
+
+                if (hasBetriebsurlaub) {
+                    cell.innerHTML += `<div class='cal-entry bg-emerald-50 text-emerald-700 border-emerald-200'>🏢 Betriebsurlaub</div>`;
+                }
+
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
                     const uLog = (db.logs[u]||{})[dStr] || {};
                     const target = getTargetHours(d, u);
                     if(uLog.type) {
                         if (uLog.type === 'Krank') return;
-                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'ZA'];
+                        if (uLog.type === 'Betriebsurlaub') return;
+                        const typesToHide = ['Urlaub', 'ZA'];
                         if (typesToHide.includes(uLog.type)) { if (target === 0) return; }
                         let cl = "bg-blue-50 text-blue-700 border-blue-200"; 
-                        if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') cl="bg-emerald-50 text-emerald-700 border-emerald-200"; 
+                        if(uLog.type==='Urlaub') cl="bg-emerald-50 text-emerald-700 border-emerald-200"; 
                         if(uLog.type==='Schulung') cl="bg-purple-100 text-purple-700 border-purple-200";
                         if(uLog.type==='Sonstiges') cl="bg-yellow-50 text-yellow-700 border-yellow-200";
                         if(uLog.type==='ZA') cl="bg-cyan-50 text-cyan-700 border-cyan-200";
@@ -1399,7 +1387,7 @@ function generateMonthNode(y, m, mini = false) {
                         let label = u.split(' ')[0];
                         if(uLog.type==='Schulung' && uLog.range) label += ` (${uLog.range})`;
                         else if(uLog.type==='Sonstiges' && uLog.title) { label += ` (${uLog.title}`; if(uLog.range) label += `, ${uLog.range}`; label += `)`; }
-                        else if(uLog.type!=='Urlaub'&&uLog.type!=='Betriebsurlaub') label += `: ${uLog.type}`;
+                        else if(uLog.type!=='Urlaub') label += `: ${uLog.type}`;
                         cell.innerHTML += `<div class='cal-entry ${cl}'>${label}</div>`;
                     }
                 });
@@ -1469,16 +1457,27 @@ function renderCalendar() {
             const d = new Date(start); d.setDate(d.getDate() + i); const dStr = toLocalISO(d); const isH = holidaysDB[dStr];
             let content = `<p class="text-[9px] uppercase font-bold text-slate-400">${WEEKDAYS_SHORT[d.getDay()]}</p><p class="text-xl font-black">${d.getDate()}.${d.getMonth()+1}.</p>`;
             if(showTeamView) {
+                let hasBetriebsurlaub = false;
+                getVisibleUsers().forEach(u => {
+                    if (u === "Admin") return;
+                    if ((db.logs[u]||{})[dStr]?.type === 'Betriebsurlaub') hasBetriebsurlaub = true;
+                });
+
+                if (hasBetriebsurlaub) {
+                    content += `<div class='text-[8px] font-bold text-emerald-700 bg-emerald-50 p-1 rounded mt-1 border truncate'>🏢 Betriebsurlaub</div>`;
+                }
+
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
                     const uLog = (db.logs[u]||{})[dStr] || {};
                     const target = getTargetHours(d, u);
                     if(uLog.type) { 
                         if (uLog.type === 'Krank') return;
-                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'ZA'];
+                        if (uLog.type === 'Betriebsurlaub') return;
+                        const typesToHide = ['Urlaub', 'ZA'];
                         if (typesToHide.includes(uLog.type)) { if (target === 0) return; }
                         let col = "theme-text theme-dim-bg"; 
-                        if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') col="text-emerald-700 bg-emerald-50"; 
+                        if(uLog.type==='Urlaub') col="text-emerald-700 bg-emerald-50"; 
                         if(uLog.type==='Schulung') col="text-purple-700 bg-purple-50";
                         if(uLog.type==='Sonstiges') col="text-yellow-700 bg-yellow-50";
                         if(uLog.type==='ZA') col="text-cyan-700 bg-cyan-50 border border-cyan-200"; 
@@ -1487,18 +1486,15 @@ function renderCalendar() {
                         let txt = u.split(' ')[0];
                         if(uLog.type==='Schulung' && uLog.range) txt += ` (${uLog.range})`;
                         else if(uLog.type==='Sonstiges' && uLog.title) { txt += ` (${uLog.title}`; if(uLog.range) txt += `, ${uLog.range}`; txt += `)`; }
-                        else if(uLog.type!=='Urlaub'&&uLog.type!=='Betriebsurlaub') txt += `: ${uLog.type}`;
+                        else if(uLog.type!=='Urlaub') txt += `: ${uLog.type}`;
                         content += `<div class='text-[8px] font-bold ${col} p-1 rounded mt-1 border truncate'>${txt}</div>`; 
                     }
                 });
             } else {
                 const log = (db.logs[currentUser]||{})[dStr] || {};
                 
-                // *** ANZEIGE FIX FÜR v4.08 Flexible Pause ***
                 let displayOutTime = '';
-                if(log.out) {
-                    displayOutTime = getExtendedOutTime(dStr, log.in, log.out);
-                }
+                if(log.out) displayOutTime = getExtendedOutTime(dStr, log.in, log.out);
                 
                 let dt = (log.in ? log.in + ' - ' + (displayOutTime || '') : '');
                 const target = getTargetHours(d, currentUser);
@@ -1531,31 +1527,19 @@ function punch(t) {
     const n = getNow(), ds = toLocalISO(n);
     let ts = n.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
 
-    const isWE = n.getDay() === 0 || n.getDay() === 6;
-    const isH = holidaysDB[ds];
-
-    // KOMMEN: Kulanz-Start (wie bisher)
-    if (t === 'in' && !isWE && !isH) {
-        const config = (db.config[currentUser] && db.config[currentUser][n.getDay()]) ? db.config[currentUser][n.getDay()] : {start:"00:00"};
-        ts = getKulanzStart(ts, config.start);
+    if (t === 'in' || t === 'out') {
+        ts = roundTime(ts, 15);
     }
 
-    // GEHEN: Neu mit Rundung auf 15 Min
-    if (t === 'out') {
-        ts = roundToQuarter(ts);
-    }
-
-    // Aktuellen Log laden oder neu erstellen
     let currentLog = (db.logs[currentUser] && db.logs[currentUser][ds]) ? {...db.logs[currentUser][ds]} : {};
     
     if(t === 'in') {
         currentLog.in = ts;
         if(currentLog.out === undefined) currentLog.out = null; 
-    } else {
+    } else if (t === 'out') {
         currentLog.out = ts; 
     }
     
-    // NEU: Einzelnen Eintrag per Delta-Sync speichern
     saveLogEntry(currentUser, ds, currentLog);
 }
 
@@ -1564,6 +1548,7 @@ function switchUser() {
     currentUser = document.getElementById('userSelect').value; 
     document.getElementById('displayUserName').innerText = currentUser; document.getElementById('targetName').innerText = currentUser; renderAll(); 
 }
+
 function renderAll() { 
     document.getElementById('displayUserName').innerText = currentUser;
     if(currentUser === 'Admin') {
@@ -1575,8 +1560,24 @@ function renderAll() {
         document.getElementById('adminPunchPlaceholder').classList.add('hidden');
         renderTodayInfo();
     }
+    
+    // --- Release Notes Logik ---
+    const notesEl = document.getElementById('dashboardReleaseNotes');
+    const notesContent = document.getElementById('dashboardReleaseNotesContent');
+    if (notesEl && notesContent) {
+        const notes = db.settings.releaseNotes || "";
+        if (notes.trim() !== "") {
+            notesContent.innerText = notes;
+            notesEl.classList.remove('hidden');
+        } else {
+            notesEl.classList.add('hidden');
+        }
+    }
+    // ---------------------------
+
     renderLogs(); renderCalendar(); renderWeeklySettings(); renderAdminConfigs(); applyTheme();
 }
+
 function showTab(id) { document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden')); document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active')); document.getElementById('tab-'+id).classList.remove('hidden'); document.getElementById('btn-'+id).classList.add('tab-active'); renderAll(); }
 function populateSelectors() {
     const sm = document.getElementById('viewMonth'), sy = document.getElementById('viewYear'), n = getNow(); sm.innerHTML = ""; sy.innerHTML = "";
@@ -1596,7 +1597,6 @@ function renderWeeklySettings() {
         const selEven = (c.weekMode === 'EVEN') ? 'selected' : '';
         const selOdd = (c.weekMode === 'ODD') ? 'selected' : '';
         
-        // v4.08 New Config Fields
         const bStart = c.breakStart || "";
         const bEnd = c.breakEnd || "";
         const bFix = c.breakIsReal ? "checked" : "";
@@ -1631,7 +1631,6 @@ function saveWeekly() {
             start: document.getElementById('ws_'+i).value, 
             target: parseFloat(document.getElementById('wt_'+i).value) || 0, 
             weekMode: document.getElementById('wm_'+i).value,
-            // v4.08 Fields
             breakStart: document.getElementById('wb_start_'+i).value,
             breakEnd: document.getElementById('wb_end_'+i).value,
             breakIsReal: document.getElementById('wb_fix_'+i).checked
@@ -1687,7 +1686,6 @@ function renderTodayInfo() {
     const ds = toLocalISO(n);
     const log = (db.logs[currentUser]||{})[ds] || {in:'--', out:null}; 
     
-    // *** KORREKTUR FÜR DIE ANZEIGE ***
     let dispOut = '--:--';
     if(log.out) {
          dispOut = getExtendedOutTime(ds, log.in, log.out);
@@ -1718,14 +1716,12 @@ function saveDayEditor() {
     const n = document.getElementById('editNote').value.trim(); const t = document.getElementById('editType').value;
     
     if(!i && !o && !n && !t) { 
-        // Wenn alles leer ist, senden wir "null", damit der Server den Eintrag löscht
         saveLogEntry(currentUser, editingDateStr, null);
     } else {
         let entry = (db.logs[currentUser] && db.logs[currentUser][editingDateStr]) ? {...db.logs[currentUser][editingDateStr]} : {};
         entry.in = i; entry.out = o; entry.note = n; entry.type = t;
         if(!entry.in) delete entry.in; if(!entry.out) delete entry.out; if(!entry.note) delete entry.note; if(!entry.type) delete entry.type;
         
-        // Gezielt speichern
         saveLogEntry(currentUser, editingDateStr, entry);
     }
     closeDayEditor();
@@ -1734,7 +1730,6 @@ function saveDayEditor() {
 function deleteDayEntry() {
     if(!editingDateStr) return;
     if(confirm("Eintrag für diesen Tag wirklich komplett löschen?")) {
-        // Sendet "null" als payload -> Server löscht den Eintrag
         saveLogEntry(currentUser, editingDateStr, null);
         closeDayEditor();
     }
@@ -1798,6 +1793,16 @@ function changePassword() {
 function sendDevMessage() {
     const txt = document.getElementById('devMsgText').value; if(!txt) return;
     if(!db.messages) db.messages = []; db.messages.push({from: currentUser, date: new Date().toISOString(), text: txt}); save(); 
+    
+    const targetEmail = db.settings.devEmail || "";
+    if (targetEmail) {
+        fetch(CLOUD_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: "send_email", sender: currentUser, message: txt, targetEmail: targetEmail }),
+            mode: 'no-cors'
+        }).catch(e => console.log("Email-Sync Fehler:", e));
+    }
+
     document.getElementById('devMsgText').value = ""; alert("Nachricht gesendet!");
 }
 
@@ -1818,7 +1823,18 @@ function adminAddUser() {
         db.config[name][0] = { start: "00:00", target: 0 }; db.config[name][6] = { start: "00:00", target: 0 };
         db.admin[name] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
         db.passwords[name] = "1234";
-        save(); alert(`Mitarbeiter ${name} angelegt.`); window.location.reload();
+        
+        db.logs[name] = {};
+        const refUser = db.users.find(u => u !== 'Admin' && u !== name);
+        if (refUser && db.logs[refUser]) {
+            for (const dIso in db.logs[refUser]) {
+                if (db.logs[refUser][dIso] && db.logs[refUser][dIso].type === 'Betriebsurlaub') {
+                    db.logs[name][dIso] = { type: 'Betriebsurlaub' };
+                }
+            }
+        }
+
+        save(); alert(`Mitarbeiter ${name} angelegt. Betriebsurlaube wurden übernommen.`); window.location.reload();
     }
 }
 
@@ -1968,10 +1984,8 @@ function exportExcel() {
         if(log.in && log.out) { 
             let calcIn = log.in;
             const cfg = db.config[currentUser][new Date(y,m,i).getDay()] || {start: "00:00"};
-            if(target > 0) calcIn = getKulanzStart(log.in, cfg.start);
             let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+calcIn))/3600000); 
             
-            // *** EXCEL LOGIK v4.08 Flexible Pause ***
             let deduction = 0;
             let customBreakFound = false;
 
@@ -1997,7 +2011,6 @@ function exportExcel() {
                  
                  ist = safeFloat(rawIst) - deduction;
                  
-                 // Excel Anzeige Logik
                  if (!cfg.breakIsReal) {
                      const durationMs = (new Date(`2000-01-01T${cfg.breakEnd}`) - new Date(`2000-01-01T${cfg.breakStart}`));
                      const outDate = new Date(`2000-01-01T${log.out}`);
