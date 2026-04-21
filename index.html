@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.12"; 
+        const CURRENT_APP_VERSION = "4.13"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -564,17 +564,6 @@ function toLocalISO(date) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); 
 }
 
-function getKulanzStart(tatsZeit, sollBeginn) {
-    if(!tatsZeit || !sollBeginn) return tatsZeit;
-    const [sH, sM] = sollBeginn.split(':').map(Number);
-    const [tH, tM] = tatsZeit.split(':').map(Number);
-    const sollMins = sH * 60 + sM;
-    const tatsMins = tH * 60 + tM;
-    
-    if (Math.abs(tatsMins - sollMins) <= 10) return sollBeginn;
-    return tatsZeit;
-}
-
 function getVisibleUsers() { return db.users; }
 
 function getTargetHours(dateObj, uName) {
@@ -839,12 +828,7 @@ function doLogout() {
 
 function getExtendedOutTime(dStr, inStr, outStr) {
     if(!inStr || !outStr) return outStr;
-    let calcIn = inStr;
-    if(currentUser !== 'Admin') {
-         const d = new Date(dStr);
-         const cfg = db.config[currentUser][d.getDay()] || {start: "00:00"};
-         calcIn = getKulanzStart(inStr, cfg.start);
-    }
+    const calcIn = inStr;
     const rawIst = (new Date(`${dStr}T${outStr}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
     if (rawIst > 6.0) {
         let [h, min] = outStr.split(':').map(Number);
@@ -1042,8 +1026,6 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
             if (target === 0) { ist = 0; } 
             
             let calcIn = log.in;
-            const cfg = db.config[userName][iter.getDay()] || {start: "00:00"};
-            if(target > 0) calcIn = getKulanzStart(log.in, cfg.start); 
             
             let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
             let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
@@ -1103,8 +1085,6 @@ function renderLogs() {
 
         if (log.in && log.out) {
             let calcIn = log.in;
-            const cfg = db.config[currentUser][d.getDay()] || {start: "00:00"};
-            if(target > 0) calcIn = getKulanzStart(log.in, cfg.start);
 
             const rawIst = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
             let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
@@ -1270,16 +1250,28 @@ function generateMonthNode(y, m, mini = false) {
             else if(isF && showFerien) { cell.classList.add('row-school-holiday'); if(dStr === isF.s) cell.innerHTML += `<div class='text-[7px] text-blue-500 font-black mt-1 leading-none uppercase'>${isF.n}</div>`; }
             
             if(showTeamView) {
+                // Betriebsurlaub prüfen und zentral anzeigen
+                let hasBetriebsurlaub = false;
+                getVisibleUsers().forEach(u => {
+                    if (u === "Admin") return;
+                    if ((db.logs[u]||{})[dStr]?.type === 'Betriebsurlaub') hasBetriebsurlaub = true;
+                });
+
+                if (hasBetriebsurlaub) {
+                    cell.innerHTML += `<div class='cal-entry bg-emerald-50 text-emerald-700 border-emerald-200'>🏢 Betriebsurlaub</div>`;
+                }
+
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
                     const uLog = (db.logs[u]||{})[dStr] || {};
                     const target = getTargetHours(d, u);
                     if(uLog.type) {
                         if (uLog.type === 'Krank') return;
-                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'ZA'];
+                        if (uLog.type === 'Betriebsurlaub') return; // Wird bereits oben angezeigt
+                        const typesToHide = ['Urlaub', 'ZA'];
                         if (typesToHide.includes(uLog.type)) { if (target === 0) return; }
                         let cl = "bg-blue-50 text-blue-700 border-blue-200"; 
-                        if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') cl="bg-emerald-50 text-emerald-700 border-emerald-200"; 
+                        if(uLog.type==='Urlaub') cl="bg-emerald-50 text-emerald-700 border-emerald-200"; 
                         if(uLog.type==='Schulung') cl="bg-purple-100 text-purple-700 border-purple-200";
                         if(uLog.type==='Sonstiges') cl="bg-yellow-50 text-yellow-700 border-yellow-200";
                         if(uLog.type==='ZA') cl="bg-cyan-50 text-cyan-700 border-cyan-200";
@@ -1288,7 +1280,7 @@ function generateMonthNode(y, m, mini = false) {
                         let label = u.split(' ')[0];
                         if(uLog.type==='Schulung' && uLog.range) label += ` (${uLog.range})`;
                         else if(uLog.type==='Sonstiges' && uLog.title) { label += ` (${uLog.title}`; if(uLog.range) label += `, ${uLog.range}`; label += `)`; }
-                        else if(uLog.type!=='Urlaub'&&uLog.type!=='Betriebsurlaub') label += `: ${uLog.type}`;
+                        else if(uLog.type!=='Urlaub') label += `: ${uLog.type}`;
                         cell.innerHTML += `<div class='cal-entry ${cl}'>${label}</div>`;
                     }
                 });
@@ -1358,16 +1350,28 @@ function renderCalendar() {
             const d = new Date(start); d.setDate(d.getDate() + i); const dStr = toLocalISO(d); const isH = holidaysDB[dStr];
             let content = `<p class="text-[9px] uppercase font-bold text-slate-400">${WEEKDAYS_SHORT[d.getDay()]}</p><p class="text-xl font-black">${d.getDate()}.${d.getMonth()+1}.</p>`;
             if(showTeamView) {
+                // Zentraler Betriebsurlaub in Wochenansicht
+                let hasBetriebsurlaub = false;
+                getVisibleUsers().forEach(u => {
+                    if (u === "Admin") return;
+                    if ((db.logs[u]||{})[dStr]?.type === 'Betriebsurlaub') hasBetriebsurlaub = true;
+                });
+
+                if (hasBetriebsurlaub) {
+                    content += `<div class='text-[8px] font-bold text-emerald-700 bg-emerald-50 p-1 rounded mt-1 border truncate'>🏢 Betriebsurlaub</div>`;
+                }
+
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
                     const uLog = (db.logs[u]||{})[dStr] || {};
                     const target = getTargetHours(d, u);
                     if(uLog.type) { 
                         if (uLog.type === 'Krank') return;
-                        const typesToHide = ['Urlaub', 'Betriebsurlaub', 'ZA'];
+                        if (uLog.type === 'Betriebsurlaub') return; // Überspringen
+                        const typesToHide = ['Urlaub', 'ZA'];
                         if (typesToHide.includes(uLog.type)) { if (target === 0) return; }
                         let col = "theme-text theme-dim-bg"; 
-                        if(uLog.type==='Urlaub' || uLog.type==='Betriebsurlaub') col="text-emerald-700 bg-emerald-50"; 
+                        if(uLog.type==='Urlaub') col="text-emerald-700 bg-emerald-50"; 
                         if(uLog.type==='Schulung') col="text-purple-700 bg-purple-50";
                         if(uLog.type==='Sonstiges') col="text-yellow-700 bg-yellow-50";
                         if(uLog.type==='ZA') col="text-cyan-700 bg-cyan-50 border border-cyan-200"; 
@@ -1376,7 +1380,7 @@ function renderCalendar() {
                         let txt = u.split(' ')[0];
                         if(uLog.type==='Schulung' && uLog.range) txt += ` (${uLog.range})`;
                         else if(uLog.type==='Sonstiges' && uLog.title) { txt += ` (${uLog.title}`; if(uLog.range) txt += `, ${uLog.range}`; txt += `)`; }
-                        else if(uLog.type!=='Urlaub'&&uLog.type!=='Betriebsurlaub') txt += `: ${uLog.type}`;
+                        else if(uLog.type!=='Urlaub') txt += `: ${uLog.type}`;
                         content += `<div class='text-[8px] font-bold ${col} p-1 rounded mt-1 border truncate'>${txt}</div>`; 
                     }
                 });
@@ -1413,17 +1417,8 @@ function punch(t) {
     const n = getNow(), ds = toLocalISO(n);
     let ts = n.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
 
-    const isWE = n.getDay() === 0 || n.getDay() === 6;
-    const isH = holidaysDB[ds];
-
-    // KOMMEN: Kulanz-Start (wie bisher)
-    if (t === 'in' && !isWE && !isH) {
-        const config = (db.config[currentUser] && db.config[currentUser][n.getDay()]) ? db.config[currentUser][n.getDay()] : {start:"00:00"};
-        ts = getKulanzStart(ts, config.start);
-    }
-
-    // Gehen: Rundung auf 15 Min
-    if (t === 'out') {
+    // Kommen & Gehen: Strikte Rundung auf 15 Min
+    if (t === 'in' || t === 'out') {
         ts = roundTime(ts, 15);
     }
     // Pausen: Rundung auf 5 Min
@@ -1711,7 +1706,19 @@ function adminAddUser() {
         db.config[name][0] = { start: "00:00", target: 0 }; db.config[name][6] = { start: "00:00", target: 0 };
         db.admin[name] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
         db.passwords[name] = "1234";
-        save(); alert(`Mitarbeiter ${name} angelegt.`); window.location.reload();
+        
+        // NEU: Betriebsurlaube kopieren
+        db.logs[name] = {};
+        const refUser = db.users.find(u => u !== 'Admin' && u !== name);
+        if (refUser && db.logs[refUser]) {
+            for (const dIso in db.logs[refUser]) {
+                if (db.logs[refUser][dIso].type === 'Betriebsurlaub') {
+                    db.logs[name][dIso] = { type: 'Betriebsurlaub' };
+                }
+            }
+        }
+
+        save(); alert(`Mitarbeiter ${name} angelegt. Betriebsurlaube wurden übernommen.`); window.location.reload();
     }
 }
 
@@ -1860,8 +1867,6 @@ function exportExcel() {
         
         if(log.in && log.out) { 
             let calcIn = log.in;
-            const cfg = db.config[currentUser][new Date(y,m,i).getDay()] || {start: "00:00"};
-            if(target > 0) calcIn = getKulanzStart(log.in, cfg.start);
             
             let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+calcIn))/3600000); 
             let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
