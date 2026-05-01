@@ -972,7 +972,17 @@ async function syncFromCloud() {
 async function fetchHolidays() {
     const years = [getNow().getFullYear()-1, getNow().getFullYear(), getNow().getFullYear()+1];
     for(let y of years) {
-        try { const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/AT`); const d = await r.json(); d.forEach(h => { holidaysDB[h.date] = h.localName; }); } catch(e) {}
+        try { 
+            const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/AT`); 
+            const d = await r.json(); 
+            d.forEach(h => { 
+                // FILTER: Nur echte, bundesweite gesetzliche Feiertage zulassen!
+                // Regionale Feiertage wie Florianitag, Leopolditag etc. werden ignoriert.
+                if (h.global === true) {
+                    holidaysDB[h.date] = h.localName; 
+                }
+            }); 
+        } catch(e) {}
     }
 }
 
