@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.13"; 
+        const CURRENT_APP_VERSION = "4.15"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -352,9 +352,22 @@
             <div class="space-y-6">
                 <div class="bg-white p-6 rounded-xl shadow border">
                     <div class="flex justify-between items-center mb-4 border-b pb-2">
-                         <h2 class="font-black mb-4 uppercase italic">Soll-Stunden: <span id="targetName" class="theme-text"></span></h2>
+                         <h2 class="font-black uppercase italic">Soll-Stunden: <span id="targetName" class="theme-text"></span> <span id="weeklySumDisplay" class="text-sm text-slate-400 ml-2 font-bold tracking-tight"></span></h2>
                          <button onclick="testFillMonth()" class="bg-purple-600 hover:bg-purple-700 text-white text-[9px] px-2 py-1 rounded font-bold uppercase shadow-sm">🤖 Monat Füllen</button>
                     </div>
+
+                    <div class="flex flex-col md:flex-row gap-2 justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4">
+                        <div class="flex items-center gap-2 w-full md:w-auto">
+                            <span class="text-[10px] font-bold uppercase text-blue-800">Plan:</span>
+                            <select id="scheduleHistorySelect" onchange="changeScheduleVersion()" class="p-1.5 border rounded text-xs font-bold text-slate-700 w-full md:w-auto outline-none"></select>
+                        </div>
+                        <div class="flex items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
+                            <span class="text-[10px] font-bold uppercase text-blue-800 whitespace-nowrap">Gültig ab:</span>
+                            <input type="date" id="scheduleValidFrom" class="p-1.5 border rounded text-xs font-bold text-slate-700 w-full md:w-auto outline-none">
+                            <button onclick="addScheduleVersion()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase shadow-sm whitespace-nowrap transition-colors">➕ Neu</button>
+                        </div>
+                    </div>
+
                     <div id="weeklyEditor" class="space-y-2"></div>
                     <button onclick="saveWeekly()" class="mt-4 bg-slate-800 text-white w-full py-3 rounded-xl font-bold uppercase shadow-lg">Plan speichern</button>
                 </div>
@@ -463,15 +476,13 @@
 // 1. Die Google Script URL für DIESEN KUNDEN hier eintragen:
 const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwg3vKEz3JHYX4baAFsL5gyutGFGswoNsXzD8YEZFYVwwMuKP7uc0rbGMyfWua1dfgA/exec";
 
-// 2. Ein eindeutiger Name für die Datenbank DIESES KUNDEN (z.B. ze_praxis_huber_v1)
-// WICHTIG: Muss für jeden Kunden anders sein!
+// 2. Ein eindeutiger Name für die Datenbank DIESES KUNDEN
 const DB_KEY = 'ze_profi_cloud_v3.86_FINAL';  
 
 // ==========================================
 // *** SYSTEM LOGIC (NICHT ÄNDERN) ***
 // ==========================================
 
-// KILL-SWITCH
 if(localStorage.getItem('ze_custom_db_key') || localStorage.getItem('ze_cloud_url')) {
     console.log("🧹 Bereinige Browser-Speicher...");
     localStorage.removeItem('ze_custom_db_key');
@@ -496,7 +507,6 @@ function toggleZoom() {
     localStorage.setItem('ze_zoom_pref', document.body.classList.contains('zoom-out'));
 }
 
-// HELPER: Decimal Hours to HH:MM string
 function formatHM(val) {
     if (val === undefined || val === null || isNaN(val)) return "0:00";
     const sign = val < 0 ? "-" : "";
@@ -506,7 +516,6 @@ function formatHM(val) {
     return `${sign}${h}:${m.toString().padStart(2, '0')}`;
 }
 
-// HELPER: Flexible Rundung (Kaufmännisch)
 function roundTime(timeStr, minutes) {
     if(!timeStr) return timeStr;
     let [h, m] = timeStr.split(':').map(Number);
@@ -526,10 +535,27 @@ function getISOWeek(d) {
     return weekNo;
 }
 
+// Hilfsfunktion: Berechnet Stunden zwischen zwei Zeiten
+function getTimeDiff(start, end) {
+    if(!start || !end) return 0;
+    const s = start.split(':').map(Number);
+    const e = end.split(':').map(Number);
+    const diff = (e[0] * 60 + e[1]) - (s[0] * 60 + s[1]);
+    return diff > 0 ? diff / 60 : 0;
+}
+
+// Hilfsfunktion: Rechnet Startzeit + Stunden in Endzeit um (für Migration)
+function calculateEndTime(start, hours) {
+    if(!start || !hours) return "";
+    const s = start.split(':').map(Number);
+    const totalMinutes = s[0] * 60 + s[1] + (hours * 60);
+    const h = Math.floor(totalMinutes / 60) % 24;
+    const m = Math.round(totalMinutes % 60);
+    return String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0');
+}
+
 let db;
-try {
-    db = JSON.parse(localStorage.getItem(DB_KEY));
-} catch(e) { }
+try { db = JSON.parse(localStorage.getItem(DB_KEY)); } catch(e) { }
 
 if (!db || !db.users || !Array.isArray(db.users) || db.users.length === 0) {
     db = { users: ["Admin"], logs: {}, config: {}, admin: {}, passwords: {}, settings: {} };
@@ -548,6 +574,7 @@ let schoolHolidays = [];
 let testModeActive = false;
 let showTeamView = false; 
 let editingDateStr = null;
+let currentScheduleEditIndex = -1;
 
 const fallbackHolidays = [
     {s: "2026-02-02", e: "2026-02-07", n: "Semesterferien (OÖ)"},
@@ -566,25 +593,66 @@ function toLocalISO(date) {
 
 function getVisibleUsers() { return db.users; }
 
+// --- MIGRATION LOGIK (Für alte v4.13 Daten) ---
+function migrateUserConfig(uName) {
+    if (!db.config[uName]) db.config[uName] = {};
+    if (!db.config[uName].schedules) {
+        let legacyDays = {};
+        for(let i=0; i<=6; i++) {
+            let c = db.config[uName][i] || { start: "00:00", target: 0, weekMode: "ALL" };
+            legacyDays[i] = { weekMode: c.weekMode || "ALL", blocks: [{start: c.start, end: calculateEndTime(c.start, c.target)}] };
+        }
+        let stDate = (db.admin[uName] && db.admin[uName].startDate) ? db.admin[uName].startDate : "2024-01-01";
+        db.config[uName].schedules = [{ validFrom: stDate, days: legacyDays }];
+    } else {
+        db.config[uName].schedules.forEach(sched => {
+            for(let i=1; i<=5; i++) {
+                if(sched.days[i] && sched.days[i].blocks) {
+                    sched.days[i].blocks.forEach(b => {
+                        if(b.target !== undefined && b.end === undefined) {
+                            b.end = calculateEndTime(b.start, b.target);
+                        }
+                    });
+                }
+            }
+        });
+    }
+}
+
 function getTargetHours(dateObj, uName) {
     const dayIdx = dateObj.getDay();
+    // WE-FIX: Wochenende ist IMMER 0 Soll-Stunden!
     if (dayIdx === 0 || dayIdx === 6) return 0; 
     
     const dStr = toLocalISO(dateObj);
-    
     if (holidaysDB[dStr]) return 0; 
-
     const log = (db.logs[uName] || {})[dStr];
     if (log && log.type === 'Feiertag') return 0;
 
-    const cfg = db.config[uName][dayIdx] || { target: 0, start: "00:00", weekMode: "ALL" };
-    let t = safeFloat(cfg.target);
-    if(t === 0) return 0;
+    migrateUserConfig(uName);
+    let scheds = db.config[uName].schedules;
+    if(!scheds || scheds.length === 0) return 0;
+    
+    // Gültigen Dienstplan finden (der letzte, der vor oder am Stempel-Datum gültig ist)
+    let applicable = scheds[0];
+    for(let i=0; i<scheds.length; i++) {
+        if(scheds[i].validFrom <= dStr) applicable = scheds[i];
+    }
 
+    const cfg = applicable.days[dayIdx] || { weekMode: "ALL", blocks: [] };
+    
     const kw = getISOWeek(dateObj);
     const mode = cfg.weekMode || "ALL";
     if (mode === 'EVEN' && kw % 2 !== 0) return 0; 
     if (mode === 'ODD' && kw % 2 === 0) return 0;  
+
+    let t = 0;
+    if(cfg.blocks) {
+        cfg.blocks.forEach(b => {
+            if(b.end) t += getTimeDiff(b.start, b.end);
+            else if(b.target) t += safeFloat(b.target);
+        });
+    }
 
     return t;
 }
@@ -599,16 +667,33 @@ function renderTeamSchedule() {
     const tbody = document.getElementById('teamScheduleBody');
     tbody.innerHTML = "";
     const days = [1, 2, 3, 4, 5]; 
+    const todayStr = toLocalISO(getNow());
+    
     getVisibleUsers().forEach(u => {
         if(u === "Admin") return;
+        migrateUserConfig(u);
+        let applicable = db.config[u].schedules[0];
+        for(let i=0; i<db.config[u].schedules.length; i++) {
+            if(db.config[u].schedules[i].validFrom <= todayStr) applicable = db.config[u].schedules[i];
+        }
+
         let rowHtml = `<td class="p-2 font-black theme-text border-b">${u}</td>`;
         days.forEach(d => {
-            const cfg = (db.config[u] && db.config[u][d]) ? db.config[u][d] : {start: "08:00", target: 0};
-            if(cfg.target > 0) {
+            const cfg = applicable.days[d] || {blocks: [], weekMode: "ALL"};
+            let sumT = 0;
+            let displayBlocks = [];
+            if(cfg.blocks) {
+                cfg.blocks.forEach(b => { 
+                    let t = b.end ? getTimeDiff(b.start, b.end) : safeFloat(b.target);
+                    sumT += t;
+                    if(t > 0) displayBlocks.push(`${b.start}-${b.end}`);
+                });
+            }
+            if(sumT > 0) {
                 let suffix = "";
                 if(cfg.weekMode === 'EVEN') suffix = " (Gerade KW)";
                 if(cfg.weekMode === 'ODD') suffix = " (Ungerade KW)";
-                rowHtml += `<td class="p-2 border-b theme-dim-bg"><div class="font-bold text-xs">${cfg.start}</div><div class="text-[9px] text-slate-400 font-bold">${cfg.target}h${suffix}</div></td>`;
+                rowHtml += `<td class="p-2 border-b theme-dim-bg"><div class="font-bold text-xs">${displayBlocks.join(' / ')}</div><div class="text-[9px] text-slate-400 font-bold">${sumT.toFixed(2)}h${suffix}</div></td>`;
             } else {
                 rowHtml += `<td class="p-2 border-b text-slate-200 text-xs">-</td>`;
             }
@@ -643,14 +728,13 @@ function applyTheme() {
     } catch(e) { console.error("Theme Error", e); }
 }
 
-function saveSystemSettings() {
+async function saveSystemSettings() {
     if(!isSuperuser) return;
     const title = document.getElementById('sysTitle').value;
     const col = document.getElementById('sysColor').value;
     const admPw = document.getElementById('sysAdminPw').value;
     const newDbKey = document.getElementById('sysDbKey').value.trim();
     
-    // NEU: Zusätzliche Werte speichern
     const devEmail = document.getElementById('sysDevEmail')?.value.trim();
     const relNotes = document.getElementById('sysReleaseNotes')?.value;
 
@@ -666,10 +750,9 @@ function saveSystemSettings() {
         return; 
     }
     
-    save().then(() => {
-        alert("Einstellungen gespeichert. App wird neu geladen.");
-        window.location.reload();
-    });
+    await save();
+    alert("Einstellungen gespeichert. App wird neu geladen.");
+    window.location.reload();
 }
 
 function clearLogo() {
@@ -778,7 +861,6 @@ function startApp() {
              document.getElementById('sysCloudUrl').value = CLOUD_URL; 
              document.getElementById('sysDbKey').value = DB_KEY; 
 
-             // NEU: Werte laden
              if(document.getElementById('sysDevEmail')) {
                  document.getElementById('sysDevEmail').value = db.settings.devEmail || "";
              }
@@ -810,6 +892,9 @@ function startApp() {
     }
     renderUserSelect();
     document.getElementById('userSelect').value = currentUser;
+    
+    getVisibleUsers().forEach(u => migrateUserConfig(u)); // Init Migration
+
     renderAll();
 }
 
@@ -869,17 +954,9 @@ async function init() {
         if(!db.settings) db.settings = {}; 
         
         db.users.forEach(u => {
-            if (!db.config[u]) { db.config[u] = {}; }
-            for(let d=1; d<=5; d++) {
-                if(!db.config[u][d]) {
-                     db.config[u][d] = { start: "08:00", target: 8, weekMode: "ALL" };
-                }
-            }
-            if(!db.config[u][0]) db.config[u][0] = { start: "00:00", target: 0 };
-            if(!db.config[u][6]) db.config[u][6] = { start: "00:00", target: 0 };
-
             if (!db.admin[u]) db.admin[u] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
             if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "Admin" : "1234"; }
+            migrateUserConfig(u); 
         });
         
         schoolHolidays = [...fallbackHolidays];
@@ -941,6 +1018,7 @@ async function syncFromCloud() {
             if(cloudDb && cloudDb.users && Array.isArray(cloudDb.users)) {
                 db = cloudDb;
                 if(!db.settings) db.settings = {}; 
+                db.users.forEach(u => migrateUserConfig(u)); 
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
                 statusDiv.innerText = "● Daten geladen"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
                 if(loginSync) { loginSync.innerText = "● Online (Daten da!)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
@@ -976,8 +1054,6 @@ async function fetchHolidays() {
             const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/AT`); 
             const d = await r.json(); 
             d.forEach(h => { 
-                // FILTER: Nur echte, bundesweite gesetzliche Feiertage zulassen!
-                // Regionale Feiertage wie Florianitag, Leopolditag etc. werden ignoriert.
                 if (h.global === true) {
                     holidaysDB[h.date] = h.localName; 
                 }
@@ -1034,18 +1110,20 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
         else if (log.type === 'Sonstiges') { ist = log.value !== undefined ? safeFloat(log.value) : target; }
         else if (log.in && log.out) {
             if (target === 0) { ist = 0; } 
-            
             let calcIn = log.in;
-            
             let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
             let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
             
             if(manualBreakHours > 0) {
-                ist = safeFloat(rawDiff - manualBreakHours);
+                ist = Math.max(0, safeFloat(rawDiff - manualBreakHours));
             } else {
                 ist = safeFloat(rawDiff);
             }
         }
+        
+        // WE-FIX: Am Wochenende wird NIE Zeit verrechnet, weder Ist noch Soll!
+        if(isWE) ist = 0;
+
         totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
     }
     return { totalSaldo: safeFloat(totalSaldo), restVacation: (safeFloat(admin.startVacation) + parseInt(admin.yearlyVacation)) - usedVacYear, monthVacation: usedVacMonth };
@@ -1095,7 +1173,6 @@ function renderLogs() {
 
         if (log.in && log.out) {
             let calcIn = log.in;
-
             const rawIst = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
             let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
             
@@ -1114,6 +1191,9 @@ function renderLogs() {
             }
         }
         
+        // WE-FIX: Nullsetzung von "Ist" am Wochenende für das UI! 
+        if(isWE) ist = 0;
+
         mIst += ist; mSoll += target;
         
         if (log.type==='Urlaub' || log.type==='Betriebsurlaub') rowClass = 'row-vacation';
@@ -1260,7 +1340,6 @@ function generateMonthNode(y, m, mini = false) {
             else if(isF && showFerien) { cell.classList.add('row-school-holiday'); if(dStr === isF.s) cell.innerHTML += `<div class='text-[7px] text-blue-500 font-black mt-1 leading-none uppercase'>${isF.n}</div>`; }
             
             if(showTeamView) {
-                // Betriebsurlaub prüfen und zentral anzeigen
                 let hasBetriebsurlaub = false;
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
@@ -1277,7 +1356,7 @@ function generateMonthNode(y, m, mini = false) {
                     const target = getTargetHours(d, u);
                     if(uLog.type) {
                         if (uLog.type === 'Krank') return;
-                        if (uLog.type === 'Betriebsurlaub') return; // Wird bereits oben angezeigt
+                        if (uLog.type === 'Betriebsurlaub') return; 
                         const typesToHide = ['Urlaub', 'ZA'];
                         if (typesToHide.includes(uLog.type)) { if (target === 0) return; }
                         let cl = "bg-blue-50 text-blue-700 border-blue-200"; 
@@ -1300,7 +1379,7 @@ function generateMonthNode(y, m, mini = false) {
                 if(log && log.type) { 
                     let showLog = true;
                     const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
-                    if (typesToHide.includes(log.type)) { if (target === 0) showLog = false; }
+                    if (typesToHide.includes(log.type)) { if (target === 0 && currentUser !== 'Admin') showLog = false; }
                     
                     if (log.type === 'Feiertag') showLog = true;
 
@@ -1360,7 +1439,6 @@ function renderCalendar() {
             const d = new Date(start); d.setDate(d.getDate() + i); const dStr = toLocalISO(d); const isH = holidaysDB[dStr];
             let content = `<p class="text-[9px] uppercase font-bold text-slate-400">${WEEKDAYS_SHORT[d.getDay()]}</p><p class="text-xl font-black">${d.getDate()}.${d.getMonth()+1}.</p>`;
             if(showTeamView) {
-                // Zentraler Betriebsurlaub in Wochenansicht
                 let hasBetriebsurlaub = false;
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
@@ -1377,7 +1455,7 @@ function renderCalendar() {
                     const target = getTargetHours(d, u);
                     if(uLog.type) { 
                         if (uLog.type === 'Krank') return;
-                        if (uLog.type === 'Betriebsurlaub') return; // Überspringen
+                        if (uLog.type === 'Betriebsurlaub') return; 
                         const typesToHide = ['Urlaub', 'ZA'];
                         if (typesToHide.includes(uLog.type)) { if (target === 0) return; }
                         let col = "theme-text theme-dim-bg"; 
@@ -1402,7 +1480,7 @@ function renderCalendar() {
                 if(log.type === 'Sonstiges' && log.title) typeDisplay = log.title;
                 if(log.type === 'Schulung' && log.range) typeDisplay = "Schulung (" + log.range + ")";
                 const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
-                if (typesToHide.includes(log.type)) { if (target === 0) typeDisplay = ""; }
+                if (typesToHide.includes(log.type)) { if (target === 0 && currentUser !== 'Admin') typeDisplay = ""; }
                 
                 if (log.type === 'Feiertag') typeDisplay = "Feiertag";
                 
@@ -1427,14 +1505,8 @@ function punch(t) {
     const n = getNow(), ds = toLocalISO(n);
     let ts = n.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
 
-    // Kommen & Gehen: Strikte Rundung auf 15 Min
-    if (t === 'in' || t === 'out') {
-        ts = roundTime(ts, 15);
-    }
-    // Pausen: Rundung auf 5 Min
-    if (t === 'break_in' || t === 'break_out') {
-        ts = roundTime(ts, 5);
-    }
+    if (t === 'in' || t === 'out') { ts = roundTime(ts, 15); }
+    if (t === 'break_in' || t === 'break_out') { ts = roundTime(ts, 5); }
 
     if(!db.logs[currentUser]) db.logs[currentUser] = {}; 
     if(!db.logs[currentUser][ds]) db.logs[currentUser][ds] = {};
@@ -1464,7 +1536,6 @@ function renderAll() {
         renderTodayInfo();
     }
     
-    // --- NEU: Release Notes im Dashboard anzeigen ---
     const notesEl = document.getElementById('dashboardReleaseNotes');
     const notesContent = document.getElementById('dashboardReleaseNotesContent');
     if (notesEl && notesContent) {
@@ -1476,7 +1547,6 @@ function renderAll() {
             notesEl.classList.add('hidden');
         }
     }
-    // ------------------------------------------------
     
     renderLogs(); renderCalendar(); renderWeeklySettings(); renderAdminConfigs(); applyTheme();
 }
@@ -1490,23 +1560,116 @@ function renderUserSelect() {
     const s = document.getElementById('userSelect'); s.innerHTML = ""; 
     getVisibleUsers().forEach(u => { let o = document.createElement('option'); o.value = u; o.innerText = u; s.appendChild(o); }); 
 }
+
+// --- NEU: Erweiterter Dienstplan-Editor ---
 function renderWeeklySettings() {
     const cont = document.getElementById('weeklyEditor'); cont.innerHTML = "";
     if (currentUser === "Admin") { cont.innerHTML = "<p class='text-xs italic text-slate-400'>Admin hat keine Arbeitszeiten.</p>"; return; }
-    for(let i=1; i<=5; i++) { 
-        const c = db.config[currentUser][i] || {start:"08:00", target:8, weekMode: "ALL"}; 
-        const selAll = (!c.weekMode || c.weekMode === 'ALL') ? 'selected' : '';
-        const selEven = (c.weekMode === 'EVEN') ? 'selected' : '';
-        const selOdd = (c.weekMode === 'ODD') ? 'selected' : '';
-        cont.innerHTML += `<div class="flex flex-col md:flex-row items-start md:items-center gap-2 p-3 bg-slate-50 rounded-lg border italic"><span class="w-16 font-bold text-xs uppercase">${WEEKDAYS_SHORT[i]}</span><div class="flex items-center gap-2"><input type="time" id="ws_${i}" value="${c.start}" class="border p-1 rounded text-xs"><input type="number" id="wt_${i}" value="${c.target}" step="0.5" class="border p-1 rounded w-16 text-right text-xs font-black"> <span class="text-xs">h</span></div><select id="wm_${i}" class="text-[10px] border rounded bg-white p-1"><option value="ALL" ${selAll}>Jede Woche</option><option value="EVEN" ${selEven}>Gerade KW (2,4..)</option><option value="ODD" ${selOdd}>Ungerade KW (1,3..)</option></select></div>`; 
+    
+    migrateUserConfig(currentUser);
+    let scheds = db.config[currentUser].schedules;
+    scheds.sort((a,b) => a.validFrom.localeCompare(b.validFrom));
+    
+    const sel = document.getElementById('scheduleHistorySelect');
+    sel.innerHTML = "";
+    scheds.forEach((s, idx) => {
+        let o = document.createElement('option'); o.value = idx; 
+        o.innerText = `Ab ${formatDateShort(s.validFrom)} (Version ${idx+1})`;
+        if(currentScheduleEditIndex === idx) o.selected = true;
+        sel.appendChild(o);
+    });
+    
+    if(currentScheduleEditIndex === -1 || currentScheduleEditIndex >= scheds.length) {
+        currentScheduleEditIndex = scheds.length - 1;
+        sel.value = currentScheduleEditIndex;
     }
+    
+    let activeSched = scheds[currentScheduleEditIndex];
+    document.getElementById('scheduleValidFrom').value = activeSched.validFrom;
+    
+    for(let i=1; i<=5; i++) { 
+        const dConf = activeSched.days[i] || { weekMode: "ALL", blocks: [{start:"08:00", end:"12:00"}] };
+        const b1 = dConf.blocks[0] || {start:"08:00", end:""};
+        const b2 = dConf.blocks[1] || {start:"", end:""};
+
+        const selAll = dConf.weekMode === 'ALL' ? 'selected' : '';
+        const selEven = dConf.weekMode === 'EVEN' ? 'selected' : '';
+        const selOdd = dConf.weekMode === 'ODD' ? 'selected' : '';
+
+        cont.innerHTML += `
+        <div class="flex flex-col p-3 bg-slate-50 rounded-lg border mb-2">
+            <div class="flex justify-between items-center mb-2">
+                <span class="font-black text-xs uppercase text-slate-600">${WEEKDAYS_SHORT[i]}</span>
+                <select id="wm_${i}" class="text-[10px] border rounded bg-white p-1" onchange="updateWeeklySum()">
+                    <option value="ALL" ${selAll}>Jede Woche</option>
+                    <option value="EVEN" ${selEven}>Gerade KW (2,4..)</option>
+                    <option value="ODD" ${selOdd}>Ungerade KW (1,3..)</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="flex flex-col gap-1 border-r border-slate-300 pr-3">
+                    <span class="text-[8px] font-bold text-slate-400 uppercase">Block 1 (von - bis)</span>
+                    <div class="flex items-center gap-1">
+                        <input type="time" id="ws1_${i}" value="${b1.start}" class="border p-1 rounded text-[10px] w-full bg-white font-bold" oninput="updateWeeklySum()">
+                        <span class="text-slate-400">-</span>
+                        <input type="time" id="we1_${i}" value="${b1.end||''}" class="border p-1 rounded text-[10px] w-full bg-white font-bold" oninput="updateWeeklySum()">
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <span class="text-[8px] font-bold text-slate-400 uppercase">Block 2 (von - bis)</span>
+                    <div class="flex items-center gap-1">
+                        <input type="time" id="ws2_${i}" value="${b2.start||''}" class="border p-1 rounded text-[10px] w-full bg-white font-bold" oninput="updateWeeklySum()">
+                        <span class="text-slate-400">-</span>
+                        <input type="time" id="we2_${i}" value="${b2.end||''}" class="border p-1 rounded text-[10px] w-full bg-white font-bold" oninput="updateWeeklySum()">
+                    </div>
+                </div>
+            </div>
+        </div>`; 
+    }
+    updateWeeklySum();
 }
+
+function updateWeeklySum() {
+    if(currentUser === "Admin") return;
+    let totalSum = 0;
+    for(let i=1; i<=5; i++) {
+        totalSum += getTimeDiff(document.getElementById('ws1_'+i)?.value, document.getElementById('we1_'+i)?.value);
+        totalSum += getTimeDiff(document.getElementById('ws2_'+i)?.value, document.getElementById('we2_'+i)?.value);
+    }
+    const d = document.getElementById('weeklySumDisplay');
+    if(d) d.innerText = `(Gesamt: ${totalSum.toFixed(2)} h / Woche)`;
+}
+
+function changeScheduleVersion() {
+    currentScheduleEditIndex = parseInt(document.getElementById('scheduleHistorySelect').value);
+    renderWeeklySettings();
+}
+
+function addScheduleVersion() {
+    let scheds = db.config[currentUser].schedules;
+    let lastSched = JSON.parse(JSON.stringify(scheds[scheds.length-1])); 
+    let newDate = prompt("Gültig ab Datum (Format: YYYY-MM-DD):", toLocalISO(getNow()));
+    if(!newDate) return;
+    lastSched.validFrom = newDate;
+    scheds.push(lastSched);
+    currentScheduleEditIndex = scheds.length - 1;
+    renderWeeklySettings();
+}
+
 function saveWeekly() { 
     if(currentUser==="Admin") return;
+    let scheds = db.config[currentUser].schedules;
+    let activeSched = scheds[currentScheduleEditIndex];
+    
+    let vf = document.getElementById('scheduleValidFrom').value;
+    if(vf) activeSched.validFrom = vf;
+    
     for(let i=1; i<=5; i++) { 
-        db.config[currentUser][i] = { start: document.getElementById('ws_'+i).value, target: parseFloat(document.getElementById('wt_'+i).value) || 0, weekMode: document.getElementById('wm_'+i).value }; 
+        let b1 = { start: document.getElementById('ws1_'+i).value, end: document.getElementById('we1_'+i).value };
+        let b2 = { start: document.getElementById('ws2_'+i).value, end: document.getElementById('we2_'+i).value };
+        activeSched.days[i] = { weekMode: document.getElementById('wm_'+i).value, blocks: [b1, b2] }; 
     } 
-    save(); alert("Plan gespeichert!"); renderAll(); 
+    save(); alert("Plan erfolgreich gespeichert!"); renderAll(); 
 }
 
 function addPlanningRange() {
@@ -1526,7 +1689,7 @@ function addPlanningRange() {
             if(confirm("Soll diese Schulung für ALLE Mitarbeiter gelten?\nOK = Ja, für alle\nAbbrechen = Nein, nur für " + currentUser)) { forAll = true; }
         }
         let targets = [currentUser];
-        if(type === 'Betriebsurlaub' || type === 'DELETE_BU' || type === 'DELETE_ALL' || forAll) { targets = getVisibleUsers().filter(u => u !== 'Admin'); } else if (currentUser === 'Admin' && !forAll) { alert("Admin hat keine Urlaubsfunktion."); return; }
+        if(type === 'Betriebsurlaub' || type === 'DELETE_BU' || type === 'DELETE_ALL' || forAll) { targets = getVisibleUsers(); } 
         while(current <= finish) { 
             const dIso = toLocalISO(current);
             targets.forEach(u => {
@@ -1555,8 +1718,7 @@ function renderTodayInfo() {
     const ds = toLocalISO(getNow()), log = (db.logs[currentUser]||{})[ds] || {in:'--', out:null}; 
     let dispOut = log.out ? getExtendedOutTime(ds, log.in, log.out) : '--:--';
     
-    // Check ob wir im Pause-Automatik-Modus sind oder echte Pause haben
-    if (log.break_in && log.break_out) dispOut = log.out; // Bei echter Pause wird out nicht geschoben
+    if (log.break_in && log.break_out) dispOut = log.out; 
     
     let html = `<div class="flex justify-between p-2 bg-green-50 rounded border text-xs italic"><span>KOMMEN:</span><span class="font-black">${log.in || '--:--'}</span></div>`;
     
@@ -1570,7 +1732,6 @@ function renderTodayInfo() {
 }
 
 function editEntry(d) {
-    if(currentUser === "Admin") return alert("Admin kann nicht stempeln/bearbeiten.");
     const dObj = new Date(d); const key = dObj.getFullYear() + "-" + dObj.getMonth();
     const sigData = (db.config[currentUser]?.signatures || {})[key];
     if(sigData && sigData.signed) { return alert("⛔ Monat ist abgeschlossen/signiert! Änderungen nicht mehr möglich."); }
@@ -1680,21 +1841,14 @@ function sendDevMessage() {
     const txt = document.getElementById('devMsgText').value; if(!txt) return;
     if(!db.messages) db.messages = []; db.messages.push({from: currentUser, date: new Date().toISOString(), text: txt}); save(); 
     
-    // --- NEU: Lautlose E-Mail Benachrichtigung im Hintergrund ---
     const targetEmail = db.settings.devEmail || "";
     if (targetEmail) {
         fetch(CLOUD_URL, {
             method: 'POST',
-            body: JSON.stringify({
-                action: "send_email",
-                sender: currentUser,
-                message: txt,
-                targetEmail: targetEmail
-            }),
+            body: JSON.stringify({ action: "send_email", sender: currentUser, message: txt, targetEmail: targetEmail }),
             mode: 'no-cors'
         }).catch(e => console.log("Email-Sync Fehler:", e));
     }
-    // -----------------------------------------------------------
 
     document.getElementById('devMsgText').value = ""; alert("Nachricht gesendet!");
 }
@@ -1711,13 +1865,12 @@ function adminAddUser() {
     if(name && name.trim() !== "") {
         if(db.users.includes(name)) return alert("User existiert bereits!");
         db.users.push(name);
-        db.config[name] = {};
-        for(let d=1; d<=5; d++) db.config[name][d] = { start: "08:00", target: 8, weekMode: "ALL" };
-        db.config[name][0] = { start: "00:00", target: 0 }; db.config[name][6] = { start: "00:00", target: 0 };
+        db.config[name] = { schedules: [{validFrom: '2024-01-01', days: {}}] };
+        for(let d=1; d<=5; d++) db.config[name].schedules[0].days[d] = { weekMode: "ALL", blocks: [{start: "08:00", end: "12:00"}] };
+        
         db.admin[name] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
         db.passwords[name] = "1234";
         
-        // NEU: Betriebsurlaube kopieren
         db.logs[name] = {};
         const refUser = db.users.find(u => u !== 'Admin' && u !== name);
         if (refUser && db.logs[refUser]) {
@@ -1756,13 +1909,23 @@ function testFillMonth() {
         if(holidaysDB[dStr]) continue; 
         const target = getTargetHours(d, user);
         if(target > 0) {
-            const dayCfg = db.config[user][d.getDay()];
-            let [h, min] = dayCfg.start.split(':').map(Number);
-            let minutesIn = h * 60 + min; let workMinutes = dayCfg.target * 60;
-            if(dayCfg.target > 6) workMinutes += 30; 
-            let totalMinutes = minutesIn + workMinutes;
-            let endH = Math.floor(totalMinutes / 60); let endM = totalMinutes % 60;
-            let sIn = dayCfg.start; let sOut = String(endH).padStart(2,'0') + ":" + String(endM).padStart(2,'0');
+            migrateUserConfig(user);
+            let scheds = db.config[user].schedules;
+            let applicable = scheds[0];
+            for(let j=0; j<scheds.length; j++) if(scheds[j].validFrom <= dStr) applicable = scheds[j];
+            
+            const dayCfg = applicable.days[d.getDay()];
+            if(!dayCfg || !dayCfg.blocks || dayCfg.blocks.length === 0) continue;
+            let mainBlock = dayCfg.blocks[0];
+
+            let sIn = mainBlock.start; 
+            let sOut = mainBlock.end;
+            
+            // Fallback, falls doch nur "target" in alten Daten existiert
+            if(!sOut && mainBlock.target) {
+                sOut = calculateEndTime(sIn, mainBlock.target);
+            }
+
             db.logs[user][dStr] = { in: sIn, out: sOut, type: "" };
         }
     }
@@ -1871,20 +2034,22 @@ function exportExcel() {
     const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value);
     const rows = [["ZEITNACHWEIS", currentUser], ["Monat", MONTH_NAMES[m], y], ["Datum", "Kommen", "Gehen", "Pause", "Ist", "Soll", "Saldo", "Notiz"]];
     for(let i=1; i<=new Date(y, m+1, 0).getDate(); i++) {
-        const ds = toLocalISO(new Date(y,m,i)), log = (db.logs[currentUser]||{})[ds] || {};
+        const dObj = new Date(y,m,i);
+        const ds = toLocalISO(dObj);
+        const isWE = dObj.getDay() === 0 || dObj.getDay() === 6;
+        const log = (db.logs[currentUser]||{})[ds] || {};
         const target = getTargetHours(new Date(y,m,i), currentUser);
         let ist = 0, pStr = "-"; let dispOut = log.out || log.type || "";
         
         if(log.in && log.out) { 
             let calcIn = log.in;
-            
             let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+calcIn))/3600000); 
             let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
             
             if (manualBreakHours > 0) {
                 pStr = `${log.break_in} - ${log.break_out}`;
                 dispOut = log.out;
-                ist = safeFloat(rawIst - manualBreakHours);
+                ist = Math.max(0, safeFloat(rawIst - manualBreakHours));
             } else {
                 if(rawIst > 6.0) { 
                     pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); 
@@ -1895,6 +2060,9 @@ function exportExcel() {
                 } 
             }
         }
+
+        if(isWE) ist = 0;
+
         rows.push([i+"."+(m+1)+".", log.in||"", dispOut, pStr, safeFloat(ist).toFixed(2), safeFloat(target).toFixed(2), (safeFloat(ist)-safeFloat(target)).toFixed(2), log.note || ""]);
     }
     const ws = XLSX.utils.aoa_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Journal"); XLSX.writeFile(wb, `ZE_${currentUser}.xlsx`);
