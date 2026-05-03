@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.11"; 
+        const CURRENT_APP_VERSION = "4.13"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -102,6 +102,10 @@
             <div class="grid grid-cols-2 gap-2">
                 <div><label class="text-[9px] font-bold uppercase text-slate-400">Kommen</label><input type="time" id="editIn" class="w-full p-2 border rounded font-bold bg-slate-50"></div>
                 <div><label class="text-[9px] font-bold uppercase text-slate-400">Gehen</label><input type="time" id="editOut" class="w-full p-2 border rounded font-bold bg-slate-50"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="text-[9px] font-bold uppercase text-slate-400">Pause Start</label><input type="time" id="editBreakIn" class="w-full p-2 border rounded font-bold bg-amber-50 text-amber-700"></div>
+                <div><label class="text-[9px] font-bold uppercase text-slate-400">Pause Ende</label><input type="time" id="editBreakOut" class="w-full p-2 border rounded font-bold bg-amber-50 text-amber-700"></div>
             </div>
             <div>
                 <label class="text-[9px] font-bold uppercase text-slate-400">Typ / Status</label>
@@ -204,9 +208,11 @@
                 <p class="text-sm text-slate-400 mb-6" id="displayTodayDate"></p>
                 
                 <div id="punchButtonsArea">
-                    <div class="flex justify-center gap-6 mb-8">
-                        <button onclick="punch('in')" class="w-24 h-24 md:w-32 md:h-32 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-xs md:text-base">Kommen</button>
-                        <button onclick="punch('out')" class="w-24 h-24 md:w-32 md:h-32 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-xs md:text-base">Gehen</button>
+                    <div class="flex justify-center gap-4 mb-8">
+                        <button onclick="punch('in')" class="w-16 h-16 md:w-24 md:h-24 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm">Kommen</button>
+                        <button onclick="punch('break_in')" class="w-16 h-16 md:w-24 md:h-24 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm text-center leading-tight">Pause<br>Start</button>
+                        <button onclick="punch('break_out')" class="w-16 h-16 md:w-24 md:h-24 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm text-center leading-tight">Pause<br>Ende</button>
+                        <button onclick="punch('out')" class="w-16 h-16 md:w-24 md:h-24 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm">Gehen</button>
                     </div>
                     
                     <div id="todayDetails" class="space-y-2 max-w-xs mx-auto mb-6"></div>
@@ -355,7 +361,15 @@
                          <h2 class="font-black mb-4 uppercase italic">Soll-Stunden: <span id="targetName" class="theme-text"></span></h2>
                          <button onclick="testFillMonth()" class="bg-purple-600 hover:bg-purple-700 text-white text-[9px] px-2 py-1 rounded font-bold uppercase shadow-sm">🤖 Monat Füllen</button>
                     </div>
-                    <div id="weeklyEditor" class="space-y-2"></div>
+                    <div class="mb-4">
+                        <select id="scheduleHistorySelect" onchange="changeScheduleVersion()" class="w-full p-2 bg-slate-50 border rounded font-bold text-xs theme-text mb-2 cursor-pointer"></select>
+                        <div class="flex gap-2">
+                            <input type="date" id="scheduleValidFrom" class="w-full p-2 border rounded text-xs font-bold bg-slate-50">
+                            <button onclick="addScheduleVersion()" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-300 px-3 py-2 rounded text-[10px] font-bold uppercase whitespace-nowrap">➕ Neuer Plan ab...</button>
+                        </div>
+                    </div>
+                    <div id="weeklyEditor" class="space-y-2 max-h-[60vh] overflow-y-auto pr-2"></div>
+                    <div id="weeklySumDisplay" class="text-right text-xs font-bold text-slate-500 mt-2 mb-2"></div>
                     <button onclick="saveWeekly()" class="mt-4 bg-slate-800 text-white w-full py-3 rounded-xl font-bold uppercase shadow-lg">Plan speichern</button>
                 </div>
 
@@ -467,7 +481,6 @@ const DB_KEY = 'ze_chirurgie_stütz_v1';
 // *** SYSTEM LOGIC (NICHT ÄNDERN) ***
 // ==========================================
 
-// KILL-SWITCH
 if(localStorage.getItem('ze_custom_db_key') || localStorage.getItem('ze_cloud_url')) {
     console.log("🧹 Bereinige Browser-Speicher...");
     localStorage.removeItem('ze_custom_db_key');
@@ -492,7 +505,6 @@ function toggleZoom() {
     localStorage.setItem('ze_zoom_pref', document.body.classList.contains('zoom-out'));
 }
 
-// HELPER: Decimal Hours to HH:MM string
 function formatHM(val) {
     if (val === undefined || val === null || isNaN(val)) return "0:00";
     const sign = val < 0 ? "-" : "";
@@ -502,7 +514,6 @@ function formatHM(val) {
     return `${sign}${h}:${m.toString().padStart(2, '0')}`;
 }
 
-// HELPER: Flexible Rundung (Kaufmännisch)
 function roundTime(timeStr, minutes) {
     if(!timeStr || !timeStr.includes(':')) return timeStr;
     let [h, m] = timeStr.split(':').map(Number);
@@ -515,6 +526,12 @@ function roundTime(timeStr, minutes) {
     return String(newH).padStart(2,'0') + ':' + String(newM).padStart(2,'0');
 }
 
+function timeToMins(t) {
+    if(!t) return 0;
+    let [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+}
+
 function getISOWeek(d) {
     d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
@@ -523,10 +540,25 @@ function getISOWeek(d) {
     return weekNo;
 }
 
+function getTimeDiff(start, end) {
+    if(!start || !end) return 0;
+    const s = start.split(':').map(Number);
+    const e = end.split(':').map(Number);
+    const diff = (e[0] * 60 + e[1]) - (s[0] * 60 + s[1]);
+    return diff > 0 ? diff / 60 : 0;
+}
+
+function calculateEndTime(start, hours) {
+    if(!start || !hours) return "";
+    const s = start.split(':').map(Number);
+    const totalMinutes = s[0] * 60 + s[1] + (hours * 60);
+    const h = Math.floor(totalMinutes / 60) % 24;
+    const m = Math.round(totalMinutes % 60);
+    return String(h).padStart(2,'0') + ":" + String(m).padStart(2,'0');
+}
+
 let db;
-try {
-    db = JSON.parse(localStorage.getItem(DB_KEY));
-} catch(e) { }
+try { db = JSON.parse(localStorage.getItem(DB_KEY)); } catch(e) { }
 
 if (!db || !db.users || !Array.isArray(db.users) || db.users.length === 0) {
     db = { users: ["Admin"], logs: {}, config: {}, admin: {}, passwords: {}, settings: {} };
@@ -545,6 +577,7 @@ let schoolHolidays = [];
 let testModeActive = false;
 let showTeamView = false; 
 let editingDateStr = null;
+let currentScheduleEditIndex = -1;
 
 const fallbackHolidays = [
     {s: "2026-02-02", e: "2026-02-07", n: "Semesterferien (OÖ)"},
@@ -563,43 +596,135 @@ function toLocalISO(date) {
 
 function getVisibleUsers() { return db.users; }
 
+// --- MIGRATION LOGIK (Neue Dienstpläne / Blöcke) ---
+function migrateUserConfig(uName) {
+    if (!db.config[uName]) db.config[uName] = {};
+    if (!db.config[uName].schedules) {
+        let legacyDays = {};
+        for(let i=0; i<=6; i++) {
+            let c = db.config[uName][i] || { start: "00:00", target: 0, weekMode: "ALL" };
+            let blocks = [];
+            if (c.breakStart && c.breakEnd && c.breakIsReal) {
+                blocks.push({ start: c.start, end: c.breakStart });
+                blocks.push({ start: c.breakEnd, end: calculateEndTime(c.start, c.target + getTimeDiff(c.breakStart, c.breakEnd))}); 
+            } else {
+                blocks.push({start: c.start, end: calculateEndTime(c.start, c.target)});
+            }
+            legacyDays[i] = { weekMode: c.weekMode || "ALL", blocks: blocks };
+        }
+        let stDate = (db.admin[uName] && db.admin[uName].startDate) ? db.admin[uName].startDate : "2024-01-01";
+        db.config[uName].schedules = [{ validFrom: stDate, days: legacyDays }];
+    } else {
+        db.config[uName].schedules.forEach(sched => {
+            for(let i=1; i<=5; i++) {
+                if(sched.days[i] && sched.days[i].blocks) {
+                    sched.days[i].blocks.forEach(b => {
+                        if(b.target !== undefined && b.end === undefined) {
+                            b.end = calculateEndTime(b.start, b.target);
+                        }
+                    });
+                }
+            }
+        });
+    }
+}
+
+// --- NEU: Zieht sich die geplante Zeit zwischen Block 1 und Block 2 ---
+function getScheduledGap(uName, dStr, dObj) {
+    migrateUserConfig(uName);
+    let scheds = db.config[uName].schedules;
+    if(!scheds || scheds.length === 0) return null;
+    let applicable = scheds[0];
+    for(let i=0; i<scheds.length; i++) {
+        if(scheds[i].validFrom <= dStr) applicable = scheds[i];
+    }
+    const cfg = applicable.days[dObj.getDay()];
+    if(cfg && cfg.blocks && cfg.blocks.length >= 2) {
+        let b1 = cfg.blocks[0];
+        let b2 = cfg.blocks[1];
+        if(b1.end && b2.start && b1.end !== "" && b2.start !== "") {
+            if (getTimeDiff(b1.end, b2.start) > 0) {
+                return { start: b1.end, end: b2.start };
+            }
+        }
+    }
+    return null;
+}
+
 function getTargetHours(dateObj, uName) {
     const dayIdx = dateObj.getDay();
     if (dayIdx === 0 || dayIdx === 6) return 0; 
     
     const dStr = toLocalISO(dateObj);
-    
     if (holidaysDB[dStr]) return 0; 
 
     const log = (db.logs[uName] || {})[dStr];
     if (log && log.type === 'Feiertag') return 0;
 
-    const cfg = db.config[uName][dayIdx] || { target: 0, start: "00:00", weekMode: "ALL" };
-    let t = safeFloat(cfg.target);
-    if(t === 0) return 0;
+    migrateUserConfig(uName);
+    let scheds = db.config[uName].schedules;
+    if(!scheds || scheds.length === 0) return 0;
+    
+    let applicable = scheds[0];
+    for(let i=0; i<scheds.length; i++) {
+        if(scheds[i].validFrom <= dStr) applicable = scheds[i];
+    }
 
+    const cfg = applicable.days[dayIdx] || { weekMode: "ALL", blocks: [] };
+    
     const kw = getISOWeek(dateObj);
     const mode = cfg.weekMode || "ALL";
     if (mode === 'EVEN' && kw % 2 !== 0) return 0; 
     if (mode === 'ODD' && kw % 2 === 0) return 0;  
 
+    let t = 0;
+    if(cfg.blocks) {
+        cfg.blocks.forEach(b => {
+            if(b.end) t += getTimeDiff(b.start, b.end);
+            else if(b.target) t += safeFloat(b.target);
+        });
+    }
+
     return t;
+}
+
+function getManualBreakHours(bIn, bOut) {
+    if(!bIn || !bOut) return 0;
+    const ms = new Date(`2000-01-01T${bOut}`) - new Date(`2000-01-01T${bIn}`);
+    return ms > 0 ? ms / 3600000 : 0;
 }
 
 function renderTeamSchedule() {
     const tbody = document.getElementById('teamScheduleBody');
     tbody.innerHTML = "";
     const days = [1, 2, 3, 4, 5]; 
+    const todayStr = toLocalISO(getNow());
+
     getVisibleUsers().forEach(u => {
         if(u === "Admin") return;
+        migrateUserConfig(u);
+        let applicable = db.config[u].schedules[0];
+        for(let i=0; i<db.config[u].schedules.length; i++) {
+            if(db.config[u].schedules[i].validFrom <= todayStr) applicable = db.config[u].schedules[i];
+        }
+
         let rowHtml = `<td class="p-2 font-black theme-text border-b">${u}</td>`;
         days.forEach(d => {
-            const cfg = (db.config[u] && db.config[u][d]) ? db.config[u][d] : {start: "08:00", target: 0};
-            if(cfg.target > 0) {
+            const cfg = applicable.days[d] || {blocks: [], weekMode: "ALL"};
+            let sumT = 0;
+            let displayBlocks = [];
+            if(cfg.blocks) {
+                cfg.blocks.forEach(b => { 
+                    let t = b.end ? getTimeDiff(b.start, b.end) : safeFloat(b.target);
+                    sumT += t;
+                    if(t > 0) displayBlocks.push(`${b.start}-${b.end}`);
+                });
+            }
+            if(sumT > 0) {
                 let suffix = "";
                 if(cfg.weekMode === 'EVEN') suffix = " (Gerade KW)";
                 if(cfg.weekMode === 'ODD') suffix = " (Ungerade KW)";
-                rowHtml += `<td class="p-2 border-b theme-dim-bg"><div class="font-bold text-xs">${cfg.start}</div><div class="text-[9px] text-slate-400 font-bold">${cfg.target}h${suffix}</div></td>`;
+                rowHtml += `<td class="p-2 border-b theme-dim-bg"><div class="font-bold text-xs">${displayBlocks.join(' / ')}</div><div class="text-[9px] text-slate-400 font-bold">${sumT.toFixed(2)}h${suffix}</div></td>`;
             } else {
                 rowHtml += `<td class="p-2 border-b text-slate-200 text-xs">-</td>`;
             }
@@ -616,7 +741,7 @@ function applyTheme() {
         root.style.setProperty('--main-color', col);
         root.style.setProperty('--main-color-dim', col + '15'); 
         
-        const title = db.settings.companyName || "Teamordination Dr. Stütz & Dr. Haselgruber";
+        const title = db.settings.companyName || "Chirurgie Dr. Stütz";
         document.getElementById('headerTitleMain').innerText = title;
         document.getElementById('loginTitleSub').innerText = title;
 
@@ -634,14 +759,13 @@ function applyTheme() {
     } catch(e) { console.error("Theme Error", e); }
 }
 
-function saveSystemSettings() {
+async function saveSystemSettings() {
     if(!isSuperuser) return;
     const title = document.getElementById('sysTitle').value;
     const col = document.getElementById('sysColor').value;
     const admPw = document.getElementById('sysAdminPw').value;
     const newDbKey = document.getElementById('sysDbKey').value.trim();
     
-    // Release Notes und E-Mail sichern
     const devEmail = document.getElementById('sysDevEmail')?.value.trim();
     const relNotes = document.getElementById('sysReleaseNotes')?.value;
 
@@ -657,10 +781,9 @@ function saveSystemSettings() {
         return; 
     }
     
-    save().then(() => {
-        alert("Einstellungen gespeichert. App wird neu geladen.");
-        window.location.reload();
-    });
+    await save();
+    alert("Einstellungen gespeichert. App wird neu geladen.");
+    window.location.reload();
 }
 
 function clearLogo() {
@@ -766,9 +889,9 @@ function startApp() {
              document.getElementById('sysColor').value = db.settings.primaryColor || "#2563eb";
              document.getElementById('sysColorVal').innerText = db.settings.primaryColor || "#2563eb";
              document.getElementById('sysAdminPw').value = db.settings.adminPassword || "";
-             document.getElementById('sysCloudUrl').value = CLOUD_URL; // Read-Only
-             document.getElementById('sysDbKey').value = DB_KEY; // Read-Only
-             
+             document.getElementById('sysCloudUrl').value = CLOUD_URL; 
+             document.getElementById('sysDbKey').value = DB_KEY; 
+
              if(document.getElementById('sysDevEmail')) {
                  document.getElementById('sysDevEmail').value = db.settings.devEmail || "";
              }
@@ -800,6 +923,9 @@ function startApp() {
     }
     renderUserSelect();
     document.getElementById('userSelect').value = currentUser;
+    
+    getVisibleUsers().forEach(u => migrateUserConfig(u)); 
+
     renderAll();
 }
 
@@ -818,38 +944,7 @@ function doLogout() {
 
 function getExtendedOutTime(dStr, inStr, outStr) {
     if(!inStr || !outStr) return outStr;
-    let calcIn = inStr;
-    let configBreak = null;
-
-    if(currentUser !== 'Admin') {
-         const d = new Date(dStr);
-         const cfg = db.config[currentUser][d.getDay()] || {start: "00:00"};
-         
-         if(cfg.breakStart && cfg.breakEnd) {
-             configBreak = {
-                 start: cfg.breakStart,
-                 end: cfg.breakEnd,
-                 isReal: cfg.breakIsReal 
-             };
-         }
-    }
-    
-    if (configBreak) {
-        if (configBreak.isReal) {
-            return outStr;
-        } else {
-            const bS = new Date(`2000-01-01T${configBreak.start}`);
-            const bE = new Date(`2000-01-01T${configBreak.end}`);
-            const durationMs = bE - bS;
-            
-            if (durationMs > 0) {
-                 const outDate = new Date(`2000-01-01T${outStr}`);
-                 const extDate = new Date(outDate.getTime() + durationMs);
-                 return extDate.getHours().toString().padStart(2, '0') + ":" + extDate.getMinutes().toString().padStart(2, '0');
-            }
-        }
-    }
-
+    const calcIn = inStr;
     const rawIst = (new Date(`${dStr}T${outStr}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
     if (rawIst > 6.0) {
         let [h, min] = outStr.split(':').map(Number);
@@ -861,13 +956,6 @@ function getExtendedOutTime(dStr, inStr, outStr) {
 
 function getBreakTimeRange(dStr, inStr, outStr, uName) {
     if(!inStr || !outStr) return "-";
-    
-    const dObj = new Date(dStr);
-    const cfg = db.config[uName] && db.config[uName][dObj.getDay()];
-    if(cfg && cfg.breakStart && cfg.breakEnd) {
-        return cfg.breakStart + " - " + cfg.breakEnd + (cfg.breakIsReal ? "" : " (auto)");
-    }
-
     const startD = new Date(`${dStr}T${inStr}`); const endD = new Date(`${dStr}T${outStr}`); const totalHours = (endD - startD) / 3600000;
     let seed = 0; const sStr = dStr + uName; for (let i = 0; i < sStr.length; i++) seed += sStr.charCodeAt(i);
     const randomMinutes = seed % 16;
@@ -884,7 +972,7 @@ async function init() {
         const domTitle = document.getElementById('appTitle');
         const domVerLogin = document.getElementById('verLogin');
         const domVerHeader = document.getElementById('verHeader');
-        const domVerBill = document.getElementById('verBill');
+        const domVerBill = document.getElementById('verBill'); 
         
         if(domTitle) domTitle.innerText = "Zeiterfassung | Chirurgie Dr. Stütz V" + CURRENT_APP_VERSION;
         if(domVerLogin) domVerLogin.innerText = versionString;
@@ -897,17 +985,9 @@ async function init() {
         if(!db.settings) db.settings = {}; 
         
         db.users.forEach(u => {
-            if (!db.config[u]) { db.config[u] = {}; }
-            for(let d=1; d<=5; d++) {
-                if(!db.config[u][d]) {
-                     db.config[u][d] = { start: "08:00", target: 8, weekMode: "ALL" };
-                }
-            }
-            if(!db.config[u][0]) db.config[u][0] = { start: "00:00", target: 0 };
-            if(!db.config[u][6]) db.config[u][6] = { start: "00:00", target: 0 };
-
             if (!db.admin[u]) db.admin[u] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
             if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "Admin" : "1234"; }
+            migrateUserConfig(u); 
         });
         
         schoolHolidays = [...fallbackHolidays];
@@ -969,6 +1049,7 @@ async function syncFromCloud() {
             if(cloudDb && cloudDb.users && Array.isArray(cloudDb.users)) {
                 db = cloudDb;
                 if(!db.settings) db.settings = {}; 
+                db.users.forEach(u => migrateUserConfig(u)); 
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
                 statusDiv.innerText = "● Daten geladen"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
                 if(loginSync) { loginSync.innerText = "● Online (Daten da!)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
@@ -1004,8 +1085,6 @@ async function fetchHolidays() {
             const r = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/AT`); 
             const d = await r.json(); 
             d.forEach(h => { 
-                // FILTER: Nur echte, bundesweite gesetzliche Feiertage zulassen!
-                // Regionale Feiertage wie Florianitag, Leopolditag etc. werden ignoriert.
                 if (h.global === true) {
                     holidaysDB[h.date] = h.localName; 
                 }
@@ -1043,6 +1122,7 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
     let usedVacYear = 0, usedVacMonth = 0;
     let iter = new Date(admin.startDate); if(isNaN(iter.getTime())) iter = new Date(targetYear, 0, 1);
     let endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
+    
     while (iter <= endIter) {
         const dStr = toLocalISO(iter); const log = logs[dStr] || {};
         const target = getTargetHours(iter, userName);
@@ -1061,37 +1141,28 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
         else if (log.type === 'Sonstiges') { ist = log.value !== undefined ? safeFloat(log.value) : target; }
         else if (log.in && log.out) {
             if (target === 0) { ist = 0; } 
-            
             let calcIn = log.in;
-            const cfg = db.config[userName][iter.getDay()] || {start: "00:00"};
-            
             let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
-            ist = safeFloat(rawDiff); 
+            let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
             
-            if (!isH && target > 0) {
-                 const breakStartStr = cfg.breakStart;
-                 const breakEndStr = cfg.breakEnd;
-                 
-                 if (breakStartStr && breakEndStr) {
-                     let [hI, mI] = calcIn.split(':').map(Number);
-                     let [hO, mO] = log.out.split(':').map(Number);
-                     let [hbS, mbS] = breakStartStr.split(':').map(Number);
-                     let [hbE, mbE] = breakEndStr.split(':').map(Number);
-
-                     let minIn = hI * 60 + mI;
-                     let minOut = hO * 60 + mO;
-                     let bStart = hbS * 60 + mbS;
-                     let bEnd = hbE * 60 + mbE;
-
-                     let start = Math.max(minIn, bStart);
-                     let end = Math.min(minOut, bEnd);
-                     
-                     if(end > start) {
-                         ist -= (end - start) / 60;
-                     }
-                 }
+            if(manualBreakHours > 0) {
+                ist = Math.max(0, safeFloat(rawDiff - manualBreakHours));
+            } else {
+                let gap = getScheduledGap(userName, dStr, iter);
+                let autoBreakHours = 0;
+                if (gap) {
+                    let overlapStart = Math.max(timeToMins(log.in), timeToMins(gap.start));
+                    let overlapEnd = Math.min(timeToMins(log.out), timeToMins(gap.end));
+                    if (overlapEnd > overlapStart) {
+                        autoBreakHours = (overlapEnd - overlapStart) / 60;
+                    }
+                }
+                ist = Math.max(0, safeFloat(rawDiff - autoBreakHours));
             }
         }
+        
+        if(isWE) ist = 0;
+
         totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
     }
     return { totalSaldo: safeFloat(totalSaldo), restVacation: (safeFloat(admin.startVacation) + parseInt(admin.yearlyVacation)) - usedVacYear, monthVacation: usedVacMonth };
@@ -1141,57 +1212,42 @@ function renderLogs() {
 
         if (log.in && log.out) {
             let calcIn = log.in;
-            const cfg = db.config[currentUser][d.getDay()] || {start: "00:00"};
-
             const rawIst = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
+            let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
             
-            let deduction = 0;
-            let customBreakFound = false;
-            
-            if (!isH && target > 0 && cfg.breakStart && cfg.breakEnd) {
-                 customBreakFound = true;
-                 let [hI, mI] = calcIn.split(':').map(Number);
-                 let [hO, mO] = log.out.split(':').map(Number);
-                 let [hbS, mbS] = cfg.breakStart.split(':').map(Number);
-                 let [hbE, mbE] = cfg.breakEnd.split(':').map(Number);
-                 
-                 let minIn = hI * 60 + mI;
-                 let minOut = hO * 60 + mO;
-                 let bStart = hbS * 60 + mbS;
-                 let bEnd = hbE * 60 + mbE;
-                 
-                 let start = Math.max(minIn, bStart);
-                 let end = Math.min(minOut, bEnd);
-                 
-                 if(end > start) {
-                     deduction = (end - start) / 60;
-                     pauseDisplay = `${cfg.breakStart} - ${cfg.breakEnd}`;
-                     if(deduction < ((bEnd-bStart)/60)) pauseDisplay += " (anteilig)";
-                     if(!cfg.breakIsReal) pauseDisplay += " (auto)";
-                 }
-                 
-                 ist = safeFloat(rawIst) - deduction;
-                 
-                 if (!cfg.breakIsReal) {
-                     const durationMs = (new Date(`2000-01-01T${cfg.breakEnd}`) - new Date(`2000-01-01T${cfg.breakStart}`));
-                     const outDate = new Date(`2000-01-01T${log.out}`);
-                     const extDate = new Date(outDate.getTime() + durationMs);
-                     dispOut = extDate.getHours().toString().padStart(2, '0') + ":" + extDate.getMinutes().toString().padStart(2, '0');
-                 } else {
-                     dispOut = log.out;
-                 }
-            } 
-            
-            if (!customBreakFound) {
-                if (rawIst > 6.0) { 
-                    pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
-                    dispOut = getExtendedOutTime(dStr, log.in, log.out); 
-                    ist = safeFloat(rawIst); 
-                } else { 
-                    ist = safeFloat(rawIst); 
+            if (manualBreakHours > 0) {
+                ist = Math.max(0, safeFloat(rawIst - manualBreakHours));
+                pauseDisplay = `${log.break_in} - ${log.break_out}`;
+                dispOut = log.out; 
+            } else {
+                let gap = getScheduledGap(currentUser, dStr, d);
+                let autoBreakHours = 0;
+                if (gap) {
+                    let overlapStart = Math.max(timeToMins(log.in), timeToMins(gap.start));
+                    let overlapEnd = Math.min(timeToMins(log.out), timeToMins(gap.end));
+                    if (overlapEnd > overlapStart) {
+                        autoBreakHours = (overlapEnd - overlapStart) / 60;
+                        pauseDisplay = `${gap.start} - ${gap.end} (Auto)`;
+                    }
+                }
+
+                if (autoBreakHours > 0) {
+                    ist = Math.max(0, safeFloat(rawIst - autoBreakHours));
+                    dispOut = log.out;
+                } else {
+                    if (rawIst > 6.0) { 
+                        pauseDisplay = getBreakTimeRange(dStr, log.in, log.out, currentUser); 
+                        dispOut = getExtendedOutTime(dStr, log.in, log.out); 
+                        ist = safeFloat(rawIst); 
+                    } else { 
+                        ist = safeFloat(rawIst); 
+                    }
                 }
             }
         }
+        
+        if(isWE) ist = 0;
+
         mIst += ist; mSoll += target;
         
         if (log.type==='Urlaub' || log.type==='Betriebsurlaub') rowClass = 'row-vacation';
@@ -1407,7 +1463,7 @@ function generateMonthNode(y, m, mini = false) {
                 if(log && log.type) { 
                     let showLog = true;
                     const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
-                    if (typesToHide.includes(log.type)) { if (target === 0) showLog = false; }
+                    if (typesToHide.includes(log.type)) { if (target === 0 && currentUser !== 'Admin') showLog = false; }
                     
                     if (log.type === 'Feiertag') showLog = true;
 
@@ -1512,7 +1568,7 @@ function renderCalendar() {
                 if(log.type === 'Sonstiges' && log.title) typeDisplay = log.title;
                 if(log.type === 'Schulung' && log.range) typeDisplay = "Schulung (" + log.range + ")";
                 const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
-                if (typesToHide.includes(log.type)) { if (target === 0) typeDisplay = ""; }
+                if (typesToHide.includes(log.type)) { if (target === 0 && currentUser !== 'Admin') typeDisplay = ""; }
                 
                 if (log.type === 'Feiertag') typeDisplay = "Feiertag";
                 
@@ -1537,9 +1593,8 @@ function punch(t) {
     const n = getNow(), ds = toLocalISO(n);
     let ts = n.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
 
-    if (t === 'in' || t === 'out') {
-        ts = roundTime(ts, 15);
-    }
+    if (t === 'in' || t === 'out') { ts = roundTime(ts, 15); }
+    if (t === 'break_in' || t === 'break_out') { ts = roundTime(ts, 5); }
 
     let currentLog = (db.logs[currentUser] && db.logs[currentUser][ds]) ? {...db.logs[currentUser][ds]} : {};
     
@@ -1548,6 +1603,10 @@ function punch(t) {
         if(currentLog.out === undefined) currentLog.out = null; 
     } else if (t === 'out') {
         currentLog.out = ts; 
+    } else if (t === 'break_in') {
+        currentLog.break_in = ts;
+    } else if (t === 'break_out') {
+        currentLog.break_out = ts;
     }
     
     saveLogEntry(currentUser, ds, currentLog);
@@ -1571,7 +1630,6 @@ function renderAll() {
         renderTodayInfo();
     }
     
-    // --- Release Notes Logik ---
     const notesEl = document.getElementById('dashboardReleaseNotes');
     const notesContent = document.getElementById('dashboardReleaseNotesContent');
     if (notesEl && notesContent) {
@@ -1583,7 +1641,6 @@ function renderAll() {
             notesEl.classList.add('hidden');
         }
     }
-    // ---------------------------
 
     renderLogs(); renderCalendar(); renderWeeklySettings(); renderAdminConfigs(); applyTheme();
 }
@@ -1598,55 +1655,115 @@ function renderUserSelect() {
     const s = document.getElementById('userSelect'); s.innerHTML = ""; 
     getVisibleUsers().forEach(u => { let o = document.createElement('option'); o.value = u; o.innerText = u; s.appendChild(o); }); 
 }
+
 function renderWeeklySettings() {
     const cont = document.getElementById('weeklyEditor'); cont.innerHTML = "";
     if (currentUser === "Admin") { cont.innerHTML = "<p class='text-xs italic text-slate-400'>Admin hat keine Arbeitszeiten.</p>"; return; }
+    
+    migrateUserConfig(currentUser);
+    let scheds = db.config[currentUser].schedules;
+    scheds.sort((a,b) => a.validFrom.localeCompare(b.validFrom));
+    
+    const sel = document.getElementById('scheduleHistorySelect');
+    sel.innerHTML = "";
+    scheds.forEach((s, idx) => {
+        let o = document.createElement('option'); o.value = idx; 
+        o.innerText = `Ab ${formatDateShort(s.validFrom)} (Version ${idx+1})`;
+        if(currentScheduleEditIndex === idx) o.selected = true;
+        sel.appendChild(o);
+    });
+    
+    if(currentScheduleEditIndex === -1 || currentScheduleEditIndex >= scheds.length) {
+        currentScheduleEditIndex = scheds.length - 1;
+        sel.value = currentScheduleEditIndex;
+    }
+    
+    let activeSched = scheds[currentScheduleEditIndex];
+    document.getElementById('scheduleValidFrom').value = activeSched.validFrom;
+    
     for(let i=1; i<=5; i++) { 
-        const c = db.config[currentUser][i] || {start:"08:00", target:8, weekMode: "ALL"}; 
-        const selAll = (!c.weekMode || c.weekMode === 'ALL') ? 'selected' : '';
-        const selEven = (c.weekMode === 'EVEN') ? 'selected' : '';
-        const selOdd = (c.weekMode === 'ODD') ? 'selected' : '';
-        
-        const bStart = c.breakStart || "";
-        const bEnd = c.breakEnd || "";
-        const bFix = c.breakIsReal ? "checked" : "";
-        
-        cont.innerHTML += `<div class="flex flex-col gap-2 p-3 bg-slate-50 rounded-lg border italic">
-            <div class="flex items-center gap-2">
-                <span class="w-16 font-bold text-xs uppercase text-slate-700">${WEEKDAYS_SHORT[i]}</span>
-                <input type="time" id="ws_${i}" value="${c.start}" class="border p-1 rounded text-xs bg-white">
-                <div class="flex items-center gap-1 bg-white border rounded p-1">
-                    <input type="number" id="wt_${i}" value="${c.target}" step="0.5" class="w-10 text-right text-xs font-black outline-none">
-                    <span class="text-[9px] font-bold text-slate-400">h</span>
-                </div>
-                <select id="wm_${i}" class="text-[9px] border rounded bg-white p-1"><option value="ALL" ${selAll}>Jede KW</option><option value="EVEN" ${selEven}>Gerade KW</option><option value="ODD" ${selOdd}>Ungerade</option></select>
+        const dConf = activeSched.days[i] || { weekMode: "ALL", blocks: [{start:"08:00", end:"12:00"}] };
+        const b1 = dConf.blocks[0] || {start:"08:00", end:""};
+        const b2 = dConf.blocks[1] || {start:"", end:""};
+
+        const selAll = dConf.weekMode === 'ALL' ? 'selected' : '';
+        const selEven = dConf.weekMode === 'EVEN' ? 'selected' : '';
+        const selOdd = dConf.weekMode === 'ODD' ? 'selected' : '';
+
+        cont.innerHTML += `
+        <div class="flex flex-col p-3 bg-slate-50 rounded-lg border mb-2">
+            <div class="flex justify-between items-center mb-2">
+                <span class="font-black text-xs uppercase text-slate-600">${WEEKDAYS_SHORT[i]}</span>
+                <select id="wm_${i}" class="text-[10px] border rounded bg-white p-1" onchange="updateWeeklySum()">
+                    <option value="ALL" ${selAll}>Jede Woche</option>
+                    <option value="EVEN" ${selEven}>Gerade KW (2,4..)</option>
+                    <option value="ODD" ${selOdd}>Ungerade KW (1,3..)</option>
+                </select>
             </div>
-            <div class="flex items-center gap-2 border-t pt-2 border-slate-200">
-                <span class="text-[9px] font-bold text-slate-400 uppercase w-16">Pause:</span>
-                <input type="time" id="wb_start_${i}" value="${bStart}" class="border p-1 rounded text-[10px] bg-white w-20">
-                <span class="text-[9px]">-</span>
-                <input type="time" id="wb_end_${i}" value="${bEnd}" class="border p-1 rounded text-[10px] bg-white w-20">
-                <label class="flex items-center gap-1 cursor-pointer ml-2">
-                    <input type="checkbox" id="wb_fix_${i}" ${bFix} class="w-3 h-3 accent-blue-600">
-                    <span class="text-[9px] font-bold text-blue-600 uppercase" title="Angehakt = Echte Pause (Gehen-Zeit bleibt) / Leer = Auto-Pause (Gehen-Zeit wird verlängert)">Fix?</span>
-                </label>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="flex flex-col gap-1 border-r border-slate-300 pr-3">
+                    <span class="text-[8px] font-bold text-slate-400 uppercase">Block 1 (von - bis)</span>
+                    <div class="flex items-center gap-1">
+                        <input type="time" id="ws1_${i}" value="${b1.start}" class="border p-1 rounded text-[10px] w-full bg-white font-bold" oninput="updateWeeklySum()">
+                        <span class="text-slate-400">-</span>
+                        <input type="time" id="we1_${i}" value="${b1.end||''}" class="border p-1 rounded text-[10px] w-full bg-white font-bold" oninput="updateWeeklySum()">
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <span class="text-[8px] font-bold text-slate-400 uppercase">Block 2 (von - bis)</span>
+                    <div class="flex items-center gap-1">
+                        <input type="time" id="ws2_${i}" value="${b2.start||''}" class="border p-1 rounded text-[10px] w-full bg-white font-bold" oninput="updateWeeklySum()">
+                        <span class="text-slate-400">-</span>
+                        <input type="time" id="we2_${i}" value="${b2.end||''}" class="border p-1 rounded text-[10px] w-full bg-white font-bold" oninput="updateWeeklySum()">
+                    </div>
+                </div>
             </div>
         </div>`; 
     }
+    updateWeeklySum();
 }
+
+function updateWeeklySum() {
+    if(currentUser === "Admin") return;
+    let totalSum = 0;
+    for(let i=1; i<=5; i++) {
+        totalSum += getTimeDiff(document.getElementById('ws1_'+i)?.value, document.getElementById('we1_'+i)?.value);
+        totalSum += getTimeDiff(document.getElementById('ws2_'+i)?.value, document.getElementById('we2_'+i)?.value);
+    }
+    const d = document.getElementById('weeklySumDisplay');
+    if(d) d.innerText = `(Gesamt: ${totalSum.toFixed(2)} h / Woche)`;
+}
+
+function changeScheduleVersion() {
+    currentScheduleEditIndex = parseInt(document.getElementById('scheduleHistorySelect').value);
+    renderWeeklySettings();
+}
+
+function addScheduleVersion() {
+    let scheds = db.config[currentUser].schedules;
+    let lastSched = JSON.parse(JSON.stringify(scheds[scheds.length-1])); 
+    let newDate = prompt("Gültig ab Datum (Format: YYYY-MM-DD):", toLocalISO(getNow()));
+    if(!newDate) return;
+    lastSched.validFrom = newDate;
+    scheds.push(lastSched);
+    currentScheduleEditIndex = scheds.length - 1;
+    renderWeeklySettings();
+}
+
 function saveWeekly() { 
     if(currentUser==="Admin") return;
+    let scheds = db.config[currentUser].schedules;
+    let activeSched = scheds[currentScheduleEditIndex];
+    
+    let vf = document.getElementById('scheduleValidFrom').value;
+    if(vf) activeSched.validFrom = vf;
+    
     for(let i=1; i<=5; i++) { 
-        db.config[currentUser][i] = { 
-            start: document.getElementById('ws_'+i).value, 
-            target: parseFloat(document.getElementById('wt_'+i).value) || 0, 
-            weekMode: document.getElementById('wm_'+i).value,
-            breakStart: document.getElementById('wb_start_'+i).value,
-            breakEnd: document.getElementById('wb_end_'+i).value,
-            breakIsReal: document.getElementById('wb_fix_'+i).checked
-        }; 
+        let b1 = { start: document.getElementById('ws1_'+i).value, end: document.getElementById('we1_'+i).value };
+        let b2 = { start: document.getElementById('ws2_'+i).value, end: document.getElementById('we2_'+i).value };
+        activeSched.days[i] = { weekMode: document.getElementById('wm_'+i).value, blocks: [b1, b2] }; 
     } 
-    save(); alert("Plan gespeichert!"); renderAll(); 
+    save(); alert("Plan erfolgreich gespeichert!"); renderAll(); 
 }
 
 function addPlanningRange() {
@@ -1700,37 +1817,57 @@ function renderTodayInfo() {
     if(log.out) {
          dispOut = getExtendedOutTime(ds, log.in, log.out);
     }
+    if(log.break_in && log.break_out) dispOut = log.out;
     
-    document.getElementById('todayDetails').innerHTML = `<div class="flex justify-between p-2 bg-green-50 rounded border text-xs italic"><span>KOMMEN:</span><span class="font-black">${log.in || '--:--'}</span></div><div class="flex justify-between p-2 bg-red-50 rounded border text-xs italic"><span>GEHEN:</span><span class="font-black">${dispOut}</span></div>`; 
+    let html = `<div class="flex justify-between p-2 bg-green-50 rounded border text-xs italic"><span>KOMMEN:</span><span class="font-black">${log.in || '--:--'}</span></div>`;
+    
+    if (log.break_in) {
+        html += `<div class="flex justify-between p-2 bg-amber-50 rounded border text-xs italic"><span>PAUSE:</span><span class="font-black text-amber-600">${log.break_in} - ${log.break_out || '...'}</span></div>`;
+    }
+    
+    html += `<div class="flex justify-between p-2 bg-red-50 rounded border text-xs italic"><span>GEHEN:</span><span class="font-black">${dispOut}</span></div>`; 
+
+    document.getElementById('todayDetails').innerHTML = html;
 }
 
 function editEntry(d) {
-    if(currentUser === "Admin") return alert("Admin kann nicht stempeln/bearbeiten.");
     const dObj = new Date(d); const key = dObj.getFullYear() + "-" + dObj.getMonth();
     const sigData = (db.config[currentUser]?.signatures || {})[key];
     if(sigData && sigData.signed) { return alert("⛔ Monat ist abgeschlossen/signiert! Änderungen nicht mehr möglich."); }
     editingDateStr = d;
-    const log = (db.logs[currentUser]||{})[d] || {in:'', out:'', note:'', type:''};
+    const log = (db.logs[currentUser]||{})[d] || {in:'', out:'', break_in:'', break_out:'', note:'', type:''};
     document.getElementById('editorDateDisplay').innerText = new Date(d).toLocaleDateString('de-DE', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
     document.getElementById('editIn').value = log.in || '';
     document.getElementById('editOut').value = log.out || '';
+    document.getElementById('editBreakIn').value = log.break_in || '';
+    document.getElementById('editBreakOut').value = log.break_out || '';
     document.getElementById('editNote').value = log.note || '';
     document.getElementById('editType').value = log.type || '';
     document.getElementById('dayEditorOverlay').classList.remove('hidden');
 }
 
 function closeDayEditor() { document.getElementById('dayEditorOverlay').classList.add('hidden'); editingDateStr = null; }
+
 function saveDayEditor() {
     if(!editingDateStr) return;
-    const i = document.getElementById('editIn').value; const o = document.getElementById('editOut').value;
-    const n = document.getElementById('editNote').value.trim(); const t = document.getElementById('editType').value;
+    const i = document.getElementById('editIn').value; 
+    const o = document.getElementById('editOut').value;
+    const bi = document.getElementById('editBreakIn').value;
+    const bo = document.getElementById('editBreakOut').value;
+    const n = document.getElementById('editNote').value.trim(); 
+    const t = document.getElementById('editType').value;
     
-    if(!i && !o && !n && !t) { 
+    if(!i && !o && !bi && !bo && !n && !t) { 
         saveLogEntry(currentUser, editingDateStr, null);
     } else {
         let entry = (db.logs[currentUser] && db.logs[currentUser][editingDateStr]) ? {...db.logs[currentUser][editingDateStr]} : {};
-        entry.in = i; entry.out = o; entry.note = n; entry.type = t;
-        if(!entry.in) delete entry.in; if(!entry.out) delete entry.out; if(!entry.note) delete entry.note; if(!entry.type) delete entry.type;
+        entry.in = i; entry.out = o; entry.break_in = bi; entry.break_out = bo; entry.note = n; entry.type = t;
+        if(!entry.in) delete entry.in; 
+        if(!entry.out) delete entry.out; 
+        if(!entry.break_in) delete entry.break_in;
+        if(!entry.break_out) delete entry.break_out;
+        if(!entry.note) delete entry.note; 
+        if(!entry.type) delete entry.type;
         
         saveLogEntry(currentUser, editingDateStr, entry);
     }
@@ -1828,9 +1965,9 @@ function adminAddUser() {
     if(name && name.trim() !== "") {
         if(db.users.includes(name)) return alert("User existiert bereits!");
         db.users.push(name);
-        db.config[name] = {};
-        for(let d=1; d<=5; d++) db.config[name][d] = { start: "08:00", target: 8, weekMode: "ALL" };
-        db.config[name][0] = { start: "00:00", target: 0 }; db.config[name][6] = { start: "00:00", target: 0 };
+        db.config[name] = { schedules: [{validFrom: '2024-01-01', days: {}}] };
+        for(let d=1; d<=5; d++) db.config[name].schedules[0].days[d] = { weekMode: "ALL", blocks: [{start: "08:00", end: "12:00"}] };
+        
         db.admin[name] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
         db.passwords[name] = "1234";
         
@@ -1872,13 +2009,22 @@ function testFillMonth() {
         if(holidaysDB[dStr]) continue; 
         const target = getTargetHours(d, user);
         if(target > 0) {
-            const dayCfg = db.config[user][d.getDay()];
-            let [h, min] = dayCfg.start.split(':').map(Number);
-            let minutesIn = h * 60 + min; let workMinutes = dayCfg.target * 60;
-            if(dayCfg.target > 6) workMinutes += 30; 
-            let totalMinutes = minutesIn + workMinutes;
-            let endH = Math.floor(totalMinutes / 60); let endM = totalMinutes % 60;
-            let sIn = dayCfg.start; let sOut = String(endH).padStart(2,'0') + ":" + String(endM).padStart(2,'0');
+            migrateUserConfig(user);
+            let scheds = db.config[user].schedules;
+            let applicable = scheds[0];
+            for(let j=0; j<scheds.length; j++) if(scheds[j].validFrom <= dStr) applicable = scheds[j];
+            
+            const dayCfg = applicable.days[d.getDay()];
+            if(!dayCfg || !dayCfg.blocks || dayCfg.blocks.length === 0) continue;
+            let mainBlock = dayCfg.blocks[0];
+
+            let sIn = mainBlock.start; 
+            let sOut = mainBlock.end;
+            
+            if(!sOut && mainBlock.target) {
+                sOut = calculateEndTime(sIn, mainBlock.target);
+            }
+
             db.logs[user][dStr] = { in: sIn, out: sOut, type: "" };
         }
     }
@@ -1946,7 +2092,7 @@ async function exportPDF() {
         const { jsPDF } = window.jspdf; const doc = new jsPDF('p', 'mm', 'a4'); const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value); const balances = calculateBalances(currentUser, y, m, false);
         const col = db.settings.primaryColor || "#2563eb"; 
         
-        doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text("Zeitnachweis", 14, 15); doc.setFontSize(8); doc.setTextColor(col); doc.text(db.settings.companyName || "Teamordination Dr. Stütz & Dr. Haselgruber", 14, 20); doc.setTextColor(148, 163, 184); doc.setFontSize(7); doc.text("MITARBEITER", 196, 15, { align: "right" }); doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text(currentUser.toUpperCase(), 196, 20, { align: "right" }); doc.setFontSize(7); doc.setTextColor(148, 163, 184); doc.text("ZEITRAUM", 196, 26, { align: "right" }); doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.text(`${MONTH_NAMES[m]} ${y}`, 196, 31, { align: "right" });
+        doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text("Zeitnachweis", 14, 15); doc.setFontSize(8); doc.setTextColor(col); doc.text(db.settings.companyName || "Chirurgie Dr. Stütz", 14, 20); doc.setTextColor(148, 163, 184); doc.setFontSize(7); doc.text("MITARBEITER", 196, 15, { align: "right" }); doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(30, 41, 59); doc.text(currentUser.toUpperCase(), 196, 20, { align: "right" }); doc.setFontSize(7); doc.setTextColor(148, 163, 184); doc.text("ZEITRAUM", 196, 26, { align: "right" }); doc.setFontSize(8); doc.setTextColor(30, 41, 59); doc.text(`${MONTH_NAMES[m]} ${y}`, 196, 31, { align: "right" });
         doc.autoTable({ html: '#mainTable', startY: 38, theme: 'striped', alternateRowStyles: { fillColor: [240, 247, 255] }, headStyles: { fillColor: col, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, halign: 'center' }, styles: { fontSize: 7.5, cellPadding: 1.2, textColor: [51, 65, 85], valign: 'middle' }, columnStyles: { 0: { cellWidth: 22, fontStyle: 'bold' }, 1: { cellWidth: 16, halign: 'right' }, 2: { cellWidth: 16, halign: 'right' }, 3: { cellWidth: 24, halign: 'center'}, 4: { cellWidth: 14, halign: 'right', fontStyle: 'bold' }, 5: { cellWidth: 14, halign: 'right' }, 6: { cellWidth: 16, halign: 'right', fontStyle: 'bold' }, 7: { halign: 'left' } }, columns: [0, 1, 2, 3, 4, 5, 6, 7],
             didParseCell: function(data) { 
                 if (data.section === 'body') { 
@@ -1987,65 +2133,54 @@ function exportExcel() {
     const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value);
     const rows = [["ZEITNACHWEIS", currentUser], ["Monat", MONTH_NAMES[m], y], ["Datum", "Kommen", "Gehen", "Pause", "Ist", "Soll", "Saldo", "Notiz"]];
     for(let i=1; i<=new Date(y, m+1, 0).getDate(); i++) {
-        const ds = toLocalISO(new Date(y,m,i)), log = (db.logs[currentUser]||{})[ds] || {};
-        const isH = holidaysDB[ds], isWE = new Date(y,m,i).getDay()%6==0;
+        const dObj = new Date(y,m,i);
+        const ds = toLocalISO(dObj);
+        const isWE = dObj.getDay() === 0 || dObj.getDay() === 6;
+        const log = (db.logs[currentUser]||{})[ds] || {};
         const target = getTargetHours(new Date(y,m,i), currentUser);
         let ist = 0, pStr = "-"; let dispOut = log.out || log.type || "";
+        
         if(log.in && log.out) { 
             let calcIn = log.in;
-            const cfg = db.config[currentUser][new Date(y,m,i).getDay()] || {start: "00:00"};
             let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+calcIn))/3600000); 
+            let manualBreakHours = getManualBreakHours(log.break_in, log.break_out);
             
-            let deduction = 0;
-            let customBreakFound = false;
+            if (manualBreakHours > 0) {
+                pStr = `${log.break_in} - ${log.break_out}`;
+                dispOut = log.out;
+                ist = Math.max(0, safeFloat(rawIst - manualBreakHours));
+            } else {
+                let gap = getScheduledGap(currentUser, ds, dObj);
+                let autoBreakHours = 0;
+                if (gap) {
+                    let overlapStart = Math.max(timeToMins(log.in), timeToMins(gap.start));
+                    let overlapEnd = Math.min(timeToMins(log.out), timeToMins(gap.end));
+                    if (overlapEnd > overlapStart) {
+                        autoBreakHours = (overlapEnd - overlapStart) / 60;
+                        pStr = `${gap.start} - ${gap.end} (Auto)`;
+                    }
+                }
 
-            if (!isH && target > 0 && cfg.breakStart && cfg.breakEnd) {
-                 customBreakFound = true;
-                 let [hI, mI] = calcIn.split(':').map(Number);
-                 let [hO, mO] = log.out.split(':').map(Number);
-                 let [hbS, mbS] = cfg.breakStart.split(':').map(Number);
-                 let [hbE, mbE] = cfg.breakEnd.split(':').map(Number);
-
-                 let minIn = hI * 60 + mI;
-                 let minOut = hO * 60 + mO;
-                 let bStart = hbS * 60 + mbS;
-                 let bEnd = hbE * 60 + mbE;
-
-                 let start = Math.max(minIn, bStart);
-                 let end = Math.min(minOut, bEnd);
-                 
-                 if(end > start) {
-                     deduction = (end - start) / 60;
-                     pStr = `${cfg.breakStart} - ${cfg.breakEnd}`;
-                 }
-                 
-                 ist = safeFloat(rawIst) - deduction;
-                 
-                 if (!cfg.breakIsReal) {
-                     const durationMs = (new Date(`2000-01-01T${cfg.breakEnd}`) - new Date(`2000-01-01T${cfg.breakStart}`));
-                     const outDate = new Date(`2000-01-01T${log.out}`);
-                     const extDate = new Date(outDate.getTime() + durationMs);
-                     dispOut = extDate.getHours().toString().padStart(2, '0') + ":" + extDate.getMinutes().toString().padStart(2, '0');
-                 } else {
-                     dispOut = log.out;
-                 }
-            } 
-            
-            if (!customBreakFound) {
-                if(rawIst > 6.0) { 
-                    pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); 
-                    dispOut = getExtendedOutTime(ds, log.in, log.out); 
-                    ist = safeFloat(rawIst); 
-                } else { 
-                    ist = safeFloat(rawIst); 
-                } 
+                if (autoBreakHours > 0) {
+                    ist = Math.max(0, safeFloat(rawIst - autoBreakHours));
+                    dispOut = log.out;
+                } else {
+                    if(rawIst > 6.0) { 
+                        pStr = getBreakTimeRange(ds, log.in, log.out, currentUser); 
+                        dispOut = getExtendedOutTime(ds, log.in, log.out); 
+                        ist = safeFloat(rawIst); 
+                    } else { 
+                        ist = safeFloat(rawIst); 
+                    } 
+                }
             }
         }
+
+        if(isWE) ist = 0;
+
         rows.push([i+"."+(m+1)+".", log.in||"", dispOut, pStr, safeFloat(ist).toFixed(2), safeFloat(target).toFixed(2), (safeFloat(ist)-safeFloat(target)).toFixed(2), log.note || ""]);
     }
     const ws = XLSX.utils.aoa_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Journal"); XLSX.writeFile(wb, `ZE_${currentUser}.xlsx`);
 }
 init();
 </script>
-</body>
-</html>
