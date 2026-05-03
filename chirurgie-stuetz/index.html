@@ -10,14 +10,13 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.13"; 
+        const CURRENT_APP_VERSION = "4.14"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
             console.log("Neue Version erkannt! Cache wird geleert...");
             localStorage.setItem("ze_system_version", CURRENT_APP_VERSION);
             
-            // Alten Service Worker löschen (wichtig für Handys!)
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.getRegistrations().then(function(registrations) {
                     for(let registration of registrations) { 
@@ -26,7 +25,6 @@
                 });
             }
             
-            // Hard-Reload erzwingen (hängt einen Zeitstempel an die URL an)
             if (window.location.search.indexOf('v=' + CURRENT_APP_VERSION) === -1) {
                 window.location.href = window.location.pathname + '?v=' + CURRENT_APP_VERSION + '&ts=' + Date.now();
             }
@@ -57,7 +55,6 @@
         
         .tab-active { border-bottom: 4px solid var(--main-color) !important; color: var(--main-color) !important; font-weight: 800; }
         
-        /* Zeilen-Styles */
         .row-holiday { background-color: #fef2f2 !important; color: #991b1b !important; }
         .row-vacation { background-color: #ecfdf5 !important; color: #064e3b !important; }
         .row-schulung { background-color: #f3e8ff !important; color: #6b21a8 !important; } 
@@ -69,14 +66,11 @@
         .row-sunday { background-color: #fff7ed !important; color: #c2410c !important; border-left: 4px solid #ea580c !important; font-weight: bold !important; }
         .row-school-holiday { background-color: #f0f9ff !important; border-left: 4px solid #0ea5e9 !important; border-bottom: 1px solid #bae6fd !important; }
         
-        /* Kalender Grid */
         .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background-color: #e2e8f0; border: 1px solid #e2e8f0; }
         .cal-day { background: white; min-height: 85px; padding: 4px; font-size: 0.75rem; position: relative; display: flex; flex-direction: column; gap: 2px; }
         .cal-header { background: #f8fafc; font-weight: bold; padding: 8px; text-align: center; font-size: 0.7rem; text-transform: uppercase; }
         
-        .cal-entry {
-            white-space: normal; word-wrap: break-word; line-height: 1.1; font-size: 0.65rem; padding: 2px 3px; border-radius: 3px; border: 1px solid transparent; font-weight: 600;          
-        }
+        .cal-entry { white-space: normal; word-wrap: break-word; line-height: 1.1; font-size: 0.65rem; padding: 2px 3px; border-radius: 3px; border: 1px solid transparent; font-weight: 600; }
         .year-grid .cal-entry { font-size: 0.5rem !important; line-height: 1.0 !important; padding: 1px 2px !important; }
         .year-grid .cal-day { min-height: 60px !important; }
         .year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
@@ -87,7 +81,6 @@
         .sig-badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-weight: bold; font-size: 0.75rem; text-transform: uppercase; }
         .sig-badge.ok { background-color: #22c55e; color: white; }
         
-        /* Zoom Modus Klasse */
         body.zoom-out { zoom: 0.85; -moz-transform: scale(0.85); -moz-transform-origin: top center; }
     </style>
 </head>
@@ -103,11 +96,11 @@
                 <div><label class="text-[9px] font-bold uppercase text-slate-400">Kommen</label><input type="time" id="editIn" class="w-full p-2 border rounded font-bold bg-slate-50"></div>
                 <div><label class="text-[9px] font-bold uppercase text-slate-400">Gehen</label><input type="time" id="editOut" class="w-full p-2 border rounded font-bold bg-slate-50"></div>
             </div>
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid grid-cols-2 gap-2 mt-1">
                 <div><label class="text-[9px] font-bold uppercase text-slate-400">Pause Start</label><input type="time" id="editBreakIn" class="w-full p-2 border rounded font-bold bg-amber-50 text-amber-700"></div>
                 <div><label class="text-[9px] font-bold uppercase text-slate-400">Pause Ende</label><input type="time" id="editBreakOut" class="w-full p-2 border rounded font-bold bg-amber-50 text-amber-700"></div>
             </div>
-            <div>
+            <div class="pt-2">
                 <label class="text-[9px] font-bold uppercase text-slate-400">Typ / Status</label>
                 <select id="editType" class="w-full p-2 border rounded font-bold text-xs bg-slate-50">
                     <option value="">(Standard: Arbeitszeit)</option>
@@ -250,9 +243,9 @@
 
     <section id="tab-planung" class="tab-content hidden">
         <div class="bg-white p-4 rounded-xl shadow border mb-4">
-            <div id="planStatsBox" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div class="theme-bg text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Aktueller Stundensaldo (heute)</p><p id="planSaldoDisplay" class="text-3xl font-black italic">0:00 h</p></div>
-                <div class="bg-emerald-600 text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Resturlaub (Tage)</p><p id="planVacDisplay" class="text-3xl font-black italic">0 Tage</p></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div id="planSaldoCard" class="theme-bg text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Aktueller Stundensaldo (heute)</p><p id="planSaldoDisplay" class="text-3xl font-black italic">0:00 h</p></div>
+                <div id="planVacCard" class="bg-emerald-600 text-white p-4 rounded-xl shadow-md"><p class="text-[10px] uppercase font-bold opacity-80">Resturlaub (Tage)</p><p id="planVacDisplay" class="text-3xl font-black italic">0 Tage</p></div>
                 
                 <div class="lg:col-span-2 flex flex-col justify-end">
                     <div class="flex items-center shadow-sm rounded-lg border border-slate-300 bg-white overflow-hidden">
@@ -363,9 +356,10 @@
                     </div>
                     <div class="mb-4">
                         <select id="scheduleHistorySelect" onchange="changeScheduleVersion()" class="w-full p-2 bg-slate-50 border rounded font-bold text-xs theme-text mb-2 cursor-pointer"></select>
-                        <div class="flex gap-2">
+                        <div class="flex gap-2 items-center">
                             <input type="date" id="scheduleValidFrom" class="w-full p-2 border rounded text-xs font-bold bg-slate-50">
-                            <button onclick="addScheduleVersion()" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-300 px-3 py-2 rounded text-[10px] font-bold uppercase whitespace-nowrap">➕ Neuer Plan ab...</button>
+                            <button onclick="addScheduleVersion()" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border border-emerald-300 px-3 py-2 rounded text-[10px] font-bold uppercase whitespace-nowrap">➕ Neu...</button>
+                            <button onclick="deleteScheduleVersion()" id="btnDeleteSchedule" class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-[10px] font-bold uppercase shadow-sm whitespace-nowrap transition-colors" title="Diese Version löschen">🗑️</button>
                         </div>
                     </div>
                     <div id="weeklyEditor" class="space-y-2 max-h-[60vh] overflow-y-auto pr-2"></div>
@@ -417,7 +411,7 @@
                         </div>
                         <div class="md:col-span-2">
                             <label class="text-[10px] font-bold uppercase text-slate-400">Release Notes / Infotext für Dashboard</label>
-                            <textarea id="sysReleaseNotes" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs" rows="3" placeholder="Was gibt es Neues?"></textarea>
+                            <textarea id="sysReleaseNotes" onchange="if(!db.settings) db.settings={}; db.settings.releaseNotes = this.value; save();" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs" rows="3" placeholder="Was gibt es Neues?"></textarea>
                         </div>
                         <div>
                             <label class="text-[10px] font-bold uppercase text-slate-400">Logo Upload (max. 100kb)</label>
@@ -495,10 +489,7 @@ const SU_PASS_HASH = "Hk@b154132l";
 let currentCloudUrl = CLOUD_URL; 
 let isSuperuser = false;
 
-// ZOOM LOGIC INITIALISIERUNG
-if(localStorage.getItem('ze_zoom_pref') === 'true') {
-    document.body.classList.add('zoom-out');
-}
+if(localStorage.getItem('ze_zoom_pref') === 'true') { document.body.classList.add('zoom-out'); }
 
 function toggleZoom() {
     document.body.classList.toggle('zoom-out');
@@ -596,7 +587,6 @@ function toLocalISO(date) {
 
 function getVisibleUsers() { return db.users; }
 
-// --- MIGRATION LOGIK (Neue Dienstpläne / Blöcke) ---
 function migrateUserConfig(uName) {
     if (!db.config[uName]) db.config[uName] = {};
     if (!db.config[uName].schedules) {
@@ -629,7 +619,6 @@ function migrateUserConfig(uName) {
     }
 }
 
-// --- NEU: Zieht sich die geplante Zeit zwischen Block 1 und Block 2 ---
 function getScheduledGap(uName, dStr, dObj) {
     migrateUserConfig(uName);
     let scheds = db.config[uName].schedules;
@@ -1049,6 +1038,14 @@ async function syncFromCloud() {
             if(cloudDb && cloudDb.users && Array.isArray(cloudDb.users)) {
                 db = cloudDb;
                 if(!db.settings) db.settings = {}; 
+                
+                // Release-Notes Sync Fix
+                if (isSuperuser && document.getElementById('sysReleaseNotes')) {
+                    if (document.activeElement !== document.getElementById('sysReleaseNotes')) {
+                        document.getElementById('sysReleaseNotes').value = db.settings.releaseNotes || "";
+                    }
+                }
+                
                 db.users.forEach(u => migrateUserConfig(u)); 
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
                 statusDiv.innerText = "● Daten geladen"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
@@ -1173,12 +1170,15 @@ function renderLogs() {
     const tbody = document.getElementById('logTableBody'); tbody.innerHTML = "";
     const balancesForMonth = calculateBalances(currentUser, y, m, false), balancesToday = calculateBalances(currentUser, getNow().getFullYear(), getNow().getMonth(), true);
     
+    // Admin-Planungs Fix
     if(currentUser === 'Admin') {
-        document.getElementById('statGrid').classList.add('opacity-0');
-        document.getElementById('planStatsBox').classList.add('hidden');
+        if(document.getElementById('statGrid')) document.getElementById('statGrid').classList.add('opacity-0');
+        if(document.getElementById('planSaldoCard')) document.getElementById('planSaldoCard').classList.add('hidden');
+        if(document.getElementById('planVacCard')) document.getElementById('planVacCard').classList.add('hidden');
     } else {
-        document.getElementById('statGrid').classList.remove('opacity-0');
-        document.getElementById('planStatsBox').classList.remove('hidden');
+        if(document.getElementById('statGrid')) document.getElementById('statGrid').classList.remove('opacity-0');
+        if(document.getElementById('planSaldoCard')) document.getElementById('planSaldoCard').classList.remove('hidden');
+        if(document.getElementById('planVacCard')) document.getElementById('planVacCard').classList.remove('hidden');
     }
 
     let mIst = 0, mSoll = 0;
@@ -1335,14 +1335,17 @@ async function forceSave() {
     const originalText = btn.innerText;
     btn.innerText = "⏳ Speichert...";
     btn.disabled = true;
-    await save();
-    btn.innerText = "✅ Gespeichert!";
+    const success = await save();
+    if(success) btn.innerText = "✅ Gespeichert!";
+    else btn.innerText = "❌ Fehler";
+    
     setTimeout(() => {
         btn.innerText = originalText;
         btn.disabled = false;
     }, 2000);
 }
 
+// Kugelsicheres Save (gibt true/false zurück)
 async function save() {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
     const statusDiv = document.getElementById('syncStatus');
@@ -1363,11 +1366,14 @@ async function save() {
             }
             if(statusDiv) { statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; }
             if(loginSync) { loginSync.innerText = "● Online (Verbunden)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
+            return true;
         }
+        return false;
     } catch(e) { 
         console.error("Cloud Sync Fehler:", e);
         if(statusDiv) { statusDiv.innerText = "● Nur lokal (Offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
         if(loginSync) { loginSync.innerText = "● Offline (Nur lokal)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
+        return false;
     }
 }
 
@@ -1431,7 +1437,8 @@ function generateMonthNode(y, m, mini = false) {
                 });
 
                 if (hasBetriebsurlaub) {
-                    cell.innerHTML += `<div class='cal-entry bg-emerald-50 text-emerald-700 border-emerald-200'>🏢 Betriebsurlaub</div>`;
+                    // BA-Kürzel Fix
+                    cell.innerHTML += `<div class='cal-entry bg-emerald-50 text-emerald-700 border-emerald-200'>🏢 ${mini ? 'BA' : 'Betriebsurlaub'}</div>`;
                 }
 
                 getVisibleUsers().forEach(u => {
@@ -1476,7 +1483,8 @@ function generateMonthNode(y, m, mini = false) {
                             else if(log.type==='Sonstiges') cell.classList.add('row-custom');
                             else cell.classList.add('bg-amber-50'); 
                         }
-                        let txt = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
+                        // BA-Kürzel Fix
+                        let txt = log.type === 'Betriebsurlaub' ? (mini ? 'BA' : 'Urlaub') : log.type;
                         if(log.type === 'Sonstiges' && log.title) txt = log.title;
                         if(log.type === 'Schulung' && log.range) txt = "Schulung (" + log.range + ")";
                         let extraClass = log.type === 'ZA' ? 'bg-cyan-50 text-cyan-800 border border-cyan-200' : '';
@@ -1750,7 +1758,31 @@ function addScheduleVersion() {
     renderWeeklySettings();
 }
 
-function saveWeekly() { 
+// Dienstplan Löschen
+async function deleteScheduleVersion() {
+    if (currentUser === "Admin") return;
+    let scheds = db.config[currentUser].schedules;
+    
+    if (scheds.length <= 1) {
+        alert("Fehler: Die einzige bzw. letzte Dienstplan-Version kann nicht gelöscht werden.");
+        return;
+    }
+    
+    if (!confirm("Soll diese Dienstplan-Version (Version " + (currentScheduleEditIndex + 1) + " ab " + formatDateShort(scheds[currentScheduleEditIndex].validFrom) + ") wirklich gelöscht werden?")) return;
+    
+    scheds.splice(currentScheduleEditIndex, 1);
+    currentScheduleEditIndex = scheds.length - 1; 
+    
+    const success = await save();
+    if(success) {
+        alert("Dienstplan-Version gelöscht.");
+        renderAll();
+    } else {
+        alert("Konnte nicht gelöscht werden. Cloud-Fehler!");
+    }
+}
+
+async function saveWeekly() { 
     if(currentUser==="Admin") return;
     let scheds = db.config[currentUser].schedules;
     let activeSched = scheds[currentScheduleEditIndex];
@@ -1763,10 +1795,14 @@ function saveWeekly() {
         let b2 = { start: document.getElementById('ws2_'+i).value, end: document.getElementById('we2_'+i).value };
         activeSched.days[i] = { weekMode: document.getElementById('wm_'+i).value, blocks: [b1, b2] }; 
     } 
-    save(); alert("Plan erfolgreich gespeichert!"); renderAll(); 
+    const success = await save(); 
+    if(success) {
+        alert("Plan erfolgreich gespeichert!"); 
+        renderAll(); 
+    }
 }
 
-function addPlanningRange() {
+async function addPlanningRange() {
     const start = document.getElementById('planStart').value, end = document.getElementById('planEnd').value, type = document.getElementById('planType').value;
     if(start) {
         let current = new Date(start), finish = end ? new Date(end) : new Date(start);
@@ -1800,7 +1836,7 @@ function addPlanningRange() {
             });
             current.setDate(current.getDate() + 1); 
         }
-        save(); renderAll();
+        await save(); renderAll();
         if(type === 'Betriebsurlaub') alert("Betriebsurlaub für alle Mitarbeiter eingetragen!");
         if(type === 'DELETE_ALL') alert("Alle Termine im Zeitraum gelöscht.");
         if(forAll) alert("Eintrag '" + (customTitle || "Schulung") + "' wurde für ALLE Mitarbeiter erstellt.");
@@ -1882,7 +1918,7 @@ function deleteDayEntry() {
     }
 }
 
-function adminClearData() {
+async function adminClearData() {
     if(loggedInUser !== "Admin") return;
     const targetUser = document.getElementById('cleanUserSelect').value;
     const sStr = document.getElementById('cleanStart').value; const eStr = document.getElementById('cleanEnd').value;
@@ -1900,23 +1936,23 @@ function adminClearData() {
             }
         }
     });
-    save(); renderAll(); alert(`${count} Einträge gelöscht.`);
+    await save(); renderAll(); alert(`${count} Einträge gelöscht.`);
 }
 
 function setHeaderWarp() { const val = document.getElementById('headerWarpTime').value; if(val) { timeWarpOffset = new Date(val).getTime() - Date.now(); renderAll(); alert("Warp aktiv!"); } }
 function resetWarp() { timeWarpOffset = 0; document.getElementById('headerWarpTime').value = ""; alert("Zeit zurückgesetzt."); renderAll(); }
-function performSignature(key) {
+async function performSignature(key) {
     if(!confirm("Monat wirklich signieren?")) return;
     if(!db.config[currentUser]) db.config[currentUser] = {}; if(!db.config[currentUser].signatures) db.config[currentUser].signatures = {};
     db.config[currentUser].signatures[key] = { signed: true, date: new Date().toISOString() };
-    save(); renderLogs();
+    await save(); renderLogs();
 }
-function resetSignature(key) {
+async function resetSignature(key) {
     if(!confirm("Signatur wirklich entfernen? Der Monat ist dann wieder offen.")) return;
-    if(db.config[currentUser]?.signatures?.[key]) { delete db.config[currentUser].signatures[key]; save(); renderLogs(); }
+    if(db.config[currentUser]?.signatures?.[key]) { delete db.config[currentUser].signatures[key]; await save(); renderLogs(); }
 }
 
-function changePassword() {
+async function changePassword() {
     const newPw = document.getElementById('newPwInput').value; 
     const confirmPw = document.getElementById('newPwConfirm').value;
     
@@ -1931,7 +1967,7 @@ function changePassword() {
         db.passwords[currentUser] = newPw; 
     }
     
-    save(); 
+    await save(); 
     alert("Passwort erfolgreich geändert!");
     document.getElementById('newPwInput').value = ""; 
     document.getElementById('newPwConfirm').value = "";
@@ -1953,13 +1989,13 @@ function sendDevMessage() {
     document.getElementById('devMsgText').value = ""; alert("Nachricht gesendet!");
 }
 
-function deleteMessage(index) {
+async function deleteMessage(index) {
     if(!confirm("Nachricht löschen?")) return;
-    db.messages.splice(index, 1); save(); renderAdminConfigs();
+    db.messages.splice(index, 1); await save(); renderAdminConfigs();
     if(isSuperuser) renderSystemMessages();
 }
 
-function adminAddUser() {
+async function adminAddUser() {
     if(loggedInUser !== "Admin") return;
     const name = prompt("Name des neuen Mitarbeiters:");
     if(name && name.trim() !== "") {
@@ -1981,24 +2017,51 @@ function adminAddUser() {
             }
         }
 
-        save(); alert(`Mitarbeiter ${name} angelegt. Betriebsurlaube wurden übernommen.`); window.location.reload();
+        const success = await save(); 
+        if(success) {
+            alert(`Mitarbeiter ${name} angelegt. Betriebsurlaube wurden übernommen.`); 
+            window.location.reload();
+        } else {
+            alert("Fehler beim Anlegen: Cloud nicht erreichbar.");
+        }
     }
 }
 
-function adminDeleteUser(name) {
+// Kugelsicheres Löschen
+async function adminDeleteUser(name) {
     if(loggedInUser !== "Admin") return;
     if(name === "Admin") return alert("Der Administrator kann nicht gelöscht werden."); 
     if(!confirm(`Benutzer "${name}" wirklich LÖSCHEN?\nAlle Daten gehen verloren!`)) return;
     if(!confirm(`Sicher? Das kann nicht rückgängig gemacht werden.`)) return;
+    
+    document.getElementById('appContainer').style.opacity = '0.5';
+
     const idx = db.users.indexOf(name);
     if(idx > -1) {
         db.users.splice(idx, 1);
         delete db.logs[name]; delete db.config[name]; delete db.passwords[name]; delete db.admin[name];
-        save(); alert("Benutzer gelöscht."); window.location.reload();
+        
+        if (localStorage.getItem('ze_last_user') === name) {
+            localStorage.setItem('ze_last_user', 'Admin');
+        }
+        if (currentUser === name) {
+            currentUser = "Admin";
+        }
+
+        const success = await save(); 
+        
+        if (success) {
+            alert("Benutzer erfolgreich gelöscht."); 
+            window.location.reload();
+        } else {
+            alert("Fehler: Cloud konnte nicht erreicht werden. Der Löschvorgang wurde abgebrochen, damit deine Daten synchron bleiben.");
+            document.getElementById('appContainer').style.opacity = '1';
+            window.location.reload(); 
+        }
     }
 }
 
-function testFillMonth() {
+async function testFillMonth() {
     if(!loggedInUser === 'Admin') return;
     if(!confirm(`ACHTUNG: Füllt den aktuellen Monat (${MONTH_NAMES[parseInt(document.getElementById('viewMonth').value)]}) für ${currentUser} mit Standard-Arbeitszeiten! Vorhandene Einträge werden überschrieben.`)) return;
     const y = parseInt(document.getElementById('viewYear').value); const m = parseInt(document.getElementById('viewMonth').value);
@@ -2028,7 +2091,7 @@ function testFillMonth() {
             db.logs[user][dStr] = { in: sIn, out: sOut, type: "" };
         }
     }
-    save(); renderAll(); alert("Monat wurde gefüllt!");
+    await save(); renderAll(); alert("Monat wurde gefüllt!");
 }
 
 function renderAdminConfigs() {
@@ -2067,7 +2130,7 @@ function renderAdminConfigs() {
     } else { inbox.innerHTML = `<p class="text-xs text-slate-400 text-center italic">Keine neuen Nachrichten.</p>`; }
 }
 
-function saveAdminConfigs() {
+async function saveAdminConfigs() {
     const selectedEditUser = currentUser; if(!selectedEditUser) return;
     let newName = testModeActive ? document.getElementById(`nameEdit_SINGLE`).value.trim() : selectedEditUser;
     if(newName !== selectedEditUser) {
@@ -2080,10 +2143,10 @@ function saveAdminConfigs() {
         delete db.admin[selectedEditUser];
         currentUser = newName;
         sessionStorage.setItem(USER_KEY, newName); localStorage.setItem('ze_last_user', newName); 
-        save(); alert(`Benutzer umbenannt in ${newName}. Seite wird neu geladen.`); window.location.reload(); 
+        await save(); alert(`Benutzer umbenannt in ${newName}. Seite wird neu geladen.`); window.location.reload(); 
     } else {
         db.admin[selectedEditUser] = { startDate: document.getElementById(`admDate_SINGLE`).value, startBalance: parseFloat(document.getElementById(`admBal_SINGLE`).value) || 0, startVacation: parseFloat(document.getElementById(`admVacAlt_SINGLE`).value) || 0, yearlyVacation: parseInt(document.getElementById(`admVacJ_SINGLE`).value) || 25 };
-        save(); alert("Daten gespeichert!"); renderAll();
+        await save(); alert("Daten gespeichert!"); renderAll();
     }
 }
 
@@ -2101,7 +2164,7 @@ async function exportPDF() {
                     const row = data.row.index + 1; const dStr = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(row).padStart(2, '0');
                     if (holidaysDB[dStr]) { data.cell.styles.fillColor = [254, 242, 242]; data.cell.styles.textColor = [153, 27, 27]; }
                     else if (new Date(y, m, row).getDay() === 0) { data.cell.styles.fillColor = [255, 247, 237]; }
-                    if (text.includes("Urlaub") || text.includes("Betriebsurlaub")) { data.cell.styles.fillColor = [209, 250, 229]; data.cell.styles.textColor = [6, 78, 59]; } 
+                    if (text.includes("Urlaub") || text.includes("Betriebsurlaub") || text.includes("BA")) { data.cell.styles.fillColor = [209, 250, 229]; data.cell.styles.textColor = [6, 78, 59]; } 
                     else if (text.includes("Krank")) { data.cell.styles.fillColor = [254, 243, 199]; } 
                     else if (text.includes("ZA")) { data.cell.styles.fillColor = [236, 254, 255]; data.cell.styles.textColor = [14, 116, 144]; } 
                     
@@ -2182,5 +2245,12 @@ function exportExcel() {
     }
     const ws = XLSX.utils.aoa_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Journal"); XLSX.writeFile(wb, `ZE_${currentUser}.xlsx`);
 }
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        syncFromCloud();
+    }
+});
+
 init();
 </script>
