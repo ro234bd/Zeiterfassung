@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.20"; 
+        const CURRENT_APP_VERSION = "4.21"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -298,8 +298,8 @@
                 <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Soll/M</label><div id="sumMonthSoll" class="font-black">0:00</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Ist/M</label><div id="sumMonthIst" class="font-black theme-text">0:00</div></div>
-                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Diff</label><div id="sumMonthDiff" class="font-black">0:00</div></div>
-                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Saldo M</label><div id="sumYearSaldo" class="font-black text-blue-800">0:00</div></div>
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Saldo Vormonat</label><div id="sumPrevMonthSaldo" class="font-black">0:00</div></div>
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Soll (Heute)</label><div id="sumSollToday" class="font-black text-slate-700">0:00</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Anspruch</label><div id="sumVacTotal" class="font-black text-green-600">0</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Genomm.</label><div id="sumMonthVac" class="font-black">0</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Rest</label><div id="sumYearVacRest" class="font-black text-green-700">0</div></div>
@@ -1202,7 +1202,19 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
 function renderLogs() {
     const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value);
     const tbody = document.getElementById('logTableBody'); tbody.innerHTML = "";
+    
     const balancesForMonth = calculateBalances(currentUser, y, m, false), balancesToday = calculateBalances(currentUser, getNow().getFullYear(), getNow().getMonth(), true);
+    
+    let py = y, pm = m - 1; if (pm < 0) { pm = 11; py--; }
+    const balancesPrevMonth = calculateBalances(currentUser, py, pm, false);
+
+    const todayDate = getNow();
+    let maxDaySoll = new Date(y, m + 1, 0).getDate();
+    if (todayDate.getFullYear() === y && todayDate.getMonth() === m) {
+        maxDaySoll = todayDate.getDate(); // Wenn aktueller Monat, dann nur bis heute zählen
+    } else if (new Date(y, m, 1) > todayDate) {
+        maxDaySoll = 0; // Wenn Zukunftsmonat, dann ist das Soll bis heute 0
+    }
     
     if(currentUser === 'Admin') {
         if(document.getElementById('statGrid')) document.getElementById('statGrid').classList.add('opacity-0');
@@ -1214,7 +1226,7 @@ function renderLogs() {
         if(document.getElementById('planVacCard')) document.getElementById('planVacCard').classList.remove('hidden');
     }
 
-    let mIst = 0, mSoll = 0;
+    let mIst = 0, mSoll = 0, mSollBisHeute = 0;
     for (let i = 1; i <= new Date(y, m+1, 0).getDate(); i++) {
         const d = new Date(y, m, i), dStr = toLocalISO(d), log = (db.logs[currentUser]||{})[dStr] || {};
         const isH = holidaysDB[dStr], isWE = d.getDay()%6==0;
@@ -1282,6 +1294,7 @@ function renderLogs() {
         if(isWE) ist = 0;
 
         mIst += ist; mSoll += target;
+        if (i <= maxDaySoll) mSollBisHeute += target;
         
         if (log.type==='Urlaub' || log.type==='Betriebsurlaub') rowClass = 'row-vacation';
         else if (log.type==='ZA') rowClass = 'row-za';
@@ -1320,15 +1333,17 @@ const dateHtml = `<div class="flex items-center"><span class="w-8 text-right fon
         document.getElementById('sumMonthIst').innerText = formatHM(mIst);
         document.getElementById('sumMonthSoll').innerText = formatHM(mSoll);
         
-        const diff = mIst - mSoll;
-        const diffEl = document.getElementById('sumMonthDiff');
-        diffEl.innerText = formatHM(diff);
-        diffEl.className = "font-black " + (diff < 0 ? "text-red-500" : (diff > 0 ? "text-green-600" : "text-blue-600"));
+        const prevSaldo = balancesPrevMonth.totalSaldo;
+        const prevSaldoEl = document.getElementById('sumPrevMonthSaldo');
+        if (prevSaldoEl) {
+            prevSaldoEl.innerText = formatHM(prevSaldo);
+            prevSaldoEl.className = "font-black " + (prevSaldo < 0 ? "text-red-500" : (prevSaldo > 0 ? "text-green-600" : "text-blue-800"));
+        }
 
-        const saldo = balancesForMonth.totalSaldo;
-        const saldoEl = document.getElementById('sumYearSaldo');
-        saldoEl.innerText = formatHM(saldo);
-        saldoEl.className = "font-black " + (saldo < 0 ? "text-red-500" : (saldo > 0 ? "text-green-600" : "text-blue-800"));
+        const sollTodayEl = document.getElementById('sumSollToday');
+        if (sollTodayEl) {
+            sollTodayEl.innerText = formatHM(mSollBisHeute);
+        }
 
         document.getElementById('sumVacTotal').innerText = db.admin[currentUser].yearlyVacation;
         document.getElementById('sumMonthVac').innerText = balancesForMonth.monthVacation;
