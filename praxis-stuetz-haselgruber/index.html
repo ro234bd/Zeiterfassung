@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.17"; 
+        const CURRENT_APP_VERSION = "4.20"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -106,13 +106,13 @@
                 <label class="text-[9px] font-bold uppercase text-slate-400">Typ / Status</label>
                 <select id="editType" class="w-full p-2 border rounded font-bold text-xs bg-slate-50">
                     <option value="">(Standard: Arbeitszeit)</option>
-                    <option value="Urlaub">🌴 Urlaub</option>
-                    <option value="Feiertag">🎄 Feiertag (Sonderfrei)</option>
-                    <option value="ZA">⏳ Zeitausgleich (ZA)</option>
-                    <option value="Krank">🤒 Krank</option>
-                    <option value="Schulung">🎓 Schulung</option>
-                    <option value="Sonstiges">✏️ Sonstiges</option>
-                    <option value="Betriebsurlaub">🏢 Betriebsurlaub</option>
+                    <option value="Urlaub">Urlaub</option>
+                    <option value="Feiertag">Feiertag (Sonderfrei)</option>
+                    <option value="ZA">Zeitausgleich (ZA)</option>
+                    <option value="Krank">Krank</option>
+                    <option value="Schulung">Schulung</option>
+                    <option value="Sonstiges">Sonstiges</option>
+                    <option value="Betriebsurlaub">Betriebsurlaub</option>
                 </select>
             </div>
             <div><label class="text-[9px] font-bold uppercase text-slate-400">Notiz</label><textarea id="editNote" rows="3" class="w-full p-2 border rounded text-xs" placeholder="Notiz hier eingeben..."></textarea></div>
@@ -256,13 +256,13 @@
                         </div>
                         <div class="flex-[1.5] border-r">
                              <select id="planType" class="w-full h-full p-2 bg-white text-xs font-bold outline-none cursor-pointer">
-                                <option value="Urlaub">🌴 Urlaub</option>
-                                <option value="Feiertag">🎄 Feiertag (Sonderfrei)</option>
-                                <option value="Betriebsurlaub">🏢 Betriebsurlaub (Alle)</option>
-                                <option value="Schulung">🎓 Schulung (Info)</option>
-                                <option value="ZA">⏳ Zeitausgleich (ZA)</option>
-                                <option value="Krank">🤒 Krank</option>
-                                <option value="Sonstiges">✏️ Freitext / Zeit</option>
+                                <option value="Urlaub">Urlaub</option>
+                                <option value="Feiertag">Feiertag (Sonderfrei)</option>
+                                <option value="Betriebsurlaub">Betriebsurlaub (Alle)</option>
+                                <option value="Schulung">Schulung (Info)</option>
+                                <option value="ZA">Zeitausgleich (ZA)</option>
+                                <option value="Krank">Krank</option>
+                                <option value="Sonstiges">Freitext / Zeit</option>
                                 <option value="DELETE">🗑️ Eintrag löschen (Einzel)</option>
                                 <option value="DELETE_ALL" class="text-red-600 font-black">🗑️ Alle Termine löschen</option>
                             </select>
@@ -350,26 +350,27 @@
 
             <div class="space-y-6">
                 <div class="bg-white p-6 rounded-xl shadow border">
-                    <div class="flex justify-between items-center mb-4 border-b pb-2">
-                         <h2 class="font-black uppercase italic">Soll-Stunden: <span id="targetName" class="theme-text"></span> <span id="weeklySumDisplay" class="text-sm text-slate-400 ml-2 font-bold tracking-tight"></span></h2>
-                         <button onclick="testFillMonth()" class="bg-purple-600 hover:bg-purple-700 text-white text-[9px] px-2 py-1 rounded font-bold uppercase shadow-sm">🤖 Monat Füllen</button>
+                    <div class="flex justify-between items-center mb-5 border-b pb-3">
+                         <h2 class="text-lg font-black uppercase italic text-slate-800 tracking-tight">Soll-Stunden: <span id="targetName" class="theme-text"></span></h2>
+                         <button onclick="testFillMonth()" class="bg-purple-600 hover:bg-purple-700 text-white text-[10px] px-3 py-1.5 rounded flex items-center gap-1 font-bold uppercase shadow-sm">🤖 Monat Füllen</button>
                     </div>
 
-                    <div class="flex flex-col md:flex-row gap-2 justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-200 mb-4">
-                        <div class="flex items-center gap-2 w-full md:w-auto">
-                            <span class="text-[10px] font-bold uppercase text-blue-800">Plan:</span>
-                            <select id="scheduleHistorySelect" onchange="changeScheduleVersion()" class="p-1.5 border rounded text-xs font-bold text-slate-700 w-full md:w-auto outline-none"></select>
-                        </div>
-                        <div class="flex items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
-                            <span class="text-[10px] font-bold uppercase text-blue-800 whitespace-nowrap">Gültig ab:</span>
-                            <input type="date" id="scheduleValidFrom" class="p-1.5 border rounded text-xs font-bold text-slate-700 w-full md:w-auto outline-none">
-                            <button onclick="addScheduleVersion()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase shadow-sm whitespace-nowrap transition-colors">➕ Neu</button>
-                            <button onclick="deleteScheduleVersion()" id="btnDeleteSchedule" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase shadow-sm whitespace-nowrap transition-colors" title="Diese Version löschen">🗑️</button>
+                    <div class="flex flex-col gap-3 mb-6">
+                        <select id="scheduleHistorySelect" onchange="changeScheduleVersion()" class="w-full p-2.5 border rounded-lg text-sm font-bold theme-text bg-white outline-none border-teal-100 shadow-sm"></select>
+                        <div class="flex gap-2">
+                            <input type="date" id="scheduleValidFrom" class="flex-1 p-2.5 border rounded-lg text-sm font-bold text-slate-700 outline-none shadow-sm">
+                            <button onclick="addScheduleVersion()" class="bg-green-100 hover:bg-green-200 text-green-700 px-4 py-2.5 rounded-lg text-xs font-bold uppercase shadow-sm whitespace-nowrap transition-colors flex items-center gap-1">➕ Neu...</button>
+                            <button onclick="deleteScheduleVersion()" id="btnDeleteSchedule" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center" title="Diese Version löschen">🗑️</button>
                         </div>
                     </div>
 
-                    <div id="weeklyEditor" class="space-y-2"></div>
-                    <button onclick="saveWeekly()" class="mt-4 bg-slate-800 text-white w-full py-3 rounded-xl font-bold uppercase shadow-lg">Plan speichern</button>
+                    <div id="weeklyEditor" class="space-y-3"></div>
+                    
+                    <div class="text-right mt-4 mb-3">
+                        <span id="weeklySumDisplay" class="text-[13px] text-slate-500 font-bold tracking-tight"></span>
+                    </div>
+                    
+                    <button onclick="saveWeekly()" class="bg-[#1e293b] hover:bg-slate-800 text-white w-full py-4 rounded-xl font-bold uppercase shadow-lg transition-transform active:scale-95 tracking-wide">Plan speichern</button>
                 </div>
 
                 <div class="bg-red-50 p-6 rounded-xl shadow border border-red-200">
@@ -394,10 +395,9 @@
             <h2 class="text-2xl font-black uppercase italic mb-2 text-amber-400">⚡ Superuser System-Konsole</h2>
             <p class="text-xs text-slate-400 mb-6">Diese Einstellungen sind nur für den Superuser sichtbar.</p>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                 <div class="bg-slate-700 p-4 rounded-xl border border-slate-600">
                     <h3 class="font-bold uppercase text-slate-300 border-b border-slate-600 pb-2 mb-4">🎨 Design & Branding</h3>
-                    
                     <div class="space-y-4">
                         <div>
                             <label class="text-[10px] font-bold uppercase text-slate-400">Firmenname / Titel</label>
@@ -411,11 +411,9 @@
                             </div>
                         </div>
                         <div>
-                            <label class="text-[10px] font-bold uppercase text-slate-400">Logo Upload (max. 100kb)</label>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Logo Upload</label>
                             <input type="file" id="sysLogoInput" accept="image/*" class="w-full text-xs text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-slate-600 file:text-white hover:file:bg-slate-500">
-                            <div class="mt-2 flex gap-2">
-                                <button onclick="clearLogo()" class="text-[9px] text-red-400 uppercase font-bold hover:underline">Logo entfernen</button>
-                            </div>
+                            <div class="mt-2 flex gap-2"><button onclick="clearLogo()" class="text-[9px] text-red-400 uppercase font-bold hover:underline">Logo entfernen</button></div>
                             <img id="sysLogoPreview" class="h-12 mt-2 object-contain hidden border border-slate-600 bg-white p-1 rounded">
                         </div>
                     </div>
@@ -423,49 +421,46 @@
 
                 <div class="bg-slate-700 p-4 rounded-xl border border-slate-600">
                     <h3 class="font-bold uppercase text-slate-300 border-b border-slate-600 pb-2 mb-4">☁️ Cloud & Sicherheit</h3>
-                    
                     <div class="space-y-4">
                         <div>
                             <label class="text-[10px] font-bold uppercase text-slate-400">Google Script URL (Cloud)</label>
                             <input type="text" id="sysCloudUrl" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-[9px] font-mono">
-                            <p class="text-[9px] text-amber-500 mt-1 italic">⚠️ Änderung trennt Verbindung sofort!</p>
-                            
-                            <div id="urlHistory" class="mt-2 flex flex-wrap gap-1"></div>
                         </div>
-                        
                          <div>
                             <label class="text-[10px] font-bold uppercase text-slate-400">Local Storage DB Key</label>
-                            <input type="text" id="sysDbKey" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-[9px] font-mono" placeholder="Default: ze_profi_cloud_v3.86_FINAL">
-                            <p class="text-[9px] text-red-400 mt-1 italic">⚠️ Änderung versteckt bisherige Daten!</p>
+                            <input type="text" id="sysDbKey" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-[9px] font-mono">
                         </div>
-                        
                         <div class="pt-2 border-t border-slate-600">
-                             <label class="text-[10px] font-bold uppercase text-slate-400">Standard Admin-Passwort ändern</label>
-                             <input type="text" id="sysAdminPw" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs font-bold" placeholder="Aktuell: Va19tti!">
-                        </div>
-
-                        <div class="pt-2 border-t border-slate-600">
-                            <label class="text-[10px] font-bold uppercase text-slate-400">Admin E-Mail (für Hintergrund-Benachrichtigung)</label>
-                            <input type="email" id="sysDevEmail" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-[9px] font-mono" placeholder="admin@beispiel.at">
+                             <label class="text-[10px] font-bold uppercase text-slate-400">Admin-Passwort</label>
+                             <input type="text" id="sysAdminPw" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs font-bold">
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <div class="bg-slate-700 p-4 rounded-xl border border-slate-600 mt-6">
-                <h3 class="font-bold uppercase text-slate-300 border-b border-slate-600 pb-2 mb-4">📢 Update Informationen (Release Notes)</h3>
-                <label class="text-[10px] font-bold uppercase text-slate-400">Aktuelle Update-Infos für Mitarbeiter (Dashboard)</label>
-                <textarea id="sysReleaseNotes" onchange="if(!db.settings) db.settings={}; db.settings.releaseNotes = this.value; forceSave();" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs h-32 mt-1" placeholder="Schreibe hier, was im neuen Update geändert wurde..."></textarea>
-            </div>
 
+            <!-- NEW DEV & RELEASE NOTES CARD -->
+            <div class="bg-slate-700 p-4 rounded-xl border border-slate-600 mb-6">
+                <h3 class="font-bold uppercase text-slate-300 border-b border-slate-600 pb-2 mb-4">📢 Release-Notes & 📬 DEV-Inbox</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Release Notes (Aktuelle Infos für alle)</label>
+                            <textarea id="sysReleaseNotes" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-xs h-24 mt-1" placeholder="Neuigkeiten oder Release-Notes, die auf dem Dashboard aller Mitarbeiter angezeigt werden sollen..."></textarea>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Entwickler E-Mail (Bugs & Wünsche)</label>
+                            <input type="email" id="sysDevEmail" class="w-full p-2 bg-slate-800 border border-slate-500 rounded text-white text-[10px] mt-1" placeholder="z.B. dev@praxis.local">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold uppercase text-slate-400 mb-1 block">DEV-Inbox (System-Nachrichten)</label>
+                        <div id="sysInbox" class="space-y-2 max-h-40 overflow-y-auto p-2 bg-slate-800 border border-slate-600 rounded"></div>
+                    </div>
+                </div>
+            </div>
+            
             <button onclick="saveSystemSettings()" class="w-full mt-6 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold uppercase shadow-lg transition-transform active:scale-95">💾 Systemeinstellungen Speichern & Neustart</button>
         </div>
-
-        <div class="mt-6 bg-purple-900 text-white p-4 rounded-xl shadow-lg border border-purple-700">
-             <h3 class="font-bold uppercase text-purple-300 border-b border-purple-700 pb-2 mb-2">📩 Dev-Inbox (Alle Nachrichten)</h3>
-             <div id="sysInbox" class="space-y-2 max-h-60 overflow-y-auto"></div>
-        </div>
-
     </section>
 </div>
 <script>
@@ -850,6 +845,7 @@ function performLogin() {
 
 function renderSystemMessages() {
     const box = document.getElementById('sysInbox');
+    if (!box) return; // Sicherstellen, dass das Element existiert
     box.innerHTML = "";
     if(db.messages && db.messages.length > 0) {
         db.messages.forEach((msg, idx) => {
@@ -1125,6 +1121,30 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
     let usedVacYear = 0, usedVacMonth = 0;
     let iter = new Date(admin.startDate); if(isNaN(iter.getTime())) iter = new Date(targetYear, 0, 1);
     let endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
+
+    const signatures = db.config[userName]?.signatures || {};
+    const signedKeys = Object.keys(signatures).filter(k => signatures[k].signed && signatures[k].frozenSaldo !== undefined);
+    let latestSignedKey = null;
+    let targetNum = targetYear * 12 + targetMonth;
+
+    for (let key of signedKeys) {
+        let [sy, sm] = key.split('-').map(Number);
+        let sNum = sy * 12 + sm;
+        if (sNum <= targetNum) {
+            if (!latestSignedKey) latestSignedKey = key;
+            else {
+                 let [ly, lm] = latestSignedKey.split('-').map(Number);
+                 if (sNum > (ly * 12 + lm)) latestSignedKey = key;
+            }
+        }
+    }
+
+    let saldoIter = new Date(iter);
+    if (latestSignedKey) {
+        let [ly, lm] = latestSignedKey.split('-').map(Number);
+        totalSaldo = safeFloat(signatures[latestSignedKey].frozenSaldo);
+        saldoIter = new Date(ly, lm + 1, 1); 
+    }
     
     while (iter <= endIter) {
         const dStr = toLocalISO(iter); const log = logs[dStr] || {};
@@ -1142,7 +1162,11 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
         } else if (log.type === 'ZA') { ist = 0; }
         else if (log.type === 'Feiertag') { ist = 0; }
         else if (log.type === 'Sonstiges') { ist = log.value !== undefined ? safeFloat(log.value) : target; }
-        else if (log.in && log.out) {
+        else if (log.type === 'Schulung') {
+            if(log.in && log.out) { } else { ist = 0; }
+        }
+
+        if (log.in && log.out) {
             if (target === 0) { ist = 0; } 
             let calcIn = log.in;
             let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
@@ -1166,7 +1190,11 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
         
         if(isWE) ist = 0;
 
-        totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
+        if (iter >= saldoIter) {
+            totalSaldo += (ist - target);
+        }
+        
+        iter.setDate(iter.getDate() + 1);
     }
     return { totalSaldo: safeFloat(totalSaldo), restVacation: (safeFloat(admin.startVacation) + parseInt(admin.yearlyVacation)) - usedVacYear, monthVacation: usedVacMonth };
 }
@@ -1176,7 +1204,6 @@ function renderLogs() {
     const tbody = document.getElementById('logTableBody'); tbody.innerHTML = "";
     const balancesForMonth = calculateBalances(currentUser, y, m, false), balancesToday = calculateBalances(currentUser, getNow().getFullYear(), getNow().getMonth(), true);
     
-    // HIER WURDE GEÄNDERT: Verstecke für Admin nur die Saldo-Karten, nicht die Eingabebox
     if(currentUser === 'Admin') {
         if(document.getElementById('statGrid')) document.getElementById('statGrid').classList.add('opacity-0');
         if(document.getElementById('planSaldoCard')) document.getElementById('planSaldoCard').classList.add('hidden');
@@ -1271,8 +1298,7 @@ function renderLogs() {
         if(log.type === 'Schulung' && log.range) note = "Schulung: " + log.range + " " + note;
         if(log.type === 'Sonstiges' && log.range) note = log.range + " " + note;
         
-        const dateHtml = `<div class="flex items-center"><span class="w-8 text-right font-bold inline-block">${i}.${m+1}.</span><span class="w-10"></span><span class="text-[9px] opacity-60 uppercase tracking-wider">${WEEKDAYS_SHORT[d.getDay()]}</span></div>`;
-        
+const dateHtml = `<div class="flex items-center"><span class="w-8 text-right font-bold inline-block">${String(i).padStart(2, '0')}.${String(m+1).padStart(2, '0')}.</span><span class="w-10"></span><span class="text-[9px] opacity-60 uppercase tracking-wider">${WEEKDAYS_SHORT[d.getDay()]}</span></div>`;        
         let diffColor = "text-slate-400";
         const diffVal = ist - target;
         if(diffVal < 0) diffColor = "text-red-500 font-bold";
@@ -1413,7 +1439,6 @@ function generateMonthNode(y, m, mini = false) {
                 });
 
                 if (hasBetriebsurlaub) {
-                    // HIER GEÄNDERT: "BA" in Jahresansicht (mini = true)
                     cell.innerHTML += `<div class='cal-entry bg-emerald-50 text-emerald-700 border-emerald-200'>🏢 ${mini ? 'BA' : 'Betriebsurlaub'}</div>`;
                 }
 
@@ -1460,7 +1485,6 @@ function generateMonthNode(y, m, mini = false) {
                             else cell.classList.add('bg-amber-50'); 
                         }
                         
-                        // HIER GEÄNDERT: "BA" in Jahresansicht auch für private Ansicht
                         let txt = log.type === 'Betriebsurlaub' ? (mini ? 'BA' : 'Urlaub') : log.type;
                         
                         if(log.type === 'Sonstiges' && log.title) txt = log.title;
@@ -1700,13 +1724,35 @@ function renderWeeklySettings() {
 
 function updateWeeklySum() {
     if(currentUser === "Admin") return;
-    let totalSum = 0;
+    let sumEven = 0;
+    let sumOdd = 0;
+    
     for(let i=1; i<=5; i++) {
-        totalSum += getTimeDiff(document.getElementById('ws1_'+i)?.value, document.getElementById('we1_'+i)?.value);
-        totalSum += getTimeDiff(document.getElementById('ws2_'+i)?.value, document.getElementById('we2_'+i)?.value);
+        let daySum = 0;
+        daySum += getTimeDiff(document.getElementById('ws1_'+i)?.value, document.getElementById('we1_'+i)?.value);
+        daySum += getTimeDiff(document.getElementById('ws2_'+i)?.value, document.getElementById('we2_'+i)?.value);
+        
+        let mode = document.getElementById('wm_'+i)?.value || "ALL";
+        
+        if (mode === "ALL") {
+            sumEven += daySum;
+            sumOdd += daySum;
+        } else if (mode === "EVEN") {
+            sumEven += daySum;
+        } else if (mode === "ODD") {
+            sumOdd += daySum;
+        }
     }
+    
     const d = document.getElementById('weeklySumDisplay');
-    if(d) d.innerText = `(Gesamt: ${totalSum.toFixed(2)} h / Woche)`;
+    if (d) {
+        if (sumEven === sumOdd) {
+            d.innerText = `(Gesamt: ${sumEven.toFixed(2)} h / Woche)`;
+        } else {
+            let avg = (sumEven + sumOdd) / 2;
+            d.innerText = `(Ø ${avg.toFixed(2)} h/Woche | Gerade: ${sumEven.toFixed(2)}h, Ungerade: ${sumOdd.toFixed(2)}h)`;
+        }
+    }
 }
 
 function changeScheduleVersion() {
@@ -1909,10 +1955,21 @@ function setHeaderWarp() { const val = document.getElementById('headerWarpTime')
 function resetWarp() { timeWarpOffset = 0; document.getElementById('headerWarpTime').value = ""; alert("Zeit zurückgesetzt."); renderAll(); }
 
 async function performSignature(key) {
-    if(!confirm("Monat wirklich signieren?")) return;
-    if(!db.config[currentUser]) db.config[currentUser] = {}; if(!db.config[currentUser].signatures) db.config[currentUser].signatures = {};
-    db.config[currentUser].signatures[key] = { signed: true, date: new Date().toISOString() };
-    await save(); renderLogs();
+    if(!confirm("Monat wirklich signieren? Der Saldo wird damit für die Zukunft fixiert!")) return;
+    if(!db.config[currentUser]) db.config[currentUser] = {}; 
+    if(!db.config[currentUser].signatures) db.config[currentUser].signatures = {};
+    
+    // Berechne den Saldo genau bis zu diesem Monat
+    const [y, m] = key.split('-').map(Number);
+    const balances = calculateBalances(currentUser, y, m, false);
+
+    db.config[currentUser].signatures[key] = { 
+        signed: true, 
+        date: new Date().toISOString(),
+        frozenSaldo: balances.totalSaldo // Saldo wird eingefroren
+    };
+    await save(); 
+    renderLogs();
 }
 
 async function resetSignature(key) {
@@ -2236,3 +2293,5 @@ document.addEventListener('visibilitychange', () => {
 
 init();
 </script>
+</body>
+</html>
