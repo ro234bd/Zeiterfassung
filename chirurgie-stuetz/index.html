@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.14"; 
+        const CURRENT_APP_VERSION = "4.20"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -201,11 +201,15 @@
                 <p class="text-sm text-slate-400 mb-6" id="displayTodayDate"></p>
                 
                 <div id="punchButtonsArea">
-                    <div class="flex justify-center gap-4 mb-8">
-                        <button onclick="punch('in')" class="w-16 h-16 md:w-24 md:h-24 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm">Kommen</button>
-                        <button onclick="punch('break_in')" class="w-16 h-16 md:w-24 md:h-24 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm text-center leading-tight">Pause<br>Start</button>
-                        <button onclick="punch('break_out')" class="w-16 h-16 md:w-24 md:h-24 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm text-center leading-tight">Pause<br>Ende</button>
-                        <button onclick="punch('out')" class="w-16 h-16 md:w-24 md:h-24 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm">Gehen</button>
+                    <div class="flex justify-center items-center gap-3 mb-8">
+                        <button onclick="punch('in')" class="w-20 h-20 md:w-28 md:h-28 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm">Kommen</button>
+                        
+                        <div class="flex flex-col gap-2">
+                            <button onclick="punch('break_in')" class="w-16 h-10 md:w-24 md:h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow font-bold flex items-center justify-center transition-all active:scale-90 uppercase text-[8px] md:text-xs">Pause Start</button>
+                            <button onclick="punch('break_out')" class="w-16 h-10 md:w-24 md:h-12 bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow font-bold flex items-center justify-center transition-all active:scale-90 uppercase text-[8px] md:text-xs">Pause Ende</button>
+                        </div>
+                        
+                        <button onclick="punch('out')" class="w-20 h-20 md:w-28 md:h-28 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-xl font-black flex items-center justify-center transition-all active:scale-90 uppercase text-[10px] md:text-sm">Gehen</button>
                     </div>
                     
                     <div id="todayDetails" class="space-y-2 max-w-xs mx-auto mb-6"></div>
@@ -287,8 +291,7 @@
         </div>
         <div id="calendarRoot"></div>
     </section>
-
-    <section id="tab-uebersicht" class="tab-content hidden">
+	<section id="tab-uebersicht" class="tab-content hidden">
         <div class="bg-white shadow rounded-xl border overflow-x-auto">
             <div class="p-6 border-b">
                 <div class="flex justify-between items-start mb-4">
@@ -1120,6 +1123,32 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
     let iter = new Date(admin.startDate); if(isNaN(iter.getTime())) iter = new Date(targetYear, 0, 1);
     let endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
     
+    // --- Saldo Lock (Kettenberechnung) Logik ---
+    const signatures = db.config[userName]?.signatures || {};
+    const signedKeys = Object.keys(signatures).filter(k => signatures[k].signed && signatures[k].frozenSaldo !== undefined);
+    let latestSignedKey = null;
+    let targetNum = targetYear * 12 + targetMonth;
+
+    for (let key of signedKeys) {
+        let [sy, sm] = key.split('-').map(Number);
+        let sNum = sy * 12 + sm;
+        if (sNum <= targetNum) {
+            if (!latestSignedKey) latestSignedKey = key;
+            else {
+                 let [ly, lm] = latestSignedKey.split('-').map(Number);
+                 if (sNum > (ly * 12 + lm)) latestSignedKey = key;
+            }
+        }
+    }
+
+    let saldoIter = new Date(iter);
+    if (latestSignedKey) {
+        let [ly, lm] = latestSignedKey.split('-').map(Number);
+        totalSaldo = safeFloat(signatures[latestSignedKey].frozenSaldo);
+        saldoIter = new Date(ly, lm + 1, 1); 
+    }
+    // -------------------------------------------
+
     while (iter <= endIter) {
         const dStr = toLocalISO(iter); const log = logs[dStr] || {};
         const target = getTargetHours(iter, userName);
@@ -1160,7 +1189,10 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
         
         if(isWE) ist = 0;
 
-        totalSaldo += (ist - target); iter.setDate(iter.getDate() + 1);
+        if (iter >= saldoIter) {
+            totalSaldo += (ist - target); 
+        }
+        iter.setDate(iter.getDate() + 1);
     }
     return { totalSaldo: safeFloat(totalSaldo), restVacation: (safeFloat(admin.startVacation) + parseInt(admin.yearlyVacation)) - usedVacYear, monthVacation: usedVacMonth };
 }
@@ -1227,7 +1259,7 @@ function renderLogs() {
                     let overlapEnd = Math.min(timeToMins(log.out), timeToMins(gap.end));
                     if (overlapEnd > overlapStart) {
                         autoBreakHours = (overlapEnd - overlapStart) / 60;
-                        pauseDisplay = `${gap.start} - ${gap.end} (Auto)`;
+                        pauseDisplay = `${gap.start} - ${gap.end}`;
                     }
                 }
 
@@ -1265,7 +1297,7 @@ function renderLogs() {
         if(log.type === 'Schulung' && log.range) note = "Schulung: " + log.range + " " + note;
         if(log.type === 'Sonstiges' && log.range) note = log.range + " " + note;
         
-        const dateHtml = `<div class="flex items-center"><span class="w-8 text-right font-bold inline-block">${i}.${m+1}.</span><span class="w-10"></span><span class="text-[9px] opacity-60 uppercase tracking-wider">${WEEKDAYS_SHORT[d.getDay()]}</span></div>`;
+        const dateHtml = `<div class="flex items-center"><span class="w-8 text-right font-bold inline-block">${String(i).padStart(2, '0')}.${String(m+1).padStart(2, '0')}.</span><span class="w-10"></span><span class="text-[9px] opacity-60 uppercase tracking-wider">${WEEKDAYS_SHORT[d.getDay()]}</span></div>`;
         
         let diffColor = "text-slate-400";
         const diffVal = ist - target;
@@ -1733,13 +1765,35 @@ function renderWeeklySettings() {
 
 function updateWeeklySum() {
     if(currentUser === "Admin") return;
-    let totalSum = 0;
+    let sumEven = 0;
+    let sumOdd = 0;
+    
     for(let i=1; i<=5; i++) {
-        totalSum += getTimeDiff(document.getElementById('ws1_'+i)?.value, document.getElementById('we1_'+i)?.value);
-        totalSum += getTimeDiff(document.getElementById('ws2_'+i)?.value, document.getElementById('we2_'+i)?.value);
+        let daySum = 0;
+        daySum += getTimeDiff(document.getElementById('ws1_'+i)?.value, document.getElementById('we1_'+i)?.value);
+        daySum += getTimeDiff(document.getElementById('ws2_'+i)?.value, document.getElementById('we2_'+i)?.value);
+        
+        let mode = document.getElementById('wm_'+i)?.value || "ALL";
+        
+        if (mode === "ALL") {
+            sumEven += daySum;
+            sumOdd += daySum;
+        } else if (mode === "EVEN") {
+            sumEven += daySum;
+        } else if (mode === "ODD") {
+            sumOdd += daySum;
+        }
     }
+    
     const d = document.getElementById('weeklySumDisplay');
-    if(d) d.innerText = `(Gesamt: ${totalSum.toFixed(2)} h / Woche)`;
+    if (d) {
+        if (sumEven === sumOdd) {
+            d.innerText = `(Gesamt: ${sumEven.toFixed(2)} h / Woche)`;
+        } else {
+            let avg = (sumEven + sumOdd) / 2;
+            d.innerText = `(Ø ${avg.toFixed(2)} h/Woche | Gerade: ${sumEven.toFixed(2)}h, Ungerade: ${sumOdd.toFixed(2)}h)`;
+        }
+    }
 }
 
 function changeScheduleVersion() {
@@ -1941,12 +1995,24 @@ async function adminClearData() {
 
 function setHeaderWarp() { const val = document.getElementById('headerWarpTime').value; if(val) { timeWarpOffset = new Date(val).getTime() - Date.now(); renderAll(); alert("Warp aktiv!"); } }
 function resetWarp() { timeWarpOffset = 0; document.getElementById('headerWarpTime').value = ""; alert("Zeit zurückgesetzt."); renderAll(); }
+
 async function performSignature(key) {
-    if(!confirm("Monat wirklich signieren?")) return;
-    if(!db.config[currentUser]) db.config[currentUser] = {}; if(!db.config[currentUser].signatures) db.config[currentUser].signatures = {};
-    db.config[currentUser].signatures[key] = { signed: true, date: new Date().toISOString() };
+    if(!confirm("Monat wirklich signieren? Der Saldo wird damit für die Zukunft fixiert!")) return;
+    if(!db.config[currentUser]) db.config[currentUser] = {}; 
+    if(!db.config[currentUser].signatures) db.config[currentUser].signatures = {};
+    
+    // Berechne den Saldo genau bis zu diesem Monat
+    const [y, m] = key.split('-').map(Number);
+    const balances = calculateBalances(currentUser, y, m, false);
+
+    db.config[currentUser].signatures[key] = { 
+        signed: true, 
+        date: new Date().toISOString(),
+        frozenSaldo: balances.totalSaldo // Saldo wird eingefroren
+    };
     await save(); renderLogs();
 }
+
 async function resetSignature(key) {
     if(!confirm("Signatur wirklich entfernen? Der Monat ist dann wieder offen.")) return;
     if(db.config[currentUser]?.signatures?.[key]) { delete db.config[currentUser].signatures[key]; await save(); renderLogs(); }
@@ -2220,7 +2286,7 @@ function exportExcel() {
                     let overlapEnd = Math.min(timeToMins(log.out), timeToMins(gap.end));
                     if (overlapEnd > overlapStart) {
                         autoBreakHours = (overlapEnd - overlapStart) / 60;
-                        pStr = `${gap.start} - ${gap.end} (Auto)`;
+                        pStr = `${gap.start} - ${gap.end}`;
                     }
                 }
 
@@ -2241,7 +2307,7 @@ function exportExcel() {
 
         if(isWE) ist = 0;
 
-        rows.push([i+"."+(m+1)+".", log.in||"", dispOut, pStr, safeFloat(ist).toFixed(2), safeFloat(target).toFixed(2), (safeFloat(ist)-safeFloat(target)).toFixed(2), log.note || ""]);
+        rows.push([String(i).padStart(2, '0') + "." + String(m+1).padStart(2, '0') + ".", log.in||"", dispOut, pStr, safeFloat(ist).toFixed(2), safeFloat(target).toFixed(2), (safeFloat(ist)-safeFloat(target)).toFixed(2), log.note || ""]);
     }
     const ws = XLSX.utils.aoa_to_sheet(rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Journal"); XLSX.writeFile(wb, `ZE_${currentUser}.xlsx`);
 }
@@ -2254,3 +2320,5 @@ document.addEventListener('visibilitychange', () => {
 
 init();
 </script>
+</body>
+</html>
