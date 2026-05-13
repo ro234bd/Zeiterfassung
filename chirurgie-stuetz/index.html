@@ -9,15 +9,14 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <script>
-        // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.22"; 
+        // Version 4.24 für korrigierte Urlaubs-Anzeige in der Monatsliste (Frei statt Urlaub bei 0 Soll-Stunden)
+        const CURRENT_APP_VERSION = "4.23"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
             console.log("Neue Version erkannt! Cache wird radikal geleert...");
             localStorage.setItem("ze_system_version", CURRENT_APP_VERSION);
             
-            // 1. Service Worker unregistrieren
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.getRegistrations().then(function(registrations) {
                     for(let registration of registrations) { 
@@ -25,7 +24,6 @@
                     }
                 });
                 
-                // 2. ALLE Cache-Storages aktiv löschen (Hard-Reset)
                 caches.keys().then(function(names) {
                     for (let name of names) {
                         caches.delete(name);
@@ -33,7 +31,6 @@
                 });
             }
             
-            // 3. Seite mit neuem Timestamp zwingend neu laden
             if (window.location.search.indexOf('v=' + CURRENT_APP_VERSION) === -1) {
                 window.location.href = window.location.pathname + '?v=' + CURRENT_APP_VERSION + '&ts=' + Date.now();
             }
@@ -307,12 +304,12 @@
                     <div><h2 class="text-xl font-black uppercase italic" id="billTitle">Zeitnachweis</h2><p class="text-xs theme-text font-bold uppercase tracking-tight" id="verBill"></p></div>
                     <div class="text-right"><p class="text-[9px] font-bold text-slate-300 uppercase">Mitarbeiter:</p><p id="billUser" class="text-lg font-black uppercase italic leading-none mb-1">--</p><p class="text-[9px] font-bold text-slate-300 uppercase">Zeitraum:</p><p id="billPeriod" class="text-xs font-bold text-slate-400 uppercase leading-none">--</p></div>
                 </div>
-                <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 text-center">
-                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Saldo Vor-M.</label><div id="sumPrevMonthSaldo" class="font-black text-slate-500">0:00</div></div>
+                
+                <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Soll/M</label><div id="sumMonthSoll" class="font-black">0:00</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Ist/M</label><div id="sumMonthIst" class="font-black theme-text">0:00</div></div>
-                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Diff</label><div id="sumMonthDiff" class="font-black">0:00</div></div>
-                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Saldo M</label><div id="sumYearSaldo" class="font-black text-blue-800">0:00</div></div>
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Saldo Vormonat</label><div id="sumPrevMonthSaldo" class="font-black">0:00</div></div>
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Soll (Heute)</label><div id="sumMonthSollToday" class="font-black">0:00</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Anspruch</label><div id="sumVacTotal" class="font-black text-green-600">0</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Genomm.</label><div id="sumMonthVac" class="font-black">0</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Rest</label><div id="sumYearVacRest" class="font-black text-green-700">0</div></div>
@@ -1052,7 +1049,6 @@ async function syncFromCloud() {
                 db = cloudDb;
                 if(!db.settings) db.settings = {}; 
                 
-                // Release-Notes Sync Fix
                 if (isSuperuser && document.getElementById('sysReleaseNotes')) {
                     if (document.activeElement !== document.getElementById('sysReleaseNotes')) {
                         document.getElementById('sysReleaseNotes').value = db.settings.releaseNotes || "";
@@ -1124,7 +1120,9 @@ function safeFloat(val) {
     return parseFloat(val);
 }
 
-// NEUE BALANCES FUNKTION MIT ENDDATUM-ÜBERGABE (für Saldo Vormonat)
+// ==========================================
+// *** BERECHNUNGS-KERN ***
+// ==========================================
 function calculateBalances(userName, targetYear, targetMonth, todayOnly = false, endDateOverride = null) {
     if(userName === 'Admin') return { totalSaldo: 0, restVacation: 0, monthVacation: 0 };
     const admin = db.admin[userName] || {startBalance:0, startDate:"2024-01-01", yearlyVacation:25, startVacation: 0};
@@ -1140,7 +1138,6 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false,
         endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
     }
     
-    // --- Saldo Lock (Kettenberechnung) Logik ---
     const signatures = db.config[userName]?.signatures || {};
     const signedKeys = Object.keys(signatures).filter(k => signatures[k].signed && signatures[k].frozenSaldo !== undefined);
     let latestSignedKey = null;
@@ -1164,7 +1161,6 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false,
         totalSaldo = safeFloat(signatures[latestSignedKey].frozenSaldo);
         saldoIter = new Date(ly, lm + 1, 1); 
     }
-    // -------------------------------------------
 
     while (iter <= endIter) {
         const dStr = toLocalISO(iter); const log = logs[dStr] || {};
@@ -1175,6 +1171,7 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false,
         
         if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
             ist = target; 
+            // ACHTUNG: Urlaub wird nur dann als genommener Urlaubstag gezählt, wenn target > 0 ist!
             if ((log.type === 'Urlaub' || log.type === 'Betriebsurlaub') && iter.getFullYear() === targetYear && target > 0) { 
                 usedVacYear++; 
                 if (iter.getMonth() === targetMonth) usedVacMonth++; 
@@ -1213,19 +1210,18 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false,
     }
     return { totalSaldo: safeFloat(totalSaldo), restVacation: (safeFloat(admin.startVacation) + parseInt(admin.yearlyVacation)) - usedVacYear, monthVacation: usedVacMonth };
 }
+// ==========================================
 
 function renderLogs() {
     const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value);
     const tbody = document.getElementById('logTableBody'); tbody.innerHTML = "";
     
-    // Saldo Vormonat berechnen (Bis zum letzten Tag des Vormonats)
     const prevMonthLastDay = new Date(y, m, 0); 
     const balancesPrev = calculateBalances(currentUser, prevMonthLastDay.getFullYear(), prevMonthLastDay.getMonth(), false, prevMonthLastDay);
     
     const balancesForMonth = calculateBalances(currentUser, y, m, false);
     const balancesToday = calculateBalances(currentUser, getNow().getFullYear(), getNow().getMonth(), true);
     
-    // Admin-Planungs Fix
     if(currentUser === 'Admin') {
         if(document.getElementById('statGrid')) document.getElementById('statGrid').classList.add('opacity-0');
         if(document.getElementById('planSaldoCard')) document.getElementById('planSaldoCard').classList.add('hidden');
@@ -1236,7 +1232,9 @@ function renderLogs() {
         if(document.getElementById('planVacCard')) document.getElementById('planVacCard').classList.remove('hidden');
     }
 
-    let mIst = 0, mSoll = 0;
+    let mIst = 0, mSoll = 0, mSollToday = 0;
+    const now = getNow();
+    
     for (let i = 1; i <= new Date(y, m+1, 0).getDate(); i++) {
         const d = new Date(y, m, i), dStr = toLocalISO(d), log = (db.logs[currentUser]||{})[dStr] || {};
         const isH = holidaysDB[dStr], isWE = d.getDay()%6==0;
@@ -1245,17 +1243,25 @@ function renderLogs() {
         let ist = 0, pauseDisplay = "-", dispOut = log.out || "-";
         let rowClass = ''; 
         
+        // STANDARD "FREI" ANZEIGE BEI 0 SOLL
         if (target === 0 && !log.type && !log.in && !log.note && !isH && !isWE) {
             dispOut = "Frei";
-            rowClass = 'row-free';
         }
 
         if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
             ist = target; 
-            if(target === 0) dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
-            else dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type; 
+            dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type; 
+
+            // FIX: Urlaube an freien Tagen (0 Soll) als "Frei" deklarieren
+            if (target === 0 && (log.type === 'Urlaub' || log.type === 'Betriebsurlaub')) {
+                dispOut = "Frei";
+            }
         }
-        else if (log.type === 'ZA') { ist = 0; dispOut = "ZA"; }
+        else if (log.type === 'ZA') { 
+            ist = 0; 
+            dispOut = "ZA"; 
+            if(target === 0) dispOut = "Frei"; 
+        }
         else if (log.type === 'Feiertag') { ist = 0; dispOut = "Feiertag"; }
         else if (log.type === 'Sonstiges') { 
             ist = log.value !== undefined ? safeFloat(log.value) : target;
@@ -1303,13 +1309,29 @@ function renderLogs() {
         
         if(isWE) ist = 0;
 
-        mIst += ist; mSoll += target;
+        mIst += ist; 
+        mSoll += target;
         
-        if (log.type==='Urlaub' || log.type==='Betriebsurlaub') rowClass = 'row-vacation';
-        else if (log.type==='ZA') rowClass = 'row-za';
-        else if (log.type==='Feiertag') rowClass = 'row-custom-holiday';
-        else if (log.type==='Schulung') rowClass = 'row-schulung';
-        else if (log.type==='Sonstiges') rowClass = 'row-custom';
+        let loopDate = new Date(y, m, i);
+        let todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (loopDate <= todayDate) {
+            mSollToday += target;
+        }
+        
+        // ZUWEISUNG DER FARBEN / KLASSEN
+        if (target === 0 && (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'ZA' || (!log.type && !log.in && !isH && !isWE))) {
+            rowClass = 'row-free'; // Verhindert grünen Balken an freien Tagen!
+        } else if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub') {
+            rowClass = 'row-vacation';
+        } else if (log.type === 'ZA') {
+            rowClass = 'row-za';
+        } else if (log.type === 'Feiertag') {
+            rowClass = 'row-custom-holiday';
+        } else if (log.type === 'Schulung') {
+            rowClass = 'row-schulung';
+        } else if (log.type === 'Sonstiges') {
+            rowClass = 'row-custom';
+        }
 
         if (d.getDay() === 6) rowClass = 'row-weekend';
         if (d.getDay() === 0) rowClass = 'row-sunday';
@@ -1340,24 +1362,15 @@ function renderLogs() {
     }
     
     if(currentUser !== 'Admin') {
-        // UI Updates
         document.getElementById('sumPrevMonthSaldo').innerText = formatHM(balancesPrev.totalSaldo);
+        document.getElementById('sumMonthSollToday').innerText = formatHM(mSollToday);
         document.getElementById('sumMonthIst').innerText = formatHM(mIst);
         document.getElementById('sumMonthSoll').innerText = formatHM(mSoll);
-        
-        const diff = mIst - mSoll;
-        const diffEl = document.getElementById('sumMonthDiff');
-        diffEl.innerText = formatHM(diff);
-        diffEl.className = "font-black " + (diff < 0 ? "text-red-500" : (diff > 0 ? "text-green-600" : "text-blue-600"));
-
-        const saldo = balancesForMonth.totalSaldo;
-        const saldoEl = document.getElementById('sumYearSaldo');
-        saldoEl.innerText = formatHM(saldo);
-        saldoEl.className = "font-black " + (saldo < 0 ? "text-red-500" : (saldo > 0 ? "text-green-600" : "text-blue-800"));
 
         document.getElementById('sumVacTotal').innerText = db.admin[currentUser].yearlyVacation;
         document.getElementById('sumMonthVac').innerText = balancesForMonth.monthVacation;
         document.getElementById('sumYearVacRest').innerText = balancesForMonth.restVacation;
+        
         document.getElementById('planSaldoDisplay').innerText = formatHM(balancesToday.totalSaldo) + " h";
         document.getElementById('planVacDisplay').innerText = balancesToday.restVacation + " Tage";
     }
@@ -1402,7 +1415,6 @@ async function forceSave() {
     }, 2000);
 }
 
-// Kugelsicheres Save (gibt true/false zurück)
 async function save() {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
     const statusDiv = document.getElementById('syncStatus');
@@ -1494,7 +1506,6 @@ function generateMonthNode(y, m, mini = false) {
                 });
 
                 if (hasBetriebsurlaub) {
-                    // BA-Kürzel Fix
                     cell.innerHTML += `<div class='cal-entry bg-emerald-50 text-emerald-700 border-emerald-200'>🏢 ${mini ? 'BA' : 'Betriebsurlaub'}</div>`;
                 }
 
@@ -1540,7 +1551,6 @@ function generateMonthNode(y, m, mini = false) {
                             else if(log.type==='Sonstiges') cell.classList.add('row-custom');
                             else cell.classList.add('bg-amber-50'); 
                         }
-                        // BA-Kürzel Fix
                         let txt = log.type === 'Betriebsurlaub' ? (mini ? 'BA' : 'Urlaub') : log.type;
                         if(log.type === 'Sonstiges' && log.title) txt = log.title;
                         if(log.type === 'Schulung' && log.range) txt = "Schulung (" + log.range + ")";
@@ -1632,15 +1642,17 @@ function renderCalendar() {
                 let typeDisplay = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
                 if(log.type === 'Sonstiges' && log.title) typeDisplay = log.title;
                 if(log.type === 'Schulung' && log.range) typeDisplay = "Schulung (" + log.range + ")";
+                
+                // Kalender FIX: Urlaub/ZA wird zu "Frei" bei 0 Soll-Stunden
                 const typesToHide = ['Urlaub', 'Betriebsurlaub', 'Krank', 'ZA'];
-                if (typesToHide.includes(log.type)) { if (target === 0 && currentUser !== 'Admin') typeDisplay = ""; }
+                if (typesToHide.includes(log.type)) { if (target === 0 && currentUser !== 'Admin') typeDisplay = "Frei"; }
                 
                 if (log.type === 'Feiertag') typeDisplay = "Feiertag";
                 
                 if (!typeDisplay && !isH && d.getDay() !== 0 && d.getDay() !== 6 && target === 0 && !log.in && !log.note) { typeDisplay = "Frei"; }
                 let textColor = "theme-text";
                 if(typeDisplay === "Frei") textColor = "text-slate-400 italic";
-                if(log.type === 'ZA') textColor = "text-cyan-600 font-black"; 
+                if(log.type === 'ZA' && typeDisplay !== "Frei") textColor = "text-cyan-600 font-black"; 
                 if(log.type === 'Feiertag') textColor = "text-rose-700 font-bold";
                 
                 content += `<p class="text-[10px] mt-2 font-bold ${textColor} truncate">${isH || typeDisplay || dt}</p>`;
@@ -2026,14 +2038,13 @@ async function performSignature(key) {
     if(!db.config[currentUser]) db.config[currentUser] = {}; 
     if(!db.config[currentUser].signatures) db.config[currentUser].signatures = {};
     
-    // Berechne den Saldo genau bis zu diesem Monat
     const [y, m] = key.split('-').map(Number);
     const balances = calculateBalances(currentUser, y, m, false);
 
     db.config[currentUser].signatures[key] = { 
         signed: true, 
         date: new Date().toISOString(),
-        frozenSaldo: balances.totalSaldo // Saldo wird eingefroren
+        frozenSaldo: balances.totalSaldo 
     };
     await save(); renderLogs();
 }
@@ -2118,7 +2129,6 @@ async function adminAddUser() {
     }
 }
 
-// Kugelsicheres Löschen
 async function adminDeleteUser(name) {
     if(loggedInUser !== "Admin") return;
     if(name === "Admin") return alert("Der Administrator kann nicht gelöscht werden."); 
@@ -2293,6 +2303,11 @@ function exportExcel() {
         const log = (db.logs[currentUser]||{})[ds] || {};
         const target = getTargetHours(new Date(y,m,i), currentUser);
         let ist = 0, pStr = "-"; let dispOut = log.out || log.type || "";
+        
+        // EXCEL FIX: Frei statt Urlaub bei 0 Soll
+        if (target === 0 && (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'ZA')) {
+            dispOut = "Frei";
+        }
         
         if(log.in && log.out) { 
             let calcIn = log.in;
