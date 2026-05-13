@@ -1123,7 +1123,7 @@ function safeFloat(val) {
 // ==========================================
 // *** BERECHNUNGS-KERN ***
 // ==========================================
-function calculateBalances(userName, targetYear, targetMonth, todayOnly = false, endDateOverride = null) {
+function calculateBalances(userName, targetYear, targetMonth, todayOnly = false) {
     if(userName === 'Admin') return { totalSaldo: 0, restVacation: 0, monthVacation: 0 };
     const admin = db.admin[userName] || {startBalance:0, startDate:"2024-01-01", yearlyVacation:25, startVacation: 0};
     const logs = db.logs[userName] || {};
@@ -1131,13 +1131,10 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false,
     let usedVacYear = 0, usedVacMonth = 0;
     let iter = new Date(admin.startDate); if(isNaN(iter.getTime())) iter = new Date(targetYear, 0, 1);
     
-    let endIter;
-    if(endDateOverride) {
-        endIter = new Date(endDateOverride);
-    } else {
-        endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
-    }
-    
+    let endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
+    // FIX: Die Uhrzeit auf die letzte Millisekunde des Tages setzen, um Sommerzeit-Fehler zu vermeiden!
+    endIter.setHours(23, 59, 59, 999);
+
     const signatures = db.config[userName]?.signatures || {};
     const signedKeys = Object.keys(signatures).filter(k => signatures[k].signed && signatures[k].frozenSaldo !== undefined);
     let latestSignedKey = null;
@@ -1161,7 +1158,7 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false,
         totalSaldo = safeFloat(signatures[latestSignedKey].frozenSaldo);
         saldoIter = new Date(ly, lm + 1, 1); 
     }
-
+    
     while (iter <= endIter) {
         const dStr = toLocalISO(iter); const log = logs[dStr] || {};
         const target = getTargetHours(iter, userName);
@@ -1171,7 +1168,6 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false,
         
         if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
             ist = target; 
-            // ACHTUNG: Urlaub wird nur dann als genommener Urlaubstag gezählt, wenn target > 0 ist!
             if ((log.type === 'Urlaub' || log.type === 'Betriebsurlaub') && iter.getFullYear() === targetYear && target > 0) { 
                 usedVacYear++; 
                 if (iter.getMonth() === targetMonth) usedVacMonth++; 
@@ -1179,7 +1175,11 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false,
         } else if (log.type === 'ZA') { ist = 0; }
         else if (log.type === 'Feiertag') { ist = 0; }
         else if (log.type === 'Sonstiges') { ist = log.value !== undefined ? safeFloat(log.value) : target; }
-        else if (log.in && log.out) {
+        else if (log.type === 'Schulung') {
+            if(log.in && log.out) { } else { ist = 0; }
+        }
+
+        if (log.in && log.out) {
             if (target === 0) { ist = 0; } 
             let calcIn = log.in;
             let rawDiff = (new Date(`${dStr}T${log.out}`) - new Date(`${dStr}T${calcIn}`)) / 3600000;
@@ -1204,8 +1204,9 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false,
         if(isWE) ist = 0;
 
         if (iter >= saldoIter) {
-            totalSaldo += (ist - target); 
+            totalSaldo += (ist - target);
         }
+        
         iter.setDate(iter.getDate() + 1);
     }
     return { totalSaldo: safeFloat(totalSaldo), restVacation: (safeFloat(admin.startVacation) + parseInt(admin.yearlyVacation)) - usedVacYear, monthVacation: usedVacMonth };
