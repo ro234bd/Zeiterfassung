@@ -9,22 +9,31 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <script>
-        // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN
-        const CURRENT_APP_VERSION = "4.21"; 
+        // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
+        const CURRENT_APP_VERSION = "4.22"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
-            console.log("Neue Version erkannt! Cache wird geleert...");
+            console.log("Neue Version erkannt! Cache wird radikal geleert...");
             localStorage.setItem("ze_system_version", CURRENT_APP_VERSION);
             
+            // 1. Service Worker unregistrieren
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.getRegistrations().then(function(registrations) {
                     for(let registration of registrations) { 
                         registration.unregister(); 
                     }
                 });
+                
+                // 2. ALLE Cache-Storages aktiv löschen (Hard-Reset)
+                caches.keys().then(function(names) {
+                    for (let name of names) {
+                        caches.delete(name);
+                    }
+                });
             }
             
+            // 3. Seite mit neuem Timestamp zwingend neu laden
             if (window.location.search.indexOf('v=' + CURRENT_APP_VERSION) === -1) {
                 window.location.href = window.location.pathname + '?v=' + CURRENT_APP_VERSION + '&ts=' + Date.now();
             }
