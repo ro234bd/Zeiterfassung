@@ -1120,7 +1120,10 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
     let totalSaldo = safeFloat(admin.startBalance); 
     let usedVacYear = 0, usedVacMonth = 0;
     let iter = new Date(admin.startDate); if(isNaN(iter.getTime())) iter = new Date(targetYear, 0, 1);
+    
     let endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
+    // FIX: Die Uhrzeit auf die letzte Millisekunde des Tages setzen, um Sommerzeit-Fehler zu vermeiden!
+    endIter.setHours(23, 59, 59, 999);
 
     const signatures = db.config[userName]?.signatures || {};
     const signedKeys = Object.keys(signatures).filter(k => signatures[k].signed && signatures[k].frozenSaldo !== undefined);
