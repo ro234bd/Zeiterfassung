@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.21"; 
+        const CURRENT_APP_VERSION = "4.23"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -1242,10 +1242,16 @@ function renderLogs() {
 
         if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
             ist = target; 
-            if(target === 0) dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type;
-            else dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type; 
+            if (target === 0 && (log.type === 'Urlaub' || log.type === 'Betriebsurlaub')) {
+                dispOut = "Frei";
+            } else {
+                dispOut = log.type === 'Betriebsurlaub' ? 'Urlaub' : log.type; 
+            }
         }
-        else if (log.type === 'ZA') { ist = 0; dispOut = "ZA"; }
+        else if (log.type === 'ZA') { 
+            ist = 0; 
+            dispOut = target === 0 ? "Frei" : "ZA"; 
+        }
         else if (log.type === 'Feiertag') { ist = 0; dispOut = "Feiertag"; }
         else if (log.type === 'Sonstiges') { 
             ist = log.value !== undefined ? safeFloat(log.value) : target;
@@ -1296,11 +1302,16 @@ function renderLogs() {
         mIst += ist; mSoll += target;
         if (i <= maxDaySoll) mSollBisHeute += target;
         
-        if (log.type==='Urlaub' || log.type==='Betriebsurlaub') rowClass = 'row-vacation';
-        else if (log.type==='ZA') rowClass = 'row-za';
-        else if (log.type==='Feiertag') rowClass = 'row-custom-holiday';
-        else if (log.type==='Schulung') rowClass = 'row-schulung';
-        else if (log.type==='Sonstiges') rowClass = 'row-custom';
+        // +++ FARBEN FÜR FREI OVERRIDE +++
+        if (target === 0 && (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'ZA') && !log.in) {
+             rowClass = 'row-free';
+        } else {
+            if (log.type==='Urlaub' || log.type==='Betriebsurlaub') rowClass = 'row-vacation';
+            else if (log.type==='ZA') rowClass = 'row-za';
+            else if (log.type==='Feiertag') rowClass = 'row-custom-holiday';
+            else if (log.type==='Schulung') rowClass = 'row-schulung';
+            else if (log.type==='Sonstiges') rowClass = 'row-custom';
+        }
 
         if (d.getDay() === 6) rowClass = 'row-weekend';
         if (d.getDay() === 0) rowClass = 'row-sunday';
@@ -2257,6 +2268,25 @@ function exportExcel() {
         const target = getTargetHours(new Date(y,m,i), currentUser);
         let ist = 0, pStr = "-"; let dispOut = log.out || log.type || "";
         
+        if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') {
+            ist = target;
+        } else if (log.type === 'Sonstiges') {
+            ist = log.value !== undefined ? safeFloat(log.value) : target;
+        } else if (log.type === 'Schulung') {
+            if(!log.in || !log.out) ist = 0;
+        }
+
+        // +++ FREI LOGIK FÜR EXCEL +++
+        if (target === 0 && (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'ZA') && !log.in) {
+            dispOut = "Frei";
+        } else if (target === 0 && !log.type && !log.in && !log.note && !holidaysDB[ds] && !isWE) {
+            dispOut = "Frei";
+        } else if (log.type === 'Betriebsurlaub') {
+            dispOut = "Urlaub";
+        } else if (log.type === 'Sonstiges' && log.title) {
+            dispOut = log.title;
+        }
+
         if(log.in && log.out) { 
             let calcIn = log.in;
             let rawIst = ((new Date(ds+"T"+log.out)-new Date(ds+"T"+calcIn))/3600000); 
