@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.20"; 
+        const CURRENT_APP_VERSION = "4.21"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -298,7 +298,8 @@
                     <div><h2 class="text-xl font-black uppercase italic" id="billTitle">Zeitnachweis</h2><p class="text-xs theme-text font-bold uppercase tracking-tight" id="verBill"></p></div>
                     <div class="text-right"><p class="text-[9px] font-bold text-slate-300 uppercase">Mitarbeiter:</p><p id="billUser" class="text-lg font-black uppercase italic leading-none mb-1">--</p><p class="text-[9px] font-bold text-slate-300 uppercase">Zeitraum:</p><p id="billPeriod" class="text-xs font-bold text-slate-400 uppercase leading-none">--</p></div>
                 </div>
-                <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
+                <div id="statGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 text-center">
+                    <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Saldo Vor-M.</label><div id="sumPrevMonthSaldo" class="font-black text-slate-500">0:00</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Soll/M</label><div id="sumMonthSoll" class="font-black">0:00</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Ist/M</label><div id="sumMonthIst" class="font-black theme-text">0:00</div></div>
                     <div><label class="text-[9px] font-bold text-slate-300 uppercase block">Diff</label><div id="sumMonthDiff" class="font-black">0:00</div></div>
@@ -990,7 +991,7 @@ async function init() {
         getVisibleUsers().forEach(u => { let o = document.createElement('option'); o.value = u; o.innerText = u; ls.appendChild(o); });
         
         if(db.users.includes("Admin") && !getVisibleUsers().includes("Admin")) {
-             let o = document.createElement('option'); o.value = "Admin"; o.innerText = "Admin"; ls.appendChild(o);
+            let o = document.createElement('option'); o.value = "Admin"; o.innerText = "Admin"; ls.appendChild(o);
         }
         
         const lastUser = localStorage.getItem('ze_last_user');
@@ -1114,14 +1115,21 @@ function safeFloat(val) {
     return parseFloat(val);
 }
 
-function calculateBalances(userName, targetYear, targetMonth, todayOnly = false) {
+// NEUE BALANCES FUNKTION MIT ENDDATUM-ÜBERGABE (für Saldo Vormonat)
+function calculateBalances(userName, targetYear, targetMonth, todayOnly = false, endDateOverride = null) {
     if(userName === 'Admin') return { totalSaldo: 0, restVacation: 0, monthVacation: 0 };
     const admin = db.admin[userName] || {startBalance:0, startDate:"2024-01-01", yearlyVacation:25, startVacation: 0};
     const logs = db.logs[userName] || {};
     let totalSaldo = safeFloat(admin.startBalance); 
     let usedVacYear = 0, usedVacMonth = 0;
     let iter = new Date(admin.startDate); if(isNaN(iter.getTime())) iter = new Date(targetYear, 0, 1);
-    let endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
+    
+    let endIter;
+    if(endDateOverride) {
+        endIter = new Date(endDateOverride);
+    } else {
+        endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
+    }
     
     // --- Saldo Lock (Kettenberechnung) Logik ---
     const signatures = db.config[userName]?.signatures || {};
@@ -1200,7 +1208,13 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
 function renderLogs() {
     const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value);
     const tbody = document.getElementById('logTableBody'); tbody.innerHTML = "";
-    const balancesForMonth = calculateBalances(currentUser, y, m, false), balancesToday = calculateBalances(currentUser, getNow().getFullYear(), getNow().getMonth(), true);
+    
+    // Saldo Vormonat berechnen (Bis zum letzten Tag des Vormonats)
+    const prevMonthLastDay = new Date(y, m, 0); 
+    const balancesPrev = calculateBalances(currentUser, prevMonthLastDay.getFullYear(), prevMonthLastDay.getMonth(), false, prevMonthLastDay);
+    
+    const balancesForMonth = calculateBalances(currentUser, y, m, false);
+    const balancesToday = calculateBalances(currentUser, getNow().getFullYear(), getNow().getMonth(), true);
     
     // Admin-Planungs Fix
     if(currentUser === 'Admin') {
@@ -1317,6 +1331,8 @@ function renderLogs() {
     }
     
     if(currentUser !== 'Admin') {
+        // UI Updates
+        document.getElementById('sumPrevMonthSaldo').innerText = formatHM(balancesPrev.totalSaldo);
         document.getElementById('sumMonthIst').innerText = formatHM(mIst);
         document.getElementById('sumMonthSoll').innerText = formatHM(mSoll);
         
