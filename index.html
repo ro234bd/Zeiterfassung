@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.23"; 
+        const CURRENT_APP_VERSION = "4.24"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -438,7 +438,6 @@
                 </div>
             </div>
 
-            <!-- NEW DEV & RELEASE NOTES CARD -->
             <div class="bg-slate-700 p-4 rounded-xl border border-slate-600 mb-6">
                 <h3 class="font-bold uppercase text-slate-300 border-b border-slate-600 pb-2 mb-4">📢 Release-Notes & 📬 DEV-Inbox</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -644,6 +643,14 @@ function getTargetHours(dateObj, uName) {
     if (dayIdx === 0 || dayIdx === 6) return 0; 
     
     const dStr = toLocalISO(dateObj);
+
+    // +++ NEU: PRÜFUNG AUF AUSTRITTSDATUM +++
+    if (db.admin[uName] && db.admin[uName].endDate) {
+        if (dStr > db.admin[uName].endDate) {
+            return 0; // Nach Austrittsdatum = 0 Sollstunden
+        }
+    }
+
     if (holidaysDB[dStr]) return 0; 
     const log = (db.logs[uName] || {})[dStr];
     if (log && log.type === 'Feiertag') return 0;
@@ -695,7 +702,13 @@ function renderTeamSchedule() {
             if(db.config[u].schedules[i].validFrom <= todayStr) applicable = db.config[u].schedules[i];
         }
 
-        let rowHtml = `<td class="p-2 font-black theme-text border-b">${u}</td>`;
+        // Falls Mitarbeiter ausgetreten ist
+        let austrittInfo = "";
+        if (db.admin[u] && db.admin[u].endDate && db.admin[u].endDate < todayStr) {
+            austrittInfo = `<br><span class="text-[9px] text-red-500 italic">Ausgetreten am ${formatDateShort(db.admin[u].endDate)}</span>`;
+        }
+
+        let rowHtml = `<td class="p-2 font-black theme-text border-b">${u}${austrittInfo}</td>`;
         days.forEach(d => {
             const cfg = applicable.days[d] || {blocks: [], weekMode: "ALL"};
             let sumT = 0;
@@ -977,7 +990,7 @@ async function init() {
         if(!db.settings) db.settings = {}; 
         
         db.users.forEach(u => {
-            if (!db.admin[u]) db.admin[u] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
+            if (!db.admin[u]) db.admin[u] = { startBalance: 0, startDate: "2024-01-01", endDate: "", yearlyVacation: 25, startVacation: 0 };
             if(!db.passwords[u]) { db.passwords[u] = (u === "Admin") ? "Admin" : "1234"; }
             migrateUserConfig(u); 
         });
@@ -1115,7 +1128,7 @@ function safeFloat(val) {
 
 function calculateBalances(userName, targetYear, targetMonth, todayOnly = false) {
     if(userName === 'Admin') return { totalSaldo: 0, restVacation: 0, monthVacation: 0 };
-    const admin = db.admin[userName] || {startBalance:0, startDate:"2024-01-01", yearlyVacation:25, startVacation: 0};
+    const admin = db.admin[userName] || {startBalance:0, startDate:"2024-01-01", endDate:"", yearlyVacation:25, startVacation: 0};
     const logs = db.logs[userName] || {};
     let totalSaldo = safeFloat(admin.startBalance); 
     let usedVacYear = 0, usedVacMonth = 0;
@@ -1158,6 +1171,7 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
         
         if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
             ist = target; 
+            // Urlaub wird nur abgezogen, wenn auch tatsächlich Sollstunden da gewesen wären!
             if ((log.type === 'Urlaub' || log.type === 'Betriebsurlaub') && iter.getFullYear() === targetYear && target > 0) { 
                 usedVacYear++; 
                 if (iter.getMonth() === targetMonth) usedVacMonth++; 
@@ -1473,6 +1487,12 @@ function generateMonthNode(y, m, mini = false) {
 
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
+                    
+                    // Bei Teamansicht Austrittsdatum berücksichtigen:
+                    if (db.admin[u] && db.admin[u].endDate && dStr > db.admin[u].endDate) {
+                        return; // Mitarbeiter nach Austritt nicht anzeigen
+                    }
+                    
                     const uLog = (db.logs[u]||{})[dStr] || {};
                     const target = getTargetHours(d, u);
                     if(uLog.type) {
@@ -1574,6 +1594,12 @@ function renderCalendar() {
 
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
+                    
+                    // Bei Teamansicht Austrittsdatum berücksichtigen:
+                    if (db.admin[u] && db.admin[u].endDate && dStr > db.admin[u].endDate) {
+                        return; // Mitarbeiter nach Austritt nicht anzeigen
+                    }
+                    
                     const uLog = (db.logs[u]||{})[dStr] || {};
                     const target = getTargetHours(d, u);
                     if(uLog.type) { 
@@ -2068,7 +2094,7 @@ async function adminAddUser() {
         db.config[name] = { schedules: [{validFrom: '2024-01-01', days: {}}] };
         for(let d=1; d<=5; d++) db.config[name].schedules[0].days[d] = { weekMode: "ALL", blocks: [{start: "08:00", end: "12:00"}] };
         
-        db.admin[name] = { startBalance: 0, startDate: "2024-01-01", yearlyVacation: 25, startVacation: 0 };
+        db.admin[name] = { startBalance: 0, startDate: "2024-01-01", endDate: "", yearlyVacation: 25, startVacation: 0 };
         db.passwords[name] = "1234";
         
         db.logs[name] = {};
@@ -2165,7 +2191,7 @@ function renderAdminConfigs() {
     const selectedEditUser = currentUser; if(!selectedEditUser) return;
     const cont = document.getElementById('adminUserConfig'); cont.innerHTML = "";
     const idx = db.users.indexOf(selectedEditUser); 
-    const a = db.admin[selectedEditUser] || {startDate: "2024-01-01", startBalance:0, yearlyVacation:25, startVacation: 0};
+    const a = db.admin[selectedEditUser] || {startDate: "2024-01-01", endDate: "", startBalance:0, yearlyVacation:25, startVacation: 0};
     let deleteBtnHtml = "";
     if(selectedEditUser === 'Admin') { deleteBtnHtml = `<span class="text-xs font-bold text-slate-400 bg-slate-200 px-2 py-1 rounded">🔒 System-Admin</span>`; } 
     else { deleteBtnHtml = `<button onclick="adminDeleteUser('${selectedEditUser}')" class="bg-red-100 hover:bg-red-200 text-red-600 border border-red-200 rounded px-2 py-1 text-[10px] font-bold uppercase whitespace-nowrap h-8">🗑️ User Löschen</button>`; }
@@ -2175,10 +2201,30 @@ function renderAdminConfigs() {
             <div class="w-full mr-2">${testModeActive ? `<label class="text-[9px] font-bold text-slate-400 uppercase">Name bearbeiten:</label><input type="text" id="nameEdit_SINGLE" value="${selectedEditUser}" class="w-full p-1 border rounded font-black theme-text uppercase text-xs italic">` : `<p class="font-black theme-text text-xs uppercase italic">${selectedEditUser}</p>`}</div>
             ${deleteBtnHtml}
         </div>
-        <div class="grid grid-cols-2 gap-2 text-[8px] font-bold text-slate-400 uppercase mb-1"><span>Start-Datum</span><span>Zeitsaldo Alt (h)</span></div>
-        <div class="grid grid-cols-2 gap-2 mb-2"><input type="date" id="admDate_SINGLE" value="${a.startDate}" class="p-2 border rounded text-xs font-bold"><input type="number" step="0.01" id="admBal_SINGLE" value="${a.startBalance}" class="p-2 border rounded text-xs font-bold"></div>
-        <div class="grid grid-cols-2 gap-2 text-[8px] font-bold text-slate-400 uppercase mb-1"><span>Urlaub Alt (Tage)</span><span>Urlaub / Jahr</span></div>
-        <div class="grid grid-cols-2 gap-2"><input type="number" id="admVacAlt_SINGLE" value="${a.startVacation || 0}" class="p-2 border rounded text-xs font-bold"><input type="number" id="admVacJ_SINGLE" value="${a.yearlyVacation}" class="p-2 border rounded text-xs font-bold"></div>
+        <div class="grid grid-cols-2 gap-2 text-[8px] font-bold text-slate-400 uppercase mb-1">
+            <span>Start-Datum</span>
+            <span class="text-amber-500">End-Datum (Austritt)</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+            <input type="date" id="admDate_SINGLE" value="${a.startDate}" class="p-2 border rounded text-xs font-bold">
+            <input type="date" id="admEndDate_SINGLE" value="${a.endDate || ''}" class="p-2 border border-amber-200 bg-amber-50 rounded text-xs font-bold text-amber-800" title="Wenn ausgefüllt, werden ab diesem Tag keine Sollstunden mehr berechnet.">
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-[8px] font-bold text-slate-400 uppercase mb-1">
+            <span>Zeitsaldo Alt (h)</span>
+            <span>Urlaub Alt (Tage)</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+            <input type="number" step="0.01" id="admBal_SINGLE" value="${a.startBalance}" class="p-2 border rounded text-xs font-bold">
+            <input type="number" id="admVacAlt_SINGLE" value="${a.startVacation || 0}" class="p-2 border rounded text-xs font-bold">
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-[8px] font-bold text-slate-400 uppercase mb-1">
+            <span>Urlaub / Jahr</span>
+            <span></span>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+            <input type="number" id="admVacJ_SINGLE" value="${a.yearlyVacation}" class="p-2 border rounded text-xs font-bold">
+            <div></div>
+        </div>
         <div class="mt-4 pt-4 border-t border-slate-200">
             <div class="text-[8px] font-bold text-slate-400 uppercase">PIN Reset</div>
             <button onclick="db.passwords['${selectedEditUser}']='1234';save();alert('PIN für ${selectedEditUser} auf 1234 gesetzt.');" class="bg-red-100 text-red-500 hover:bg-red-200 px-3 py-2 rounded text-[9px] mt-1 font-bold w-full">PIN auf 1234 zurücksetzen</button>
@@ -2205,7 +2251,13 @@ async function saveAdminConfigs() {
         db.logs[newName] = db.logs[selectedEditUser]; delete db.logs[selectedEditUser];
         db.config[newName] = db.config[selectedEditUser]; delete db.config[selectedEditUser];
         db.passwords[newName] = db.passwords[selectedEditUser]; delete db.passwords[selectedEditUser];
-        db.admin[newName] = { startDate: document.getElementById(`admDate_SINGLE`).value, startBalance: parseFloat(document.getElementById(`admBal_SINGLE`).value) || 0, startVacation: parseFloat(document.getElementById(`admVacAlt_SINGLE`).value) || 0, yearlyVacation: parseInt(document.getElementById(`admVacJ_SINGLE`).value) || 25 };
+        db.admin[newName] = { 
+            startDate: document.getElementById(`admDate_SINGLE`).value, 
+            endDate: document.getElementById(`admEndDate_SINGLE`).value,
+            startBalance: parseFloat(document.getElementById(`admBal_SINGLE`).value) || 0, 
+            startVacation: parseFloat(document.getElementById(`admVacAlt_SINGLE`).value) || 0, 
+            yearlyVacation: parseInt(document.getElementById(`admVacJ_SINGLE`).value) || 25 
+        };
         delete db.admin[selectedEditUser];
         currentUser = newName;
         sessionStorage.setItem(USER_KEY, newName); localStorage.setItem('ze_last_user', newName); 
@@ -2213,7 +2265,13 @@ async function saveAdminConfigs() {
         alert(`Benutzer umbenannt in ${newName}. Seite wird neu geladen.`); 
         window.location.reload(); 
     } else {
-        db.admin[selectedEditUser] = { startDate: document.getElementById(`admDate_SINGLE`).value, startBalance: parseFloat(document.getElementById(`admBal_SINGLE`).value) || 0, startVacation: parseFloat(document.getElementById(`admVacAlt_SINGLE`).value) || 0, yearlyVacation: parseInt(document.getElementById(`admVacJ_SINGLE`).value) || 25 };
+        db.admin[selectedEditUser] = { 
+            startDate: document.getElementById(`admDate_SINGLE`).value, 
+            endDate: document.getElementById(`admEndDate_SINGLE`).value,
+            startBalance: parseFloat(document.getElementById(`admBal_SINGLE`).value) || 0, 
+            startVacation: parseFloat(document.getElementById(`admVacAlt_SINGLE`).value) || 0, 
+            yearlyVacation: parseInt(document.getElementById(`admVacJ_SINGLE`).value) || 25 
+        };
         await save(); alert("Daten gespeichert!"); renderAll();
     }
 }
