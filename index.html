@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.24"; 
+        const CURRENT_APP_VERSION = "4.25"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -914,7 +914,14 @@ function startApp() {
              document.getElementById('suHeaderTools').classList.add('hidden');
         }
         
-        currentUser = db.users[0]; 
+        // NEU: Merke den zuletzt bearbeiteten User
+        let lastEditUser = localStorage.getItem('ze_last_edit_user');
+        if (lastEditUser && db.users.includes(lastEditUser)) {
+            currentUser = lastEditUser;
+        } else {
+            currentUser = db.users.find(u => u !== 'Admin') || db.users[0]; 
+        }
+        
         const cl = document.getElementById('cleanUserSelect'); cl.innerHTML = "<option value='ALL'>ALLE MITARBEITER</option>";
         getVisibleUsers().forEach(u => { if(u!=='Admin') { let o = document.createElement('option'); o.value = u; o.innerText = u; cl.appendChild(o); } });
 
@@ -1668,11 +1675,14 @@ function punch(t) {
     save(); renderAll();
 }
 
+// NEU: Diese Funktion merkt sich jetzt zusätzlich den gewählten User!
 function switchUser() { 
     if(loggedInUser !== "Admin") return; 
     currentUser = document.getElementById('userSelect').value; 
+    localStorage.setItem('ze_last_edit_user', currentUser);
     document.getElementById('displayUserName').innerText = currentUser; document.getElementById('targetName').innerText = currentUser; renderAll(); 
 }
+
 function renderAll() { 
     document.getElementById('displayUserName').innerText = currentUser;
     if(currentUser === 'Admin') {
@@ -2085,6 +2095,7 @@ async function deleteMessage(index) {
     if(isSuperuser) renderSystemMessages();
 }
 
+// NEU: Merkt sich den Namen des gerade angelegten Mitarbeiters für den Reload
 async function adminAddUser() {
     if(loggedInUser !== "Admin") return;
     const name = prompt("Name des neuen Mitarbeiters:");
@@ -2107,6 +2118,9 @@ async function adminAddUser() {
             }
         }
 
+        // HIER IST DER FIX FÜR DAS DROPDOWN:
+        localStorage.setItem('ze_last_edit_user', name);
+
         const success = await save(); 
         if(success) {
             alert(`Mitarbeiter ${name} angelegt. Betriebsurlaube wurden übernommen.`); 
@@ -2117,6 +2131,7 @@ async function adminAddUser() {
     }
 }
 
+// NEU: Setzt das Dropdown-Gedächtnis bei Löschung zurück
 async function adminDeleteUser(name) {
     if(loggedInUser !== "Admin") return;
     if(name === "Admin") return alert("Der Administrator kann nicht gelöscht werden."); 
@@ -2136,8 +2151,13 @@ async function adminDeleteUser(name) {
         if (localStorage.getItem('ze_last_user') === name) {
             localStorage.setItem('ze_last_user', 'Admin');
         }
+        
+        // HIER IST DER FIX BEIM LÖSCHEN:
+        if (localStorage.getItem('ze_last_edit_user') === name) {
+            localStorage.removeItem('ze_last_edit_user');
+        }
         if (currentUser === name) {
-            currentUser = "Admin";
+            currentUser = db.users.find(u => u !== 'Admin') || "Admin";
         }
 
         const success = await save(); 
@@ -2242,6 +2262,7 @@ function renderAdminConfigs() {
     } else { inbox.innerHTML = `<p class="text-xs text-slate-400 text-center italic">Keine neuen Nachrichten.</p>`; }
 }
 
+// NEU: Setzt das Dropdown-Gedächtnis bei Namensänderung um
 async function saveAdminConfigs() {
     const selectedEditUser = currentUser; if(!selectedEditUser) return;
     let newName = testModeActive ? document.getElementById(`nameEdit_SINGLE`).value.trim() : selectedEditUser;
@@ -2261,6 +2282,10 @@ async function saveAdminConfigs() {
         delete db.admin[selectedEditUser];
         currentUser = newName;
         sessionStorage.setItem(USER_KEY, newName); localStorage.setItem('ze_last_user', newName); 
+        
+        // HIER IST DER FIX FÜR DAS DROPDOWN NACH UMBENENNUNG:
+        localStorage.setItem('ze_last_edit_user', newName);
+        
         await save(); 
         alert(`Benutzer umbenannt in ${newName}. Seite wird neu geladen.`); 
         window.location.reload(); 
