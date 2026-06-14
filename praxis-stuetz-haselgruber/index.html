@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.25"; 
+        const CURRENT_APP_VERSION = "4.27"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -462,6 +462,7 @@
         </div>
     </section>
 </div>
+
 <script>
 // ==========================================
 // *** KUNDEN KONFIGURATION (HIER ÄNDERN) ***
@@ -644,7 +645,6 @@ function getTargetHours(dateObj, uName) {
     
     const dStr = toLocalISO(dateObj);
 
-    // +++ NEU: PRÜFUNG AUF AUSTRITTSDATUM +++
     if (db.admin[uName] && db.admin[uName].endDate) {
         if (dStr > db.admin[uName].endDate) {
             return 0; // Nach Austrittsdatum = 0 Sollstunden
@@ -702,7 +702,6 @@ function renderTeamSchedule() {
             if(db.config[u].schedules[i].validFrom <= todayStr) applicable = db.config[u].schedules[i];
         }
 
-        // Falls Mitarbeiter ausgetreten ist
         let austrittInfo = "";
         if (db.admin[u] && db.admin[u].endDate && db.admin[u].endDate < todayStr) {
             austrittInfo = `<br><span class="text-[9px] text-red-500 italic">Ausgetreten am ${formatDateShort(db.admin[u].endDate)}</span>`;
@@ -783,8 +782,9 @@ async function saveSystemSettings() {
     
     const success = await save();
     if(success) {
-        alert("Einstellungen gespeichert. App wird neu geladen.");
-        window.location.reload();
+        alert("Einstellungen gespeichert.");
+        applyTheme();
+        renderAll();
     } else {
         alert("Fehler: Einstellungen konnten nicht in die Cloud gespeichert werden!");
     }
@@ -858,7 +858,7 @@ function performLogin() {
 
 function renderSystemMessages() {
     const box = document.getElementById('sysInbox');
-    if (!box) return; // Sicherstellen, dass das Element existiert
+    if (!box) return; 
     box.innerHTML = "";
     if(db.messages && db.messages.length > 0) {
         db.messages.forEach((msg, idx) => {
@@ -914,7 +914,6 @@ function startApp() {
              document.getElementById('suHeaderTools').classList.add('hidden');
         }
         
-        // NEU: Merke den zuletzt bearbeiteten User
         let lastEditUser = localStorage.getItem('ze_last_edit_user');
         if (lastEditUser && db.users.includes(lastEditUser)) {
             currentUser = lastEditUser;
@@ -1048,30 +1047,44 @@ async function init() {
 async function syncFromCloud() {
     const statusDiv = document.getElementById('syncStatus');
     const loginSync = document.getElementById('loginSyncStatus');
-    const targetUrl = CLOUD_URL;
 
     try {
-        const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 5000); 
-        const cleanUrl = targetUrl + "?noCache=" + new Date().getTime();
+        const controller = new AbortController(); 
+        const timeoutId = setTimeout(() => controller.abort(), 5000); 
+        const cleanUrl = CLOUD_URL + "?noCache=" + Date.now();
         const r = await fetch(cleanUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
         
         if(r.ok) {
             const cloudDb = await r.json();
+            
             if(cloudDb && cloudDb.users && Array.isArray(cloudDb.users)) {
+                
+                // 1. Schutz: Leere Cloud abwehren
+                if (cloudDb.users.length === 0) {
+                    console.warn("Cloud ist leer! Behalte lokale Daten.");
+                    return;
+                }
+
+                // 2. Schutz: Veraltete Cloud abwehren (DIE FIREWALL)
+                let localTime = db.lastUpdated || 0;
+                let cloudTime = cloudDb.lastUpdated || 0;
+
+                if (localTime > cloudTime) {
+                    console.warn("Lokale Daten sind neuer! Verhindere das Überschreiben.");
+                    if(statusDiv) { statusDiv.innerText = "● Lokal aktueller (Warte auf Upload)"; statusDiv.className = "text-[10px] font-bold text-amber-500 uppercase"; }
+                    // Wir pushen die neueren lokalen Daten jetzt hart in die Cloud
+                    save(); 
+                    return; 
+                }
+
+                // Nur wenn die Cloud WIRKLICH aktueller ist, übernehmen wir
                 db = cloudDb;
                 if(!db.settings) db.settings = {}; 
-                
-                if (isSuperuser && document.getElementById('sysReleaseNotes')) {
-                    if (document.activeElement !== document.getElementById('sysReleaseNotes')) {
-                        document.getElementById('sysReleaseNotes').value = db.settings.releaseNotes || "";
-                    }
-                }
-                
                 db.users.forEach(u => migrateUserConfig(u)); 
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
-                statusDiv.innerText = "● Daten geladen"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
-                if(loginSync) { loginSync.innerText = "● Online (Daten da!)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
+                
+                if(statusDiv) { statusDiv.innerText = "● Daten geladen"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; }
                 
                 if(loggedInUser) {
                      renderUserSelect();
@@ -1082,18 +1095,13 @@ async function syncFromCloud() {
                      if(db.users.includes("Admin") && !getVisibleUsers().includes("Admin")) {
                         let o = document.createElement('option'); o.value = "Admin"; o.innerText = "Admin"; ls.appendChild(o);
                     }
-                    const lastUser = localStorage.getItem('ze_last_user');
-                    if(lastUser && db.users.includes(lastUser)) {
-                        ls.value = lastUser;
-                    }
                 }
                 applyTheme(); 
             } 
         }
     } catch(e) { 
-        console.log("Offline Modus aktiv");
-        statusDiv.innerText = "● Nur lokal (Offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase";
-        if(loginSync) { loginSync.innerText = "● Offline (Nur lokal)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
+        console.log("Cloud beim Laden nicht erreichbar", e);
+        if(statusDiv) { statusDiv.innerText = "● Nur lokal (Offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
     }
 }
 
@@ -1142,7 +1150,6 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
     let iter = new Date(admin.startDate); if(isNaN(iter.getTime())) iter = new Date(targetYear, 0, 1);
     
     let endIter = todayOnly ? getNow() : new Date(targetYear, targetMonth + 1, 0);
-    // FIX: Die Uhrzeit auf die letzte Millisekunde des Tages setzen, um Sommerzeit-Fehler zu vermeiden!
     endIter.setHours(23, 59, 59, 999);
 
     const signatures = db.config[userName]?.signatures || {};
@@ -1178,7 +1185,6 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
         
         if (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'Krank') { 
             ist = target; 
-            // Urlaub wird nur abgezogen, wenn auch tatsächlich Sollstunden da gewesen wären!
             if ((log.type === 'Urlaub' || log.type === 'Betriebsurlaub') && iter.getFullYear() === targetYear && target > 0) { 
                 usedVacYear++; 
                 if (iter.getMonth() === targetMonth) usedVacMonth++; 
@@ -1235,9 +1241,9 @@ function renderLogs() {
     const todayDate = getNow();
     let maxDaySoll = new Date(y, m + 1, 0).getDate();
     if (todayDate.getFullYear() === y && todayDate.getMonth() === m) {
-        maxDaySoll = todayDate.getDate(); // Wenn aktueller Monat, dann nur bis heute zählen
+        maxDaySoll = todayDate.getDate(); 
     } else if (new Date(y, m, 1) > todayDate) {
-        maxDaySoll = 0; // Wenn Zukunftsmonat, dann ist das Soll bis heute 0
+        maxDaySoll = 0; 
     }
     
     if(currentUser === 'Admin') {
@@ -1326,7 +1332,6 @@ function renderLogs() {
         mIst += ist; mSoll += target;
         if (i <= maxDaySoll) mSollBisHeute += target;
         
-        // +++ FARBEN FÜR FREI OVERRIDE +++
         if (target === 0 && (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'ZA') && !log.in) {
              rowClass = 'row-free';
         } else {
@@ -1429,36 +1434,36 @@ async function forceSave() {
     }, 2000);
 }
 
+// +++ NEU: TIMESTAMP CACHE-SCHUTZ +++
 async function save() {
+    // Zeitstempel setzen, damit wir wissen, wie neu diese Daten sind
+    db.lastUpdated = Date.now();
     localStorage.setItem(DB_KEY, JSON.stringify(db));
+    
     const statusDiv = document.getElementById('syncStatus');
     const loginSync = document.getElementById('loginSyncStatus');
-    const targetUrl = CLOUD_URL;
-
-    const payload = {
-        sender: currentUser,
-        db: db
-    };
 
     try {
-        const response = await fetch(targetUrl, { 
-            method: 'POST', 
-            body: JSON.stringify(payload) 
+        const response = await fetch(CLOUD_URL, { 
+            method: 'POST',
+            // WICHTIG: text/plain zwingt den Browser, die Anfrage nicht wegen CORS zu blockieren!
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ sender: currentUser, db: db }) 
         });
         
         const result = await response.json();
 
         if (result.status === "success") {
-            statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase";
+            if(statusDiv) { statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; }
             if(loginSync) { loginSync.innerText = "● Online (Verbunden)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
             return true;
         } else {
-            throw new Error(result.message);
+            throw new Error(result.message || "Unbekannter Cloud-Fehler");
         }
     } catch(e) { 
-        console.error("Cloud-Sync Fehler:", e);
-        statusDiv.innerText = "● Nur lokal (Offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; 
-        if(loginSync) { loginSync.innerText = "● Offline (Nur lokal)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
+        console.error("Cloud-Sync blockiert oder fehlgeschlagen:", e);
+        if(statusDiv) { statusDiv.innerText = "● Nur lokal gespeichert"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
+        if(loginSync) { loginSync.innerText = "● Lokal gespeichert (Cloud offline)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
         return false;
     }
 }
@@ -1495,9 +1500,8 @@ function generateMonthNode(y, m, mini = false) {
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
                     
-                    // Bei Teamansicht Austrittsdatum berücksichtigen:
                     if (db.admin[u] && db.admin[u].endDate && dStr > db.admin[u].endDate) {
-                        return; // Mitarbeiter nach Austritt nicht anzeigen
+                        return; 
                     }
                     
                     const uLog = (db.logs[u]||{})[dStr] || {};
@@ -1602,9 +1606,8 @@ function renderCalendar() {
                 getVisibleUsers().forEach(u => {
                     if (u === "Admin") return;
                     
-                    // Bei Teamansicht Austrittsdatum berücksichtigen:
                     if (db.admin[u] && db.admin[u].endDate && dStr > db.admin[u].endDate) {
-                        return; // Mitarbeiter nach Austritt nicht anzeigen
+                        return; 
                     }
                     
                     const uLog = (db.logs[u]||{})[dStr] || {};
@@ -1675,7 +1678,6 @@ function punch(t) {
     save(); renderAll();
 }
 
-// NEU: Diese Funktion merkt sich jetzt zusätzlich den gewählten User!
 function switchUser() { 
     if(loggedInUser !== "Admin") return; 
     currentUser = document.getElementById('userSelect').value; 
@@ -2024,14 +2026,13 @@ async function performSignature(key) {
     if(!db.config[currentUser]) db.config[currentUser] = {}; 
     if(!db.config[currentUser].signatures) db.config[currentUser].signatures = {};
     
-    // Berechne den Saldo genau bis zu diesem Monat
     const [y, m] = key.split('-').map(Number);
     const balances = calculateBalances(currentUser, y, m, false);
 
     db.config[currentUser].signatures[key] = { 
         signed: true, 
         date: new Date().toISOString(),
-        frozenSaldo: balances.totalSaldo // Saldo wird eingefroren
+        frozenSaldo: balances.totalSaldo
     };
     await save(); 
     renderLogs();
@@ -2095,7 +2096,6 @@ async function deleteMessage(index) {
     if(isSuperuser) renderSystemMessages();
 }
 
-// NEU: Merkt sich den Namen des gerade angelegten Mitarbeiters für den Reload
 async function adminAddUser() {
     if(loggedInUser !== "Admin") return;
     const name = prompt("Name des neuen Mitarbeiters:");
@@ -2118,20 +2118,20 @@ async function adminAddUser() {
             }
         }
 
-        // HIER IST DER FIX FÜR DAS DROPDOWN:
         localStorage.setItem('ze_last_edit_user', name);
 
         const success = await save(); 
         if(success) {
             alert(`Mitarbeiter ${name} angelegt. Betriebsurlaube wurden übernommen.`); 
-            window.location.reload();
+            renderUserSelect();
+            document.getElementById('userSelect').value = name;
+            switchUser(); 
         } else {
             alert("Fehler beim Anlegen: Cloud nicht erreichbar.");
         }
     }
 }
 
-// NEU: Setzt das Dropdown-Gedächtnis bei Löschung zurück
 async function adminDeleteUser(name) {
     if(loggedInUser !== "Admin") return;
     if(name === "Admin") return alert("Der Administrator kann nicht gelöscht werden."); 
@@ -2152,7 +2152,6 @@ async function adminDeleteUser(name) {
             localStorage.setItem('ze_last_user', 'Admin');
         }
         
-        // HIER IST DER FIX BEIM LÖSCHEN:
         if (localStorage.getItem('ze_last_edit_user') === name) {
             localStorage.removeItem('ze_last_edit_user');
         }
@@ -2164,11 +2163,13 @@ async function adminDeleteUser(name) {
         
         if (success) {
             alert("Benutzer erfolgreich gelöscht."); 
-            window.location.reload();
+            document.getElementById('appContainer').style.opacity = '1';
+            renderUserSelect();
+            document.getElementById('userSelect').value = currentUser;
+            renderAll(); 
         } else {
             alert("Fehler: Cloud konnte nicht erreicht werden. Der Löschvorgang wurde abgebrochen, damit deine Daten synchron bleiben.");
             document.getElementById('appContainer').style.opacity = '1';
-            window.location.reload(); 
         }
     }
 }
@@ -2262,10 +2263,10 @@ function renderAdminConfigs() {
     } else { inbox.innerHTML = `<p class="text-xs text-slate-400 text-center italic">Keine neuen Nachrichten.</p>`; }
 }
 
-// NEU: Setzt das Dropdown-Gedächtnis bei Namensänderung um
 async function saveAdminConfigs() {
     const selectedEditUser = currentUser; if(!selectedEditUser) return;
     let newName = testModeActive ? document.getElementById(`nameEdit_SINGLE`).value.trim() : selectedEditUser;
+    
     if(newName !== selectedEditUser) {
         const idx = db.users.indexOf(selectedEditUser);
         if(idx !== -1) db.users[idx] = newName;
@@ -2283,12 +2284,13 @@ async function saveAdminConfigs() {
         currentUser = newName;
         sessionStorage.setItem(USER_KEY, newName); localStorage.setItem('ze_last_user', newName); 
         
-        // HIER IST DER FIX FÜR DAS DROPDOWN NACH UMBENENNUNG:
         localStorage.setItem('ze_last_edit_user', newName);
         
         await save(); 
-        alert(`Benutzer umbenannt in ${newName}. Seite wird neu geladen.`); 
-        window.location.reload(); 
+        alert(`Benutzer umbenannt in ${newName}.`); 
+        renderUserSelect();
+        document.getElementById('userSelect').value = newName;
+        switchUser(); 
     } else {
         db.admin[selectedEditUser] = { 
             startDate: document.getElementById(`admDate_SINGLE`).value, 
@@ -2362,7 +2364,6 @@ function exportExcel() {
             if(!log.in || !log.out) ist = 0;
         }
 
-        // +++ FREI LOGIK FÜR EXCEL +++
         if (target === 0 && (log.type === 'Urlaub' || log.type === 'Betriebsurlaub' || log.type === 'ZA') && !log.in) {
             dispOut = "Frei";
         } else if (target === 0 && !log.type && !log.in && !log.note && !holidaysDB[ds] && !isWE) {
