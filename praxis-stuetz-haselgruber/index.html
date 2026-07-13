@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.28"; 
+        const CURRENT_APP_VERSION = "4.29"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -1045,63 +1045,56 @@ async function init() {
 
 async function syncFromCloud() {
     const statusDiv = document.getElementById('syncStatus');
-    const loginSync = document.getElementById('loginSyncStatus');
-
     try {
-        const controller = new AbortController(); 
-        const timeoutId = setTimeout(() => controller.abort(), 5000); 
         const cleanUrl = CLOUD_URL + "?noCache=" + Date.now();
-        const r = await fetch(cleanUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        
+        const r = await fetch(cleanUrl);
         if(r.ok) {
-            const cloudDb = await r.json();
+            let cloudData = await r.json();
             
-            if(cloudDb && cloudDb.users && Array.isArray(cloudDb.users)) {
-                
-                // 1. Schutz: Leere Cloud abwehren
-                if (cloudDb.users.length === 0) {
-                    console.warn("Cloud ist leer! Behalte lokale Daten.");
-                    return;
-                }
+            // HIER PACKEN WIR DEN UMSCHLAG AUS:
+            let actualDb = cloudData;
+            if (cloudData.db && cloudData.sender) {
+                console.log("Briefumschlag entdeckt, packe Daten aus...");
+                actualDb = cloudData.db;
+            }
 
-                // 2. Schutz: Veraltete Cloud abwehren (DIE FIREWALL)
+            if(actualDb && actualDb.users) {
                 let localTime = db.lastUpdated || 0;
-                let cloudTime = cloudDb.lastUpdated || 0;
+                let cloudTime = actualDb.lastUpdated || 0;
 
                 if (localTime > cloudTime) {
-                    console.warn("Lokale Daten sind neuer! Verhindere das Überschreiben.");
-                    if(statusDiv) { statusDiv.innerText = "● Lokal aktueller (Warte auf Upload)"; statusDiv.className = "text-[10px] font-bold text-amber-500 uppercase"; }
-                    // Wir pushen die neueren lokalen Daten jetzt hart in die Cloud
-                    save(); 
+                    save(); // Lokal ist neuer, direkt pushen
                     return; 
                 }
 
-                // Nur wenn die Cloud WIRKLICH aktueller ist, übernehmen wir
-                db = cloudDb;
+                db = actualDb;
                 if(!db.settings) db.settings = {}; 
-                db.users.forEach(u => migrateUserConfig(u)); 
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
                 
-                if(statusDiv) { statusDiv.innerText = "● Daten geladen"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; }
-                
-                if(loggedInUser) {
-                     renderUserSelect();
-                     renderAll();
-                } else {
-                     const ls = document.getElementById('loginUserSelect'); ls.innerHTML = "";
-                     getVisibleUsers().forEach(u => { let o = document.createElement('option'); o.value = u; o.innerText = u; ls.appendChild(o); });
-                     if(db.users.includes("Admin") && !getVisibleUsers().includes("Admin")) {
-                        let o = document.createElement('option'); o.value = "Admin"; o.innerText = "Admin"; ls.appendChild(o);
-                    }
-                }
-                applyTheme(); 
+                if(statusDiv) { statusDiv.innerText = "● Sync erfolgreich"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; }
+                renderAll();
             } 
         }
     } catch(e) { 
-        console.log("Cloud beim Laden nicht erreichbar", e);
-        if(statusDiv) { statusDiv.innerText = "● Nur lokal (Offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
+        console.log("Cloud offline", e);
+        if(statusDiv) { statusDiv.innerText = "● Offline-Modus"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
     }
+}
+
+async function save() {
+    db.lastUpdated = Date.now();
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+    
+    try {
+        await fetch(CLOUD_URL, { 
+            method: 'POST',
+            mode: 'no-cors', 
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: "save", sender: currentUser || "User", db: db }) 
+        });
+        document.getElementById('syncStatus').innerText = "● Gespeichert!";
+        return true;
+    } catch(e) { return false; }
 }
 
 async function fetchHolidays() {
