@@ -17,13 +17,6 @@
             console.log("Neue Version erkannt! Cache wird geleert...");
             localStorage.setItem("ze_system_version", CURRENT_APP_VERSION);
             
- // Service Worker RADIKAL DEAKTIVIEREN, um falsches Offline-Caching zu stoppen
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) { 
-            registration.unregister(); 
-          }
-        });          
             if (window.location.search.indexOf('v=' + CURRENT_APP_VERSION) === -1) {
                 window.location.href = window.location.pathname + '?v=' + CURRENT_APP_VERSION + '&ts=' + Date.now();
             }
@@ -35,8 +28,13 @@
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2972/2972531.png">
     
     <script>
+      // Service Worker RADIKAL DEAKTIVIEREN, um falsches Offline-Caching zu stoppen
       if ('serviceWorker' in navigator) {
-        try { navigator.serviceWorker.register('./sw.js').catch(console.log); } catch(e) {}
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) { 
+            registration.unregister(); 
+          }
+        });
       }
     </script>
 
