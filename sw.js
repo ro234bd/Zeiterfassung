@@ -1,12 +1,11 @@
-// sw.js - Völlig neutralisiert und alter Cache wird gelöscht
+// sw.js - Völlig neutralisiert. Lässt alle Cloud-Speicherungen durch.
 
 self.addEventListener('install', (e) => {
-  // Zwingt den Browser, diese neue (leere) Version sofort zu aktivieren
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
-  // Löscht alle alten Offline-Speicher (Caches), die Probleme machen
+  // Löscht alle alten Caches, die Probleme machen
   e.waitUntil(
     caches.keys().then((keyList) => {
       return Promise.all(keyList.map((key) => caches.delete(key)));
@@ -16,7 +15,6 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  // Der Türsteher macht Feierabend: 
-  // Alle Anfragen (Speichern, Laden) gehen direkt und unbearbeitet ans echte Internet
+  // Ignoriert alle Anfragen und lässt sie direkt ans Internet durch
   return;
 });
