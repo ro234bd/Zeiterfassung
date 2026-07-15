@@ -10,21 +10,20 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.31"; 
+        const CURRENT_APP_VERSION = "4.32"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
             console.log("Neue Version erkannt! Cache wird geleert...");
             localStorage.setItem("ze_system_version", CURRENT_APP_VERSION);
             
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                    for(let registration of registrations) { 
-                        registration.unregister(); 
-                    }
-                });
-            }
-            
+ // Service Worker RADIKAL DEAKTIVIEREN, um falsches Offline-Caching zu stoppen
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) { 
+            registration.unregister(); 
+          }
+        });          
             if (window.location.search.indexOf('v=' + CURRENT_APP_VERSION) === -1) {
                 window.location.href = window.location.pathname + '?v=' + CURRENT_APP_VERSION + '&ts=' + Date.now();
             }
