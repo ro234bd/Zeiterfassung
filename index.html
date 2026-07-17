@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.32"; 
+        const CURRENT_APP_VERSION = "4.33"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -1078,19 +1078,17 @@ async function save() {
     const loginSync = document.getElementById('loginSyncStatus');
 
     try {
-        // FIX 1: Der Admin gibt sich in der Cloud IMMER als Admin zu erkennen, 
-        // auch wenn er gerade die Liste von Mitarbeiter "Müller" bearbeitet.
+        // FIX 1: Admin-Identität sichern
         const actualSender = (loggedInUser === "Admin") ? "Admin" : currentUser;
 
-        // FIX 2: mode: 'no-cors' ist WEG! Der Browser darf und muss jetzt 
-        // auf die Antwort des Servers warten.
+        // FIX 2: KEIN 'no-cors'! Die App MUSS auf Google warten.
         const response = await fetch(CLOUD_URL, { 
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: "save", sender: actualSender, db: db }) 
         });
         
-        // FIX 3: Wir lesen die Antwort. Wenn Google einen Fehler wirft, fangen wir ihn ab.
+        // FIX 3: Die echte Antwort von Google auslesen
         const result = await response.json();
         
         if (result.status === "success") {
@@ -1102,7 +1100,7 @@ async function save() {
         }
     } catch(e) { 
         console.error("Cloud-Sync fehlgeschlagen:", e);
-        if(statusDiv) { statusDiv.innerText = "● Nur lokal gespeichert"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
+        if(statusDiv) { statusDiv.innerText = "● Nur lokal gespeichert (Cloud offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
         if(loginSync) { loginSync.innerText = "● Lokal gespeichert (Cloud offline)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
         return false;
     }
