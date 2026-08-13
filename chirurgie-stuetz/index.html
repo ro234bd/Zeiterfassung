@@ -9,8 +9,8 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <script>
-        // VERSION 4.33 - Funktionsupdate Chirurgie
-        const CURRENT_APP_VERSION = "4.33"; 
+        // VERSION 4.34 - Funktionsupdate Chirurgie
+        const CURRENT_APP_VERSION = "4.34"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -131,7 +131,8 @@
         <h2 class="text-2xl font-black italic uppercase mb-2 text-slate-800 text-center" id="loginTitleMain">Login</h2>
         <div class="text-center mb-4">
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest" id="loginTitleSub">Zeiterfassung</p>
-            <span id="verLogin" class="text-[9px] font-bold text-blue-50 bg-blue-50 px-2 py-0.5 rounded-full"></span>
+            <!-- HIER WURDE DER FARB-BUG BEHOBEN: text-blue-600 statt text-blue-50 -->
+            <span id="verLogin" class="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full"></span>
         </div>
         
         <div id="loginSyncStatus" class="text-[10px] font-bold text-slate-400 uppercase text-center mb-6">● Bereit zum Start</div>
@@ -1041,6 +1042,9 @@ async function init() {
     }
 }
 
+// ----------------------------------------------------
+// NEUE SYNC-FUNKTION (Kollisionsschutz)
+// ----------------------------------------------------
 async function syncFromCloud() {
     const statusDiv = document.getElementById('syncStatus');
     try {
@@ -1050,8 +1054,21 @@ async function syncFromCloud() {
         const remoteDb = await response.json();
         
         if (remoteDb && remoteDb.users) {
-            db = remoteDb;
-            localStorage.setItem(DB_KEY, JSON.stringify(db));
+            // Lokale Daten abrufen zum Abgleich
+            const localDbText = localStorage.getItem(DB_KEY);
+            const localDb = localDbText ? JSON.parse(localDbText) : {};
+            
+            // NEU: Zeitstempel abgleichen! Verhindert das Überschreiben durch veraltete Cloud-Daten
+            if (localDb.lastUpdated && remoteDb.lastUpdated && localDb.lastUpdated > remoteDb.lastUpdated) {
+                console.log("Lokale Daten sind neuer! Cloud-Sync wird übersprungen und Cloud aktualisiert.");
+                db = localDb;
+                if (!db.settings) db.settings = {};
+                save(); // Lokale (neuere) Daten in die Cloud pushen
+            } else {
+                db = remoteDb;
+                if (!db.settings) db.settings = {};
+                localStorage.setItem(DB_KEY, JSON.stringify(db));
+            }
             
             if(statusDiv) { 
                 statusDiv.innerText = "● Sync erfolgreich"; 
@@ -1068,7 +1085,6 @@ async function syncFromCloud() {
     }
 }
 
-// +++ ROBUSTE SPEICHERN FUNKTION FÜR PRAXIS 2 +++
 async function save() {
     db.lastUpdated = Date.now();
     localStorage.setItem(DB_KEY, JSON.stringify(db));
@@ -1078,7 +1094,6 @@ async function save() {
 
     try {
         const actualSender = (loggedInUser === "Admin") ? "Admin" : currentUser;
-        // Wir nutzen "full_sync" und "payload", um mit dem Limit-Breaker Apps Script der Chirurgie zu kommunizieren
         const dataToSend = { action: "full_sync", sender: actualSender, payload: db };
 
         const response = await fetch(CLOUD_URL, { 
@@ -1229,6 +1244,9 @@ function calculateBalances(userName, targetYear, targetMonth, todayOnly = false)
     return { totalSaldo: safeFloat(totalSaldo), restVacation: (safeFloat(admin.startVacation) + parseInt(admin.yearlyVacation)) - usedVacYear, monthVacation: usedVacMonth };
 }
 
+// ----------------------------------------------------
+// NEUES RENDERLOGS (Ohne "Auto")
+// ----------------------------------------------------
 function renderLogs() {
     const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value);
     const tbody = document.getElementById('logTableBody'); tbody.innerHTML = "";
@@ -1308,7 +1326,7 @@ function renderLogs() {
                     let overlapEnd = Math.min(timeToMins(log.out), timeToMins(gap.end));
                     if (overlapEnd > overlapStart) {
                         autoBreakHours = (overlapEnd - overlapStart) / 60;
-                        pauseDisplay = `${gap.start} - ${gap.end} (Auto)`;
+                        pauseDisplay = `${gap.start} - ${gap.end}`; // HIER: "(Auto)" entfernt!
                     }
                 }
 
@@ -1351,7 +1369,7 @@ function renderLogs() {
         if(log.type === 'Schulung' && log.range) note = "Schulung: " + log.range + " " + note;
         if(log.type === 'Sonstiges' && log.range) note = log.range + " " + note;
         
-const dateHtml = `<div class="flex items-center"><span class="w-8 text-right font-bold inline-block">${String(i).padStart(2, '0')}.${String(m+1).padStart(2, '0')}.</span><span class="w-10"></span><span class="text-[9px] opacity-60 uppercase tracking-wider">${WEEKDAYS_SHORT[d.getDay()]}</span></div>`;        
+        const dateHtml = `<div class="flex items-center"><span class="w-8 text-right font-bold inline-block">${String(i).padStart(2, '0')}.${String(m+1).padStart(2, '0')}.</span><span class="w-10"></span><span class="text-[9px] opacity-60 uppercase tracking-wider">${WEEKDAYS_SHORT[d.getDay()]}</span></div>`;        
         let diffColor = "text-slate-400";
         const diffVal = ist - target;
         if(diffVal < 0) diffColor = "text-red-500 font-bold";
@@ -2269,6 +2287,9 @@ async function saveAdminConfigs() {
     }
 }
 
+// ----------------------------------------------------
+// NEUES EXPORT-PDF UND EXPORT-EXCEL (Ohne "Auto")
+// ----------------------------------------------------
 async function exportPDF() { 
     try {
         const { jsPDF } = window.jspdf; const doc = new jsPDF('p', 'mm', 'a4'); const m = parseInt(document.getElementById('viewMonth').value), y = parseInt(document.getElementById('viewYear').value); const balances = calculateBalances(currentUser, y, m, false);
@@ -2357,7 +2378,7 @@ function exportExcel() {
                     let overlapEnd = Math.min(timeToMins(log.out), timeToMins(gap.end));
                     if (overlapEnd > overlapStart) {
                         autoBreakHours = (overlapEnd - overlapStart) / 60;
-                        pStr = `${gap.start} - ${gap.end} (Auto)`;
+                        pStr = `${gap.start} - ${gap.end}`; // HIER: "(Auto)" entfernt!
                     }
                 }
 
