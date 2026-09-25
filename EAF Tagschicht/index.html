@@ -34,6 +34,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
             border-bottom: 2px solid var(--border-color);
         }
         .week-selector-wrapper {
@@ -50,6 +52,13 @@
             font-family: inherit;
         }
         
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
         .btn {
             background-color: var(--primary-color);
             color: white;
@@ -61,10 +70,13 @@
             transition: background 0.2s;
             text-decoration: none;
             display: inline-block;
+            font-size: 0.9rem;
         }
         .btn:hover { background-color: #003366; }
         .btn-print { background-color: #28a745; display: flex; align-items: center; gap: 5px; }
         .btn-print:hover { background-color: #218838; }
+        .btn-cloud { background-color: #6c757d; display: flex; align-items: center; gap: 5px; }
+        .btn-cloud:hover { background-color: #5a6268; }
 
         .nav-tabs {
             display: flex;
@@ -222,7 +234,6 @@
         }
         .delete-btn:hover { background-color: #c82333; }
 
-        /* --- DRUCK-EINSTELLUNGEN: NUR DIE ZEITERFASSUNG WIRD GEDRUCKT --- */
         @media print {
             body { background: white; color: black; margin: 0; padding: 0; }
             header, .global-controls, .nav-tabs, #view-schulungen { display: none !important; }
@@ -260,7 +271,14 @@
             <label for="week-selector">Kalenderwoche:</label>
             <input type="week" id="week-selector" onchange="onWeekChange()">
         </div>
-        <button class="btn btn-print" onclick="window.print()">🖨️ Nur Wochenstunden drucken</button>
+        <div class="action-buttons">
+            <button class="btn btn-cloud" onclick="exportCloudBackup()" title="Daten als JSON-Datei speichern">☁️ Backup exportieren</button>
+            <label class="btn btn-cloud" style="cursor: pointer; margin:0;" title="Backup-Datei laden">
+                📂 Backup importieren
+                <input type="file" id="import-file" accept=".json" style="display: none;" onchange="importCloudBackup(event)">
+            </label>
+            <button class="btn btn-print" onclick="window.print()">🖨️ Nur Wochenstunden drucken</button>
+        </div>
     </div>
     
     <div class="nav-tabs">
@@ -300,7 +318,6 @@
         
         <div class="calendar-table-wrapper" id="calendar-table-wrapper">
             <table class="cal-table" id="cal-table">
-                <!-- Wird dynamisch gefüllt -->
             </table>
         </div>
 
@@ -348,6 +365,52 @@
         const dayNames = ['Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.', 'So.'];
         const fullDayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
         
+        let allTimes = JSON.parse(localStorage.getItem('voest_zeiten_kws')) || {};
+        let trainings = JSON.parse(localStorage.getItem('voest_schulungen_daten')) || [];
+
+        function exportCloudBackup() {
+            const backupData = {
+                version: 1,
+                exportDate: new Date().toISOString(),
+                voest_zeiten_kws: allTimes,
+                voest_schulungen_daten: trainings
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "zeiterfassung_backup.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importCloudBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const backup = JSON.parse(e.target.result);
+                    if (backup.voest_zeiten_kws && backup.voest_schulungen_daten) {
+                        allTimes = backup.voest_zeiten_kws;
+                        trainings = backup.voest_schulungen_daten;
+                        localStorage.setItem('voest_zeiten_kws', JSON.stringify(allTimes));
+                        localStorage.setItem('voest_schulungen_daten', JSON.stringify(trainings));
+                        
+                        onWeekChange();
+                        renderTrainingList();
+                        alert("Backup erfolgreich importiert und synchronisiert!");
+                    } else {
+                        alert("Ungültiges Backup-Dateiformat!");
+                    }
+                } catch (err) {
+                    alert("Fehler beim Lesen der JSON-Datei: " + err);
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
         function getISOWeekString(date) {
             const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
             const dayNum = d.getUTCDay() || 7;
@@ -364,7 +427,7 @@
             const dow = jan4.getDay() || 7;
             const week1Start = new Date(year, 0, 4 - dow + 1);
             const targetWeekStart = new Date(week1Start);
-            targetWeekStart.setDate(week1Start.getDate() + (week - 1) * 7);
+            targetWeekStart.setDate(targetWeekStart.getDate() + (week - 1) * 7);
             
             const dates = [];
             for (let i = 0; i < 7; i++) {
@@ -376,7 +439,6 @@
         }
 
         function formatDateStr(date) { return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }); }
-        function formatDayDate(date) { return date.getDate(); }
         function formatFullDateStr(date) {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -396,9 +458,6 @@
                     return { bg: '#ffe082', text: '#333', border: '#ffd54f' };
             }
         }
-
-        let allTimes = JSON.parse(localStorage.getItem('voest_zeiten_kws')) || {};
-        let trainings = JSON.parse(localStorage.getItem('voest_schulungen_daten')) || [];
 
         function switchTab(tabId) {
             document.getElementById('view-zeit').style.display = tabId === 'zeit' ? 'block' : 'none';
@@ -499,7 +558,6 @@
             calcAndSave();
         }
 
-        // --- WOCHENKALENDER --- //
         function buildCalendarTable(dates) {
             const table = document.getElementById('cal-table');
             
@@ -608,7 +666,7 @@
             
             renderTrainingList();
             const weekStr = document.getElementById('week-selector').value;
-            buildCalendarTable(getDatesOfWeek(weekStr)); // Korrigiert zu buildCalendarTable
+            buildCalendarTable(getDatesOfWeek(weekStr));
         }
 
         function deleteTraining(index) {
