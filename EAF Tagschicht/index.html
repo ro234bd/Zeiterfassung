@@ -124,7 +124,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 650px;
+            min-width: 600px;
             margin-top: 15px;
         }
         th, td { border: 1px solid var(--border-color); padding: 10px; text-align: center; }
@@ -295,8 +295,6 @@
                     <tr>
                         <th>Wochentag</th>
                         <th>Kommen</th>
-                        <th>Pause Start</th>
-                        <th>Pause Ende</th>
                         <th>Gehen</th>
                         <th>Arbeitszeit</th>
                     </tr>
@@ -304,7 +302,7 @@
                 <tbody id="zeit-body"></tbody>
                 <tfoot>
                     <tr class="sum-row">
-                        <td colspan="5" style="text-align:right;">Wochensumme:</td>
+                        <td colspan="3" style="text-align:right;">Wochensumme:</td>
                         <td id="wochensumme">0:00</td>
                     </tr>
                 </tfoot>
@@ -500,8 +498,6 @@
                         </div>
                     </td>
                     <td><input type="time" id="k-${index}" onchange="calcAndSave()"></td>
-                    <td><input type="time" id="ps-${index}" onchange="calcAndSave()"></td>
-                    <td><input type="time" id="pe-${index}" onchange="calcAndSave()"></td>
                     <td><input type="time" id="g-${index}" onchange="calcAndSave()"></td>
                     <td id="res-${index}" style="font-weight:bold; color:var(--primary-color);">0:00</td>
                 `;
@@ -528,15 +524,11 @@
             const weekData = {};
             for (let i = 0; i < 7; i++) {
                 const k = document.getElementById(`k-${i}`).value;
-                const ps = document.getElementById(`ps-${i}`).value;
-                const pe = document.getElementById(`pe-${i}`).value;
                 const g = document.getElementById(`g-${i}`).value;
-                weekData[i] = {k, ps, pe, g};
+                weekData[i] = {k, g};
                 
                 let dayMin = 0;
                 dayMin = toMin(g) - toMin(k);
-                const pause = toMin(pe) - toMin(ps);
-                if (pause > 0) dayMin -= pause;
                 if (dayMin < 0) dayMin = 0; 
                 totalMin += dayMin;
                 document.getElementById(`res-${i}`).innerText = toTimeStr(dayMin);
@@ -551,8 +543,6 @@
             for (let i = 0; i < 7; i++) {
                 const d = weekData[i] || {};
                 document.getElementById(`k-${i}`).value = d.k || '';
-                document.getElementById(`ps-${i}`).value = d.ps || '';
-                document.getElementById(`pe-${i}`).value = d.pe || '';
                 document.getElementById(`g-${i}`).value = d.g || '';
             }
             calcAndSave();
