@@ -34,8 +34,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
             border-bottom: 2px solid var(--border-color);
         }
         .week-selector-wrapper {
@@ -52,13 +50,6 @@
             font-family: inherit;
         }
         
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
         .btn {
             background-color: var(--primary-color);
             color: white;
@@ -70,13 +61,10 @@
             transition: background 0.2s;
             text-decoration: none;
             display: inline-block;
-            font-size: 0.9rem;
         }
         .btn:hover { background-color: #003366; }
         .btn-print { background-color: #28a745; display: flex; align-items: center; gap: 5px; }
         .btn-print:hover { background-color: #218838; }
-        .btn-cloud { background-color: #d97706; display: flex; align-items: center; gap: 5px; }
-        .btn-cloud:hover { background-color: #b45309; }
 
         .nav-tabs {
             display: flex;
@@ -234,6 +222,7 @@
         }
         .delete-btn:hover { background-color: #c82333; }
 
+        /* --- DRUCK-EINSTELLUNGEN: NUR DIE ZEITERFASSUNG WIRD GEDRUCKT --- */
         @media print {
             body { background: white; color: black; margin: 0; padding: 0; }
             header, .global-controls, .nav-tabs, #view-schulungen { display: none !important; }
@@ -271,10 +260,7 @@
             <label for="week-selector">Kalenderwoche:</label>
             <input type="week" id="week-selector" onchange="onWeekChange()">
         </div>
-        <div class="action-buttons">
-            <button class="btn btn-cloud" onclick="connectCloudFile()" title="Direkt mit einer JSON-Datei in OneDrive/Google Drive verbinden">☁️ Cloud-Datei verknüpfen</button>
-            <button class="btn btn-print" onclick="window.print()">🖨️ Nur Wochenstunden drucken</button>
-        </div>
+        <button class="btn btn-print" onclick="window.print()">🖨️ Nur Wochenstunden drucken</button>
     </div>
     
     <div class="nav-tabs">
@@ -314,6 +300,7 @@
         
         <div class="calendar-table-wrapper" id="calendar-table-wrapper">
             <table class="cal-table" id="cal-table">
+                <!-- Wird dynamisch gefüllt -->
             </table>
         </div>
 
@@ -361,65 +348,6 @@
         const dayNames = ['Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.', 'So.'];
         const fullDayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
         
-        let fileHandle = null;
-        let allTimes = JSON.parse(localStorage.getItem('voest_zeiten_kws')) || {};
-        let trainings = JSON.parse(localStorage.getItem('voest_schulungen_daten')) || [];
-
-        // --- DIREKTE CLOUD-DATEI SYNCHRONISATION (File System Access API) --- //
-        async function connectCloudFile() {
-            try {
-                if (!window.showOpenFilePicker) {
-                    alert("Dein Browser unterstützt direkte Dateiverknüpfungen (File System Access API) leider nicht. Bitte verwende Google Chrome oder Microsoft Edge.");
-                    return;
-                }
-                const [handle] = await window.showOpenFilePicker({
-                    types: [{
-                        description: 'JSON Daten',
-                        accept: {'application/json': ['.json']}
-                    }],
-                    multiple: false
-                });
-                fileHandle = handle;
-                
-                // Datei einlesen
-                const file = await fileHandle.getFile();
-                const contents = await file.text();
-                const data = JSON.parse(contents);
-                
-                if (data.voest_zeiten_kws && data.voest_schulungen_daten) {
-                    allTimes = data.voest_zeiten_kws;
-                    trainings = data.voest_schulungen_daten;
-                    localStorage.setItem('voest_zeiten_kws', JSON.stringify(allTimes));
-                    localStorage.setItem('voest_schulungen_daten', JSON.stringify(trainings));
-                    onWeekChange();
-                    renderTrainingList();
-                    alert("Erfolgreich mit Cloud-Datei verbunden! Änderungen werden ab sofort direkt in diese Datei gespeichert.");
-                }
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    console.error(err);
-                    alert("Fehler beim Öffnen der Cloud-Datei: " + err.message);
-                }
-            }
-        }
-
-        async function saveToCloudFile() {
-            if (!fileHandle) return;
-            try {
-                const writable = await fileHandle.createWritable();
-                const backupData = {
-                    version: 1,
-                    exportDate: new Date().toISOString(),
-                    voest_zeiten_kws: allTimes,
-                    voest_schulungen_daten: trainings
-                };
-                await writable.write(JSON.stringify(backupData, null, 2));
-                await writable.close();
-            } catch (err) {
-                console.error("Fehler beim automatischen Speichern in die Cloud-Datei:", err);
-            }
-        }
-
         function getISOWeekString(date) {
             const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
             const dayNum = d.getUTCDay() || 7;
@@ -436,7 +364,7 @@
             const dow = jan4.getDay() || 7;
             const week1Start = new Date(year, 0, 4 - dow + 1);
             const targetWeekStart = new Date(week1Start);
-            targetWeekStart.setDate(targetWeekStart.getDate() + (week - 1) * 7);
+            targetWeekStart.setDate(week1Start.getDate() + (week - 1) * 7);
             
             const dates = [];
             for (let i = 0; i < 7; i++) {
@@ -448,6 +376,7 @@
         }
 
         function formatDateStr(date) { return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }); }
+        function formatDayDate(date) { return date.getDate(); }
         function formatFullDateStr(date) {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -467,6 +396,9 @@
                     return { bg: '#ffe082', text: '#333', border: '#ffd54f' };
             }
         }
+
+        let allTimes = JSON.parse(localStorage.getItem('voest_zeiten_kws')) || {};
+        let trainings = JSON.parse(localStorage.getItem('voest_schulungen_daten')) || [];
 
         function switchTab(tabId) {
             document.getElementById('view-zeit').style.display = tabId === 'zeit' ? 'block' : 'none';
@@ -553,7 +485,6 @@
             document.getElementById('wochensumme').innerText = toTimeStr(totalMin);
             allTimes[weekStr] = weekData;
             localStorage.setItem('voest_zeiten_kws', JSON.stringify(allTimes));
-            saveToCloudFile();
         }
 
         function loadZeiterfassung(weekStr) {
@@ -568,6 +499,7 @@
             calcAndSave();
         }
 
+        // --- WOCHENKALENDER --- //
         function buildCalendarTable(dates) {
             const table = document.getElementById('cal-table');
             
@@ -668,7 +600,6 @@
             
             trainings.push({ date, start, end, topic, color });
             localStorage.setItem('voest_schulungen_daten', JSON.stringify(trainings));
-            saveToCloudFile();
             
             document.getElementById('t-start').value = '';
             document.getElementById('t-end').value = '';
@@ -677,14 +608,13 @@
             
             renderTrainingList();
             const weekStr = document.getElementById('week-selector').value;
-            buildCalendarTable(getDatesOfWeek(weekStr));
+            buildCalendarTable(getDatesOfWeek(weekStr)); // Korrigiert zu buildCalendarTable
         }
 
         function deleteTraining(index) {
             if(confirm("Termin wirklich löschen?")) {
                 trainings.splice(index, 1);
                 localStorage.setItem('voest_schulungen_daten', JSON.stringify(trainings));
-                saveToCloudFile();
                 renderTrainingList();
                 const weekStr = document.getElementById('week-selector').value;
                 buildCalendarTable(getDatesOfWeek(weekStr));
