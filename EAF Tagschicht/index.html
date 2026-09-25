@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zeiterfassung & Schulungskalender</title>
+    <style>
+        :root {
+            --primary-color: #004d99;
+            --bg-color: #f4f7f9;
+            --text-color: #333;
+            --border-color: #dce3e9;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        header h1 { margin: 0; font-size: 1.5rem; }
+        
+        .global-controls {
+            background: #e6edf2;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            border-bottom: 2px solid var(--border-color);
+        }
+        .week-selector-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+        }
+        input[type="week"] {
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+            transition: background 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 0.9rem;
+        }
+        .btn:hover { background-color: #003366; }
+        .btn-print { background-color: #28a745; display: flex; align-items: center; gap: 5px; }
+        .btn-print:hover { background-color: #218838; }
+        .btn-cloud { background-color: #d97706; display: flex; align-items: center; gap: 5px; }
+        .btn-cloud:hover { background-color: #b45309; }
+
+        .nav-tabs {
+            display: flex;
+            background: white;
+            border-bottom: 2px solid var(--border-color);
+        }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            color: #555;
+            transition: all 0.2s;
+        }
+        .tab:hover { background-color: #f4f7f9; }
+        .tab.active {
+            color: var(--primary-color);
+            border-bottom: 3px solid var(--primary-color);
+            background: #f8fafd;
+        }
+        
+        .container {
+            max-width: 950px;
+            margin: 20px auto;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+        h2 {
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-responsive { overflow-x: auto; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 650px;
+            margin-top: 15px;
+        }
+        th, td { border: 1px solid var(--border-color); padding: 10px; text-align: center; }
+        th { background-color: #f8fafd; color: #444; }
+        input[type="time"], input[type="date"], input[type="text"], select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: inherit;
+            background: #fff;
+        }
+        .day-label { display: flex; flex-direction: column; align-items: center; }
+        .date-sub { font-size: 0.8em; color: #777; font-weight: normal; }
+        .sum-row { font-weight: bold; background-color: #e6f2ff; font-size: 1.1em; }
+
+        /* --- KALENDER --- */
+        .calendar-table-wrapper {
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: #fff;
+            margin-bottom: 30px;
+        }
+        .cal-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .cal-table th {
+            background-color: #f8fafd;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            border: 1px solid var(--border-color);
+            padding: 10px 4px;
+            font-size: 0.85em;
+            color: #444;
+        }
+        .time-col-header { width: 60px; }
+        .day-td {
+            position: relative;
+            border-right: 1px solid #eaeaea;
+            border-bottom: 1px solid #eaeaea;
+            padding: 0;
+            height: 1200px;
+            background-size: 100% 50px;
+            background-image: linear-gradient(to bottom, #f2f2f2 1px, transparent 1px);
+            vertical-align: top;
+        }
+        .day-td:last-child { border-right: none; }
+        
+        .cal-event-box {
+            position: absolute;
+            left: 3px;
+            right: 3px;
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            line-height: 1.3;
+            overflow: hidden;
+            box-sizing: border-box;
+            border: 1px solid rgba(0,0,0,0.15);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .cal-event-time { font-weight: bold; display: block; margin-bottom: 2px; }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1fr 1.5fr 1.2fr auto;
+            gap: 12px;
+            align-items: end;
+            margin-bottom: 30px;
+            background: #f8fafd;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { margin-bottom: 5px; font-weight: bold; font-size: 0.85em; color: #444; }
+        
+        .training-list { list-style: none; padding: 0; }
+        .training-item {
+            background: #fff;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            border-left: 5px solid var(--primary-color);
+        }
+        .training-info { display: flex; flex-direction: column; gap: 3px; }
+        .training-date { font-weight: bold; color: var(--primary-color); font-size: 0.85em; }
+        .training-time { font-size: 0.85em; color: #666; }
+        .delete-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        .delete-btn:hover { background-color: #c82333; }
+
+        @media print {
+            body { background: white; color: black; margin: 0; padding: 0; }
+            header, .global-controls, .nav-tabs, #view-schulungen { display: none !important; }
+            #view-zeit { display: block !important; margin: 0; box-shadow: none; border: none; padding: 0; max-width: 100%; }
+            table { border-collapse: collapse !important; width: 100% !important; }
+            th, td { border: 1px solid black !important; color: black !important; }
+            th { background-color: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .sum-row { background-color: #e6e6e6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            input[type="time"] { 
+                border: none !important; 
+                background: transparent !important; 
+                padding: 0 !important; 
+                text-align: center;
+                font-size: 1rem;
+                -webkit-appearance: none;
+            }
+            input[type="time"]::-webkit-calendar-picker-indicator {
+                display: none !important;
+            }
+        }
+
+        @media (max-width: 950px) {
+            .form-grid { grid-template-columns: 1fr; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Arbeitszeit & Schulungs-Manager</h1>
+    </header>
+    
+    <div class="global-controls">
+        <div class="week-selector-wrapper">
+            <label for="week-selector">Kalenderwoche:</label>
+            <input type="week" id="week-selector" onchange="onWeekChange()">
+        </div>
+        <div class="action-buttons">
+            <button class="btn btn-cloud" onclick="connectCloudFile()" title="Direkt mit einer JSON-Datei in OneDrive/Google Drive verbinden">☁️ Cloud-Datei verknüpfen</button>
+            <button class="btn btn-print" onclick="window.print()">🖨️ Nur Wochenstunden drucken</button>
+        </div>
+    </div>
+    
+    <div class="nav-tabs">
+        <button class="tab active" id="tab-zeit" onclick="switchTab('zeit')">Zeiterfassung</button>
+        <button class="tab" id="tab-schulung" onclick="switchTab('schulungen')">Schulungskalender</button>
+    </div>
+
+    <!-- ANSICHT 1 -->
+    <div class="container" id="view-zeit">
+        <h2>Wöchentliche Zeiterfassung <span id="zeiterfassung-kw-label" style="font-size: 0.7em; color: #666; font-weight: normal;"></span></h2>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Wochentag</th>
+                        <th>Kommen</th>
+                        <th>Pause Start</th>
+                        <th>Pause Ende</th>
+                        <th>Gehen</th>
+                        <th>Arbeitszeit</th>
+                    </tr>
+                </thead>
+                <tbody id="zeit-body"></tbody>
+                <tfoot>
+                    <tr class="sum-row">
+                        <td colspan="5" style="text-align:right;">Wochensumme:</td>
+                        <td id="wochensumme">0:00</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- ANSICHT 2 -->
+    <div class="container" id="view-schulungen" style="display:none;">
+        <h2>Wochenansicht <span id="schulungen-kw-label" style="font-size: 0.7em; color: #666; font-weight: normal;"></span></h2>
+        
+        <div class="calendar-table-wrapper" id="calendar-table-wrapper">
+            <table class="cal-table" id="cal-table">
+            </table>
+        </div>
+
+        <h2>Neuen Termin eintragen</h2>
+        <form id="schulung-form" onsubmit="addTraining(event)">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="t-date">Datum</label>
+                    <input type="date" id="t-date" required>
+                </div>
+                <div class="form-group">
+                    <label for="t-start">Startzeit</label>
+                    <input type="time" id="t-start" required>
+                </div>
+                <div class="form-group">
+                    <label for="t-end">Endzeit</label>
+                    <input type="time" id="t-end" required>
+                </div>
+                <div class="form-group">
+                    <label for="t-topic">Bezeichnung</label>
+                    <input type="text" id="t-topic" placeholder="z.B. Tagschicht..." required>
+                </div>
+                <div class="form-group">
+                    <label for="t-color">Farbe</label>
+                    <select id="t-color">
+                        <option value="yellow">Gelb (Standard)</option>
+                        <option value="pink">Rosa</option>
+                        <option value="purple">Lila</option>
+                        <option value="blue">Blau</option>
+                        <option value="green">Grün</option>
+                        <option value="gray">Grau</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn" style="height: 38px;">Hinzufügen</button>
+                </div>
+            </div>
+        </form>
+
+        <h2>Terminliste</h2>
+        <ul class="training-list" id="training-list"></ul>
+    </div>
+
+    <script>
+        const dayNames = ['Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.', 'So.'];
+        const fullDayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+        
+        let fileHandle = null;
+        let allTimes = JSON.parse(localStorage.getItem('voest_zeiten_kws')) || {};
+        let trainings = JSON.parse(localStorage.getItem('voest_schulungen_daten')) || [];
+
+        // --- DIREKTE CLOUD-DATEI SYNCHRONISATION (File System Access API) --- //
+        async function connectCloudFile() {
+            try {
+                if (!window.showOpenFilePicker) {
+                    alert("Dein Browser unterstützt direkte Dateiverknüpfungen (File System Access API) leider nicht. Bitte verwende Google Chrome oder Microsoft Edge.");
+                    return;
+                }
+                const [handle] = await window.showOpenFilePicker({
+                    types: [{
+                        description: 'JSON Daten',
+                        accept: {'application/json': ['.json']}
+                    }],
+                    multiple: false
+                });
+                fileHandle = handle;
+                
+                // Datei einlesen
+                const file = await fileHandle.getFile();
+                const contents = await file.text();
+                const data = JSON.parse(contents);
+                
+                if (data.voest_zeiten_kws && data.voest_schulungen_daten) {
+                    allTimes = data.voest_zeiten_kws;
+                    trainings = data.voest_schulungen_daten;
+                    localStorage.setItem('voest_zeiten_kws', JSON.stringify(allTimes));
+                    localStorage.setItem('voest_schulungen_daten', JSON.stringify(trainings));
+                    onWeekChange();
+                    renderTrainingList();
+                    alert("Erfolgreich mit Cloud-Datei verbunden! Änderungen werden ab sofort direkt in diese Datei gespeichert.");
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error(err);
+                    alert("Fehler beim Öffnen der Cloud-Datei: " + err.message);
+                }
+            }
+        }
+
+        async function saveToCloudFile() {
+            if (!fileHandle) return;
+            try {
+                const writable = await fileHandle.createWritable();
+                const backupData = {
+                    version: 1,
+                    exportDate: new Date().toISOString(),
+                    voest_zeiten_kws: allTimes,
+                    voest_schulungen_daten: trainings
+                };
+                await writable.write(JSON.stringify(backupData, null, 2));
+                await writable.close();
+            } catch (err) {
+                console.error("Fehler beim automatischen Speichern in die Cloud-Datei:", err);
+            }
+        }
+
+        function getISOWeekString(date) {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            return d.getUTCFullYear() + '-W' + (weekNo < 10 ? '0' : '') + weekNo;
+        }
+
+        function getDatesOfWeek(weekStr) {
+            if (!weekStr) return [];
+            const [year, week] = weekStr.split('-W').map(Number);
+            const jan4 = new Date(year, 0, 4);
+            const dow = jan4.getDay() || 7;
+            const week1Start = new Date(year, 0, 4 - dow + 1);
+            const targetWeekStart = new Date(week1Start);
+            targetWeekStart.setDate(targetWeekStart.getDate() + (week - 1) * 7);
+            
+            const dates = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(targetWeekStart);
+                d.setDate(d.getDate() + i);
+                dates.push(d);
+            }
+            return dates;
+        }
+
+        function formatDateStr(date) { return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }); }
+        function formatFullDateStr(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function getEventColor(colorKey) {
+            switch(colorKey) {
+                case 'pink': return { bg: '#ffb3d9', text: '#333', border: '#ff80bf' };
+                case 'purple': return { bg: '#d0b3ff', text: '#333', border: '#b080ff' };
+                case 'blue': return { bg: '#b3d9ff', text: '#333', border: '#80bfff' };
+                case 'green': return { bg: '#b3ffcc', text: '#333', border: '#80ffaa' };
+                case 'gray': return { bg: '#e0e0e0', text: '#333', border: '#bcbcbc' };
+                case 'yellow':
+                default:
+                    return { bg: '#ffe082', text: '#333', border: '#ffd54f' };
+            }
+        }
+
+        function switchTab(tabId) {
+            document.getElementById('view-zeit').style.display = tabId === 'zeit' ? 'block' : 'none';
+            document.getElementById('view-schulungen').style.display = tabId === 'schulungen' ? 'block' : 'none';
+            document.getElementById('tab-zeit').classList.remove('active');
+            document.getElementById('tab-schulung').classList.remove('active');
+            document.getElementById('tab-' + (tabId === 'zeit' ? 'zeit' : 'schulung')).classList.add('active');
+            
+            if(tabId === 'schulungen') {
+                const wrapper = document.getElementById('calendar-table-wrapper');
+                wrapper.scrollTop = 300;
+            }
+        }
+
+        function onWeekChange() {
+            const weekStr = document.getElementById('week-selector').value;
+            if (!weekStr) return;
+            const [year, kw] = weekStr.split('-W');
+            const displayLabel = `KW ${kw} / ${year}`;
+            document.getElementById('zeiterfassung-kw-label').innerText = displayLabel;
+            document.getElementById('schulungen-kw-label').innerText = displayLabel;
+
+            const dates = getDatesOfWeek(weekStr);
+            buildZeiterfassungTable(dates, weekStr);
+            buildCalendarTable(dates);
+            loadZeiterfassung(weekStr);
+        }
+
+        function buildZeiterfassungTable(dates, weekStr) {
+            const tbody = document.getElementById('zeit-body');
+            tbody.innerHTML = '';
+            fullDayNames.forEach((day, index) => {
+                const dateObj = dates[index];
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div class="day-label">
+                            <strong>${day}</strong>
+                            <span class="date-sub">${formatDateStr(dateObj)}</span>
+                        </div>
+                    </td>
+                    <td><input type="time" id="k-${index}" onchange="calcAndSave()"></td>
+                    <td><input type="time" id="ps-${index}" onchange="calcAndSave()"></td>
+                    <td><input type="time" id="pe-${index}" onchange="calcAndSave()"></td>
+                    <td><input type="time" id="g-${index}" onchange="calcAndSave()"></td>
+                    <td id="res-${index}" style="font-weight:bold; color:var(--primary-color);">0:00</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function toMin(timeStr) {
+            if (!timeStr) return 0;
+            const parts = timeStr.split(':');
+            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        }
+
+        function toTimeStr(minutes) {
+            if (minutes <= 0) return "0:00";
+            const h = Math.floor(minutes / 60);
+            const m = minutes % 60;
+            return h + ":" + (m < 10 ? "0" : "") + m;
+        }
+
+        function calcAndSave() {
+            const weekStr = document.getElementById('week-selector').value;
+            let totalMin = 0;
+            const weekData = {};
+            for (let i = 0; i < 7; i++) {
+                const k = document.getElementById(`k-${i}`).value;
+                const ps = document.getElementById(`ps-${i}`).value;
+                const pe = document.getElementById(`pe-${i}`).value;
+                const g = document.getElementById(`g-${i}`).value;
+                weekData[i] = {k, ps, pe, g};
+                
+                let dayMin = 0;
+                dayMin = toMin(g) - toMin(k);
+                const pause = toMin(pe) - toMin(ps);
+                if (pause > 0) dayMin -= pause;
+                if (dayMin < 0) dayMin = 0; 
+                totalMin += dayMin;
+                document.getElementById(`res-${i}`).innerText = toTimeStr(dayMin);
+            }
+            document.getElementById('wochensumme').innerText = toTimeStr(totalMin);
+            allTimes[weekStr] = weekData;
+            localStorage.setItem('voest_zeiten_kws', JSON.stringify(allTimes));
+            saveToCloudFile();
+        }
+
+        function loadZeiterfassung(weekStr) {
+            const weekData = allTimes[weekStr] || {};
+            for (let i = 0; i < 7; i++) {
+                const d = weekData[i] || {};
+                document.getElementById(`k-${i}`).value = d.k || '';
+                document.getElementById(`ps-${i}`).value = d.ps || '';
+                document.getElementById(`pe-${i}`).value = d.pe || '';
+                document.getElementById(`g-${i}`).value = d.g || '';
+            }
+            calcAndSave();
+        }
+
+        function buildCalendarTable(dates) {
+            const table = document.getElementById('cal-table');
+            
+            let headerHtml = '<thead><tr><th class="time-col-header">Uhr</th>';
+            dates.forEach((dateObj, index) => {
+                headerHtml += `<th>${dayNames[index]}<br><span style="font-weight:normal; font-size:0.9em; color:#777;">${formatDateStr(dateObj)}</span></th>`;
+            });
+            headerHtml += '</tr></thead>';
+            
+            let bodyHtml = '<tbody><tr>';
+            
+            bodyHtml += '<td style="padding:0; vertical-align:top; border-right:1px solid var(--border-color); background:#fdfdfd;">';
+            for (let hour = 0; hour < 24; hour++) {
+                let hourFormatted = (hour < 10 ? '0' : '') + hour + ':00';
+                bodyHtml += `<div style="height: 50px; box-sizing: border-box; border-bottom: 1px solid #eaeaea; text-align: right; padding-right: 8px; padding-top: 4px; font-size: 0.75em; color: #666;">${hourFormatted}</div>`;
+            }
+            bodyHtml += '</td>';
+            
+            dates.forEach((dateObj, index) => {
+                const dateStrForCompare = formatFullDateStr(dateObj);
+                const dayTrainings = trainings.filter(t => t.date === dateStrForCompare);
+                
+                let eventsHtml = '';
+                dayTrainings.forEach(t => {
+                    let sStr = t.start || '08:00';
+                    let [sh, sm] = sStr.split(':').map(Number);
+                    
+                    let eStr = t.end || '12:00';
+                    let [eh, em] = eStr.split(':').map(Number);
+                    
+                    let startMinutes = sh * 60 + sm;
+                    let endMinutes = eh * 60 + em;
+                    
+                    if (endMinutes <= startMinutes) {
+                        endMinutes += 24 * 60; 
+                    }
+                    
+                    let durationMinutes = endMinutes - startMinutes;
+                    if (durationMinutes <= 0) durationMinutes = 60;
+                    
+                    let top = (startMinutes / 60) * 50;
+                    let height = (durationMinutes / 60) * 50;
+                    
+                    const col = getEventColor(t.color);
+                    
+                    eventsHtml += `
+                        <div class="cal-event-box" style="top: ${top}px; height: ${height}px; background-color: ${col.bg}; color: ${col.text}; border-color: ${col.border};">
+                            <span class="cal-event-time">${sStr} - ${eStr}</span>
+                            ${t.topic}
+                        </div>
+                    `;
+                });
+                
+                bodyHtml += `<td class="day-td">${eventsHtml}</td>`;
+            });
+            
+            bodyHtml += '</tr></tbody>';
+            table.innerHTML = headerHtml + bodyHtml;
+        }
+
+        function renderTrainingList() {
+            const list = document.getElementById('training-list');
+            list.innerHTML = '';
+            if (trainings.length === 0) {
+                list.innerHTML = '<li style="text-align:center; color:#888;">Noch keine Termine eingetragen.</li>';
+                return;
+            }
+            trainings.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            trainings.forEach((t, index) => {
+                const li = document.createElement('li');
+                li.className = 'training-item';
+                const col = getEventColor(t.color);
+                li.style.borderLeftColor = col.border;
+                
+                const d = new Date(t.date);
+                const dateStr = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const timeStr = t.start ? `${t.start} ${t.end ? '- '+t.end : ''} Uhr` : '';
+                
+                li.innerHTML = `
+                    <div class="training-info">
+                        <span class="training-date">${dateStr} <span class="training-time">${timeStr}</span></span>
+                        <span class="training-topic">${t.topic}</span>
+                    </div>
+                    <button class="delete-btn" onclick="deleteTraining(${index})">Entfernen</button>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        function addTraining(e) {
+            e.preventDefault();
+            const date = document.getElementById('t-date').value;
+            const start = document.getElementById('t-start').value;
+            const end = document.getElementById('t-end').value;
+            const topic = document.getElementById('t-topic').value;
+            const color = document.getElementById('t-color').value;
+            
+            trainings.push({ date, start, end, topic, color });
+            localStorage.setItem('voest_schulungen_daten', JSON.stringify(trainings));
+            saveToCloudFile();
+            
+            document.getElementById('t-start').value = '';
+            document.getElementById('t-end').value = '';
+            document.getElementById('t-topic').value = '';
+            document.getElementById('t-color').value = 'yellow';
+            
+            renderTrainingList();
+            const weekStr = document.getElementById('week-selector').value;
+            buildCalendarTable(getDatesOfWeek(weekStr));
+        }
+
+        function deleteTraining(index) {
+            if(confirm("Termin wirklich löschen?")) {
+                trainings.splice(index, 1);
+                localStorage.setItem('voest_schulungen_daten', JSON.stringify(trainings));
+                saveToCloudFile();
+                renderTrainingList();
+                const weekStr = document.getElementById('week-selector').value;
+                buildCalendarTable(getDatesOfWeek(weekStr));
+            }
+        }
+
+        window.onload = () => {
+            const weekSelector = document.getElementById('week-selector');
+            const currentWeek = getISOWeekString(new Date());
+            weekSelector.value = currentWeek;
+            
+            renderTrainingList();
+            onWeekChange(); 
+        };
+    </script>
+</body>
+</html>
