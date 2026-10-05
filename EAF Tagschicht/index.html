@@ -129,7 +129,7 @@
         }
         th, td { border: 1px solid var(--border-color); padding: 10px; text-align: center; }
         th { background-color: #f8fafd; color: #444; }
-        input[type="time"], input[type="date"], input[type="text"], select {
+        input[type="time"], input[type="text"], select {
             width: 100%;
             padding: 8px;
             border: 1px solid #ccc;
@@ -141,6 +141,22 @@
         .day-label { display: flex; flex-direction: column; align-items: center; }
         .date-sub { font-size: 0.8em; color: #777; font-weight: normal; }
         .sum-row { font-weight: bold; background-color: #e6f2ff; font-size: 1.1em; }
+
+        /* --- FLEXISALDO CARD --- */
+        .summary-card {
+            margin-top: 25px;
+            background: #f8fafd;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid var(--border-color);
+        }
+        .summary-card h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
 
         /* --- KALENDER --- */
         .calendar-table-wrapper {
@@ -236,13 +252,13 @@
 
         @media print {
             body { background: white; color: black; margin: 0; padding: 0; }
-            header, .global-controls, .nav-tabs, #view-schulungen { display: none !important; }
+            header, .global-controls, .nav-tabs, #view-schulungen, .summary-card { display: none !important; }
             #view-zeit { display: block !important; margin: 0; box-shadow: none; border: none; padding: 0; max-width: 100%; }
             table { border-collapse: collapse !important; width: 100% !important; }
             th, td { border: 1px solid black !important; color: black !important; }
             th { background-color: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .sum-row { background-color: #e6e6e6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            input[type="time"] { 
+            input[type="time"], input[type="text"] { 
                 border: none !important; 
                 background: transparent !important; 
                 padding: 0 !important; 
@@ -257,6 +273,7 @@
 
         @media (max-width: 950px) {
             .form-grid { grid-template-columns: 1fr; gap: 10px; }
+            .summary-grid { grid-template-columns: 1fr 1fr !important; }
         }
     </style>
 </head>
@@ -286,9 +303,10 @@
         <button class="tab" id="tab-schulung" onclick="switchTab('schulungen')">Schulungskalender</button>
     </div>
 
-    <!-- ANSICHT 1 -->
+    <!-- ANSICHT 1: ZEITERFASSUNG -->
     <div class="container" id="view-zeit">
         <h2>Wöchentliche Zeiterfassung <span id="zeiterfassung-kw-label" style="font-size: 0.7em; color: #666; font-weight: normal;"></span></h2>
+        
         <div class="table-responsive">
             <table>
                 <thead>
@@ -302,15 +320,39 @@
                 <tbody id="zeit-body"></tbody>
                 <tfoot>
                     <tr class="sum-row">
-                        <td colspan="3" style="text-align:right;">Wochensumme:</td>
+                        <td colspan="3" style="text-align:right;">Ist-Stunden gesamt:</td>
                         <td id="wochensumme">0:00</td>
                     </tr>
                 </tfoot>
             </table>
         </div>
+
+        <!-- FLEXISALDO KONTO -->
+        <div class="summary-card">
+            <h3>Wochen-Auswertung & Flexisaldo</h3>
+            <div class="form-grid summary-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr; background: transparent; border: none; padding: 0; margin-bottom: 0;">
+                <div class="form-group">
+                    <label>Soll-Stunden (Std:Min oder Komma)</label>
+                    <input type="text" id="soll-stunden" placeholder="z.B. 34,4 oder 34:24" value="34,4" onchange="calcAndSave()">
+                </div>
+                <div class="form-group">
+                    <label>Wochen-Differenz</label>
+                    <div id="wochen-differenz" style="font-weight: bold; font-size: 1.2em; padding: 8px 0;">0,00 h</div>
+                </div>
+                <div class="form-group">
+                    <label>Startsaldo (Anfang KW)</label>
+                    <input type="text" id="start-saldo" placeholder="z.B. -35,25" onchange="calcAndSave()">
+                </div>
+                <div class="form-group">
+                    <label>Neuer Saldo (Ende KW)</label>
+                    <div id="end-saldo" style="font-weight: bold; font-size: 1.2em; padding: 8px 0; color: var(--primary-color);">0,00 h</div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <!-- ANSICHT 2 -->
+    <!-- ANSICHT 2: KALENDER -->
     <div class="container" id="view-schulungen" style="display:none;">
         <h2>Wochenansicht <span id="schulungen-kw-label" style="font-size: 0.7em; color: #666; font-weight: normal;"></span></h2>
         
@@ -368,10 +410,11 @@
 
         function exportCloudBackup() {
             const backupData = {
-                version: 1,
+                version: 2,
                 exportDate: new Date().toISOString(),
                 voest_zeiten_kws: allTimes,
-                voest_schulungen_daten: trainings
+                voest_schulungen_daten: trainings,
+                voest_soll_stunden: localStorage.getItem('voest_soll_stunden') || "34,4"
             };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
             const downloadAnchor = document.createElement('a');
@@ -395,6 +438,10 @@
                         localStorage.setItem('voest_zeiten_kws', JSON.stringify(allTimes));
                         localStorage.setItem('voest_schulungen_daten', JSON.stringify(trainings));
                         
+                        if (backup.voest_soll_stunden) {
+                            localStorage.setItem('voest_soll_stunden', backup.voest_soll_stunden);
+                        }
+                        
                         onWeekChange();
                         renderTrainingList();
                         alert("Backup erfolgreich importiert und synchronisiert!");
@@ -416,6 +463,17 @@
             const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
             const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
             return d.getUTCFullYear() + '-W' + (weekNo < 10 ? '0' : '') + weekNo;
+        }
+
+        function getOffsetWeekString(weekStr, offsetDays) {
+            if (!weekStr) return null;
+            const [year, week] = weekStr.split('-W').map(Number);
+            const jan4 = new Date(year, 0, 4);
+            const dow = jan4.getDay() || 7;
+            const week1Start = new Date(year, 0, 4 - dow + 1);
+            const targetDate = new Date(week1Start);
+            targetDate.setDate(targetDate.getDate() + (week - 1) * 7 + offsetDays);
+            return getISOWeekString(targetDate);
         }
 
         function getDatesOfWeek(weekStr) {
@@ -518,10 +576,91 @@
             return h + ":" + (m < 10 ? "0" : "") + m;
         }
 
+        function parseInputToMin(str) {
+            if (!str) return 0;
+            str = str.replace(',', '.').trim();
+            let isNegative = str.startsWith('-');
+            if (isNegative) str = str.substring(1);
+            
+            let min = 0;
+            if (str.includes(':')) {
+                let parts = str.split(':');
+                let h = parseInt(parts[0], 10) || 0;
+                let m = parseInt(parts[1], 10) || 0;
+                min = h * 60 + m;
+            } else {
+                let val = parseFloat(str) || 0;
+                min = Math.round(val * 60);
+            }
+            return isNegative ? -min : min;
+        }
+
+        function formatMinToTimeStr(totalMins) {
+            if (isNaN(totalMins)) return "0:00";
+            let isNegative = totalMins < 0;
+            let absMins = Math.abs(totalMins);
+            let h = Math.floor(absMins / 60);
+            let m = absMins % 60;
+            return (isNegative ? "-" : "") + h + ":" + (m < 10 ? "0" : "") + m;
+        }
+
+        function formatMinToDecimalStr(totalMins) {
+            if (isNaN(totalMins)) return "0,00";
+            let dec = totalMins / 60;
+            let decStr = (totalMins > 0 ? "+" : "") + dec.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if(decStr === "-0,00") return "0,00";
+            return decStr;
+        }
+
+        function calcWeekTotalMin(weekDataObj) {
+            let total = 0;
+            for (let i = 0; i < 7; i++) {
+                let d = weekDataObj[i];
+                if(d) {
+                   let dayMin = toMin(d.g) - toMin(d.k);
+                   if(dayMin > 0) total += dayMin;
+                }
+            }
+            return total;
+        }
+
+        function loadZeiterfassung(weekStr) {
+            const weekData = allTimes[weekStr] || {};
+            for (let i = 0; i < 7; i++) {
+                const d = weekData[i] || {};
+                document.getElementById(`k-${i}`).value = d.k || '';
+                document.getElementById(`g-${i}`).value = d.g || '';
+            }
+            
+            let globalSoll = localStorage.getItem('voest_soll_stunden') || "34,4";
+            document.getElementById('soll-stunden').value = globalSoll;
+            
+            if (weekData.startSaldo !== undefined) {
+                document.getElementById('start-saldo').value = weekData.startSaldo;
+            } else {
+                let prevWeekStr = getOffsetWeekString(weekStr, -7);
+                let prevWeekData = allTimes[prevWeekStr];
+                
+                if (prevWeekData && prevWeekData.startSaldo !== undefined) {
+                    let prevIstMin = calcWeekTotalMin(prevWeekData);
+                    let prevSollMin = parseInputToMin(globalSoll); 
+                    let prevDiff = prevIstMin - prevSollMin;
+                    let prevEndSaldoMin = parseInputToMin(prevWeekData.startSaldo) + prevDiff;
+                    
+                    document.getElementById('start-saldo').value = formatMinToDecimalStr(prevEndSaldoMin).replace('+', '');
+                } else {
+                    document.getElementById('start-saldo').value = "0,00";
+                }
+            }
+            
+            calcAndSave();
+        }
+
         function calcAndSave() {
             const weekStr = document.getElementById('week-selector').value;
             let totalMin = 0;
-            const weekData = {};
+            const weekData = allTimes[weekStr] || {}; 
+            
             for (let i = 0; i < 7; i++) {
                 const k = document.getElementById(`k-${i}`).value;
                 const g = document.getElementById(`g-${i}`).value;
@@ -534,18 +673,29 @@
                 document.getElementById(`res-${i}`).innerText = toTimeStr(dayMin);
             }
             document.getElementById('wochensumme').innerText = toTimeStr(totalMin);
+            
+            let sollStr = document.getElementById('soll-stunden').value;
+            localStorage.setItem('voest_soll_stunden', sollStr);
+            
+            let startSaldoStr = document.getElementById('start-saldo').value;
+            weekData.startSaldo = startSaldoStr; 
+            
+            let sollMin = parseInputToMin(sollStr);
+            let diffMin = totalMin - sollMin;
+            
+            let wochenDiffEl = document.getElementById('wochen-differenz');
+            wochenDiffEl.innerHTML = `${formatMinToDecimalStr(diffMin)} h <span style="font-size:0.5em; color:#777; display:block; margin-top:2px;">(${formatMinToTimeStr(diffMin)} h)</span>`;
+            wochenDiffEl.style.color = diffMin >= 0 ? 'green' : 'red';
+            
+            let startSaldoMin = parseInputToMin(startSaldoStr);
+            let endSaldoMin = startSaldoMin + diffMin;
+            
+            let endSaldoEl = document.getElementById('end-saldo');
+            endSaldoEl.innerHTML = `${formatMinToDecimalStr(endSaldoMin)} h <span style="font-size:0.5em; color:#777; display:block; margin-top:2px;">(${formatMinToTimeStr(endSaldoMin)} h)</span>`;
+            endSaldoEl.style.color = endSaldoMin >= 0 ? 'var(--primary-color)' : 'red';
+            
             allTimes[weekStr] = weekData;
             localStorage.setItem('voest_zeiten_kws', JSON.stringify(allTimes));
-        }
-
-        function loadZeiterfassung(weekStr) {
-            const weekData = allTimes[weekStr] || {};
-            for (let i = 0; i < 7; i++) {
-                const d = weekData[i] || {};
-                document.getElementById(`k-${i}`).value = d.k || '';
-                document.getElementById(`g-${i}`).value = d.g || '';
-            }
-            calcAndSave();
         }
 
         function buildCalendarTable(dates) {
