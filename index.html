@@ -1049,33 +1049,33 @@ async function syncFromCloud() {
         const remoteDb = await response.json();
         
         if (remoteDb && remoteDb.users) {
-            // SICHERHEIT: Nur überschreiben, wenn die Cloud-Daten neuer sind 
-            // oder lokal keine neueren Einträge existieren
             const localUpdated = db.lastUpdated || 0;
             const remoteUpdated = remoteDb.lastUpdated || 0;
             
-            if (remoteUpdated >= localUpdated || !db.logs || Object.keys(db.logs).length === 0) {
+            // Nur überschreiben, wenn die Cloud-Daten neuer sind als unsere lokalen 
+            // ODER wenn wir lokal gar keine neueren Änderungen haben
+            if (remoteUpdated >= localUpdated) {
                 db = remoteDb;
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
+                renderAll();
             }
             
             if(statusDiv) { 
-                statusDiv.innerText = "● Sync erfolgreich"; 
+                statusDiv.innerText = "● Mit Cloud synchronisiert"; 
                 statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; 
             }
-            renderAll();
         }
     } catch (e) {
         console.error("Sync fehlgeschlagen:", e);
         if(statusDiv) { 
-            statusDiv.innerText = "● Nur lokal gespeichert (Cloud offline)"; 
+            statusDiv.innerText = "● Cloud offline (Nur lokale Ansicht)"; 
             statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; 
         }
     }
 }
 
 async function save() {
-    db.lastUpdated = Date.now();
+    db.lastUpdated = Date.now(); // Zeitstempel setzen, damit andere Clients wissen, dass das neu ist
     localStorage.setItem(DB_KEY, JSON.stringify(db));
     
     const statusDiv = document.getElementById('syncStatus');
@@ -1093,9 +1093,9 @@ async function save() {
         if(loginSync) { loginSync.innerText = "● Online (Verbunden)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
         return true;
     } catch(e) { 
-        console.error("Cloud-Sync blockiert oder fehlgeschlagen:", e);
-        if(statusDiv) { statusDiv.innerText = "● Nur lokal gespeichert"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
-        if(loginSync) { loginSync.innerText = "● Lokal gespeichert (Cloud offline)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
+        console.error("Cloud-Speichern fehlgeschlagen:", e);
+        if(statusDiv) { statusDiv.innerText = "● Speichern fehlgeschlagen!"; statusDiv.className = "text-[10px] font-bold text-red-600 uppercase"; }
+        if(loginSync) { loginSync.innerText = "● Speicherfehler (Cloud offline)"; loginSync.className = "text-[10px] font-bold text-red-600 uppercase text-center mb-6"; }
         return false;
     }
 }
