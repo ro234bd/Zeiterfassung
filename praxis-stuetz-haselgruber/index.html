@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.35"; 
+        const CURRENT_APP_VERSION = "4.36"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -1042,6 +1042,27 @@ async function init() {
 
 async function syncFromCloud() {
     const statusDiv = document.getElementById('syncStatus');
+    const loginSync = document.getElementById('loginSyncStatus');
+    
+    // 1. KLICKSPERRE AKTIVIEREN (Blockiert alle Buttons sofort)
+    document.body.style.pointerEvents = 'none';
+    
+    // Optisches Feedback (Bildschirm wird grau/blass), damit User sieht: Er muss warten
+    const appContainer = document.getElementById('appContainer');
+    if (appContainer && !appContainer.classList.contains('hidden')) {
+        appContainer.style.opacity = '0.5'; 
+        appContainer.style.filter = 'grayscale(50%)';
+    }
+    
+    if(statusDiv) { 
+        statusDiv.innerText = "⏳ Lade Live-Daten... Bitte warten"; 
+        statusDiv.className = "text-[10px] font-bold text-blue-600 uppercase"; 
+    }
+    if(loginSync) { 
+        loginSync.innerText = "⏳ Verbinde mit Cloud..."; 
+        loginSync.className = "text-[10px] font-bold text-blue-600 uppercase text-center mb-6"; 
+    }
+
     try {
         console.log("🔄 Starte Cloud-Abruf...");
         const response = await fetch(CLOUD_URL + "?t=" + Date.now());
@@ -1065,11 +1086,26 @@ async function syncFromCloud() {
             statusDiv.innerText = "● Mit Cloud synchronisiert"; 
             statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; 
         }
+        if(loginSync) { 
+            loginSync.innerText = "● Bereit zum Start"; 
+            loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; 
+        }
     } catch (e) {
         console.error("❌ Sync-Fehler im Detail:", e);
         if(statusDiv) { 
             statusDiv.innerText = "● Cloud-Fehler (Siehe Konsole)"; 
             statusDiv.className = "text-[10px] font-bold text-red-600 uppercase"; 
+        }
+        if(loginSync) { 
+            loginSync.innerText = "● Offline / Fehler"; 
+            loginSync.className = "text-[10px] font-bold text-red-600 uppercase text-center mb-6"; 
+        }
+    } finally {
+        // 2. KLICKSPERRE IMMER AUFHEBEN (Egal ob erfolgreich oder Fehler)
+        document.body.style.pointerEvents = 'auto';
+        if (appContainer) {
+            appContainer.style.opacity = '1';
+            appContainer.style.filter = 'none';
         }
     }
 }
