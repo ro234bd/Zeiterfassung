@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // HIER IMMER DIE AKTUELLE VERSION EINTRAGEN!
-        const CURRENT_APP_VERSION = "4.35"; 
+        const CURRENT_APP_VERSION = "4.37"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -1042,6 +1042,27 @@ async function init() {
 
 async function syncFromCloud() {
     const statusDiv = document.getElementById('syncStatus');
+    const loginSync = document.getElementById('loginSyncStatus');
+    
+    // 1. KLICKSPERRE AKTIVIEREN (Blockiert alle Buttons sofort)
+    document.body.style.pointerEvents = 'none';
+    
+    // Optisches Feedback (Bildschirm wird grau/blass), damit User sieht: Er muss warten
+    const appContainer = document.getElementById('appContainer');
+    if (appContainer && !appContainer.classList.contains('hidden')) {
+        appContainer.style.opacity = '0.5'; 
+        appContainer.style.filter = 'grayscale(50%)';
+    }
+    
+    if(statusDiv) { 
+        statusDiv.innerText = "⏳ Lade Live-Daten... Bitte warten"; 
+        statusDiv.className = "text-[10px] font-bold text-blue-600 uppercase"; 
+    }
+    if(loginSync) { 
+        loginSync.innerText = "⏳ Verbinde mit Cloud..."; 
+        loginSync.className = "text-[10px] font-bold text-blue-600 uppercase text-center mb-6"; 
+    }
+
     try {
         console.log("🔄 Starte Cloud-Abruf...");
         const response = await fetch(CLOUD_URL + "?t=" + Date.now());
@@ -1065,11 +1086,26 @@ async function syncFromCloud() {
             statusDiv.innerText = "● Mit Cloud synchronisiert"; 
             statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; 
         }
+        if(loginSync) { 
+            loginSync.innerText = "● Bereit zum Start"; 
+            loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; 
+        }
     } catch (e) {
         console.error("❌ Sync-Fehler im Detail:", e);
         if(statusDiv) { 
             statusDiv.innerText = "● Cloud-Fehler (Siehe Konsole)"; 
             statusDiv.className = "text-[10px] font-bold text-red-600 uppercase"; 
+        }
+        if(loginSync) { 
+            loginSync.innerText = "● Offline / Fehler"; 
+            loginSync.className = "text-[10px] font-bold text-red-600 uppercase text-center mb-6"; 
+        }
+    } finally {
+        // 2. KLICKSPERRE IMMER AUFHEBEN (Egal ob erfolgreich oder Fehler)
+        document.body.style.pointerEvents = 'auto';
+        if (appContainer) {
+            appContainer.style.opacity = '1';
+            appContainer.style.filter = 'none';
         }
     }
 }
@@ -1459,30 +1495,78 @@ async function forceSave() {
 
 // +++ DIE REPARIERTE SPEICHERN FUNKTION +++
 async function save() {
-    db.lastUpdated = Date.now();
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
-    
     const statusDiv = document.getElementById('syncStatus');
     const loginSync = document.getElementById('loginSyncStatus');
+    
+    // 1. VISUELLE SPERRE (Nichts kann mehr doppelt geklickt werden)
+    document.body.style.pointerEvents = 'none';
+    document.body.style.opacity = '0.7';
 
     try {
-        // HIER IST DER MAGISCHE FIX: mode: 'no-cors' UND action: "save"
+        // 2. DAS ZEITSTEMPEL-RADAR (Schützt vor offenen "Ghost-Tabs"!)
+        if (loggedInUser === "Admin") {
+            if(statusDiv) { statusDiv.innerText = "🔍 Prüfe Sicherheit..."; }
+            
+            // Holt in Millisekunden das Alter der Cloud ab
+            const checkRes = await fetch(CLOUD_URL + "?t=" + Date.now());
+            if (checkRes.ok) {
+                const checkDb = JSON.parse(await checkRes.text());
+                
+                // FATALER VERGLEICH: Ist die Cloud neuer als unser Tab?
+                if (checkDb.lastUpdated && db.lastUpdated && checkDb.lastUpdated > db.lastUpdated) {
+                    alert("⚠️ STOPP!\n\nJemand anderes hat in der Zwischenzeit Daten gespeichert! (Die Cloud ist neuer als dein aktueller Bildschirm).\n\nUm zu verhindern, dass du Daten löschst, wurde das Speichern BLOCKIERT.\n\nBitte drücke jetzt F5 zum Aktualisieren!");
+                    document.body.style.pointerEvents = 'auto';
+                    document.body.style.opacity = '1';
+                    return false; // Bricht das Speichern sofort ab!
+                }
+            }
+        }
+
+        // Wenn wir hier sind, ist der Tab aktuell und sicher!
+        db.lastUpdated = Date.now();
+        localStorage.setItem(DB_KEY, JSON.stringify(db));
+        
+        if(statusDiv) { 
+            statusDiv.innerText = "⏳ Speichere in Cloud..."; 
+            statusDiv.className = "text-[10px] font-bold text-blue-600 uppercase"; 
+        }
+
+        // 3. DAS NEUE GEHEIM-PASSWORT FÜR DIE CLOUD ("Admin_V2")
+        let senderId = currentUser;
+        if (loggedInUser === "Admin") {
+            senderId = "Admin_V2";
+        }
+
         await fetch(CLOUD_URL, { 
             method: 'POST',
             mode: 'no-cors', 
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: "save", sender: currentUser, db: db }) 
+            body: JSON.stringify({ action: "save", sender: senderId, db: db }) 
         });
         
-        // Da 'no-cors' dem Browser verbietet, die Antwort des Servers zu lesen (JSON),
-        // werten wir den Aufruf als Erfolg, solange fetch() keinen echten Netzwerkfehler wirft.
-        if(statusDiv) { statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; }
-        if(loginSync) { loginSync.innerText = "● Online (Verbunden)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
+        // Zwangspause für Google Sheets
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        if(statusDiv) { 
+            statusDiv.innerText = "● Cloud synchronisiert"; 
+            statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; 
+        }
+        if(loginSync) { 
+            loginSync.innerText = "● Online (Verbunden)"; 
+            loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; 
+        }
+        
+        document.body.style.pointerEvents = 'auto';
+        document.body.style.opacity = '1';
         return true;
+
     } catch(e) { 
-        console.error("Cloud-Sync blockiert oder fehlgeschlagen:", e);
-        if(statusDiv) { statusDiv.innerText = "● Nur lokal gespeichert"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
-        if(loginSync) { loginSync.innerText = "● Lokal gespeichert (Cloud offline)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
+        document.body.style.pointerEvents = 'auto';
+        document.body.style.opacity = '1';
+        if(statusDiv) { 
+            statusDiv.innerText = "● Nur lokal gespeichert (Cloud offline)"; 
+            statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; 
+        }
         return false;
     }
 }
