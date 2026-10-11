@@ -1514,7 +1514,7 @@ async function save() {
                 
                 // FATALER VERGLEICH: Ist die Cloud neuer als unser Tab?
                 if (checkDb.lastUpdated && db.lastUpdated && checkDb.lastUpdated > db.lastUpdated) {
-                    alert("⚠️ STOPP!\n\nJemand anderes hat in der Zwischenzeit Daten gespeichert! (Die Cloud ist neuer als dein aktueller Bildschirm).\n\nUm zu verhindern, dass du Daten löschst, wurde das Speichern BLOCKIERT.\n\nBitte drücke jetzt F5 zum Aktualisieren!");
+                    alert("⚠️ STOPP!\n\nJemand anderes hat in der Zwischenzeit Daten gespeichert! (Die Cloud ist neuer als dein aktueller Bildschirm).\n\nUm zu verhindern, dass du Daten löschst, wurde das Speichern BLOCKIERT.\n\nBitte drücke jetzt F5 (am PC) oder aktualisiere die Seite (nach unten wischen am Mobiltelefon)!");
                     document.body.style.pointerEvents = 'auto';
                     document.body.style.opacity = '1';
                     return false; // Bricht das Speichern sofort ab!
