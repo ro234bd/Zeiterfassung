@@ -10,7 +10,7 @@
     <meta http-equiv="Expires" content="0">
     <script>
         // VERSION 4.34 - Funktionsupdate Chirurgie
-        const CURRENT_APP_VERSION = "4.34"; 
+        const CURRENT_APP_VERSION = "4.37"; 
         
         const savedAppVersion = localStorage.getItem("ze_system_version");
         if (savedAppVersion !== CURRENT_APP_VERSION) {
@@ -1043,38 +1043,50 @@ async function init() {
 }
 
 // ----------------------------------------------------
-// NEUE SYNC-FUNKTION (Kollisionsschutz)
+// NEUE SYNC-FUNKTION (Kollisionsschutz & Klicksperre)
 // ----------------------------------------------------
 async function syncFromCloud() {
     const statusDiv = document.getElementById('syncStatus');
+    const loginSync = document.getElementById('loginSyncStatus');
+    
+    // 1. KLICKSPERRE AKTIVIEREN
+    document.body.style.pointerEvents = 'none';
+    const appContainer = document.getElementById('appContainer');
+    if (appContainer && !appContainer.classList.contains('hidden')) {
+        appContainer.style.opacity = '0.5'; 
+        appContainer.style.filter = 'grayscale(50%)';
+    }
+    
+    if(statusDiv) { 
+        statusDiv.innerText = "⏳ Lade Live-Daten... Bitte warten"; 
+        statusDiv.className = "text-[10px] font-bold text-blue-600 uppercase"; 
+    }
+    if(loginSync) { 
+        loginSync.innerText = "⏳ Verbinde mit Cloud..."; 
+        loginSync.className = "text-[10px] font-bold text-blue-600 uppercase text-center mb-6"; 
+    }
+
     try {
         const response = await fetch(CLOUD_URL + "?t=" + Date.now());
         if (!response.ok) throw new Error("Cloud nicht erreichbar");
         
-        const remoteDb = await response.json();
+        const textData = await response.text();
+        const remoteDb = JSON.parse(textData);
         
         if (remoteDb && remoteDb.users) {
-            // Lokale Daten abrufen zum Abgleich
-            const localDbText = localStorage.getItem(DB_KEY);
-            const localDb = localDbText ? JSON.parse(localDbText) : {};
-            
-            // NEU: Zeitstempel abgleichen! Verhindert das Überschreiben durch veraltete Cloud-Daten
-            if (localDb.lastUpdated && remoteDb.lastUpdated && localDb.lastUpdated > remoteDb.lastUpdated) {
-                console.log("Lokale Daten sind neuer! Cloud-Sync wird übersprungen und Cloud aktualisiert.");
-                db = localDb;
-                if (!db.settings) db.settings = {};
-                save(); // Lokale (neuere) Daten in die Cloud pushen
-            } else {
-                db = remoteDb;
-                if (!db.settings) db.settings = {};
-                localStorage.setItem(DB_KEY, JSON.stringify(db));
-            }
-            
-            if(statusDiv) { 
-                statusDiv.innerText = "● Sync erfolgreich"; 
-                statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; 
-            }
+            db = remoteDb;
+            if (!db.settings) db.settings = {};
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
             renderAll();
+        }
+        
+        if(statusDiv) { 
+            statusDiv.innerText = "● Sync erfolgreich"; 
+            statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; 
+        }
+        if(loginSync) { 
+            loginSync.innerText = "● Bereit zum Start"; 
+            loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; 
         }
     } catch (e) {
         console.error("Sync fehlgeschlagen:", e);
@@ -1082,19 +1094,63 @@ async function syncFromCloud() {
             statusDiv.innerText = "● Sync Fehler"; 
             statusDiv.className = "text-[10px] font-bold text-red-600 uppercase"; 
         }
+        if(loginSync) { 
+            loginSync.innerText = "● Offline / Fehler"; 
+            loginSync.className = "text-[10px] font-bold text-red-600 uppercase text-center mb-6"; 
+        }
+    } finally {
+        // 2. KLICKSPERRE AUFHEBEN
+        document.body.style.pointerEvents = 'auto';
+        if (appContainer) {
+            appContainer.style.opacity = '1';
+            appContainer.style.filter = 'none';
+        }
     }
 }
 
 async function save() {
-    db.lastUpdated = Date.now();
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
-    
     const statusDiv = document.getElementById('syncStatus');
     const loginSync = document.getElementById('loginSyncStatus');
+    
+    // 1. VISUELLE SPERRE
+    document.body.style.pointerEvents = 'none';
+    document.body.style.opacity = '0.7';
 
     try {
-        const actualSender = (loggedInUser === "Admin") ? "Admin" : currentUser;
-        const dataToSend = { action: "full_sync", sender: actualSender, payload: db };
+        // 2. DAS ZEITSTEMPEL-RADAR (Schützt vor offenen "Ghost-Tabs"!)
+        if (loggedInUser === "Admin") {
+            if(statusDiv) { statusDiv.innerText = "🔍 Prüfe Sicherheit..."; }
+            
+            const checkRes = await fetch(CLOUD_URL + "?t=" + Date.now());
+            if (checkRes.ok) {
+                const checkDbText = await checkRes.text();
+                const checkDb = JSON.parse(checkDbText);
+                
+                if (checkDb.lastUpdated && db.lastUpdated && checkDb.lastUpdated > db.lastUpdated) {
+                    alert("⚠️ STOPP!\n\nJemand anderes hat in der Zwischenzeit Daten gespeichert! (Die Cloud ist neuer als dein aktueller Bildschirm).\n\nUm zu verhindern, dass du Daten überschreibst, wurde das Speichern BLOCKIERT.\n\nBitte aktualisiere jetzt die Seite (Am PC mit der Taste F5 und am Mobiltelefon nach unten wischen)!");
+                    document.body.style.pointerEvents = 'auto';
+                    document.body.style.opacity = '1';
+                    return false; 
+                }
+            }
+        }
+
+        // Wenn wir hier sind, ist der Tab aktuell und sicher!
+        db.lastUpdated = Date.now();
+        localStorage.setItem(DB_KEY, JSON.stringify(db));
+        
+        if(statusDiv) { 
+            statusDiv.innerText = "⏳ Speichere in Cloud..."; 
+            statusDiv.className = "text-[10px] font-bold text-blue-600 uppercase"; 
+        }
+
+        // 3. DAS NEUE GEHEIM-PASSWORT FÜR DIE CLOUD ("Admin_V2")
+        let senderId = currentUser;
+        if (loggedInUser === "Admin") {
+            senderId = "Admin_V2";
+        }
+
+        const dataToSend = { action: "full_sync", sender: senderId, payload: db };
 
         const response = await fetch(CLOUD_URL, { 
             method: 'POST',
@@ -1102,18 +1158,26 @@ async function save() {
         });
         
         if(response.ok) {
-            const result = await response.json();
+            const resultText = await response.text();
+            const result = JSON.parse(resultText);
+            
             if(result && result.users) {
                 db = result;
                 localStorage.setItem(DB_KEY, JSON.stringify(db));
             }
             if(statusDiv) { statusDiv.innerText = "● Cloud synchronisiert"; statusDiv.className = "text-[10px] font-bold text-emerald-600 uppercase"; }
             if(loginSync) { loginSync.innerText = "● Online (Verbunden)"; loginSync.className = "text-[10px] font-bold text-emerald-600 uppercase text-center mb-6"; }
+            
+            document.body.style.pointerEvents = 'auto';
+            document.body.style.opacity = '1';
             return true;
         }
         throw new Error("Cloud Fehler");
+
     } catch(e) { 
         console.error("Cloud-Sync fehlgeschlagen:", e);
+        document.body.style.pointerEvents = 'auto';
+        document.body.style.opacity = '1';
         if(statusDiv) { statusDiv.innerText = "● Nur lokal gespeichert (Cloud offline)"; statusDiv.className = "text-[10px] font-bold text-amber-600 uppercase"; }
         if(loginSync) { loginSync.innerText = "● Lokal gespeichert (Cloud offline)"; loginSync.className = "text-[10px] font-bold text-amber-600 uppercase text-center mb-6"; }
         return false;
